@@ -1,9 +1,6 @@
 #pragma once
-
 #include <vector>
-#include <iterator>
-#include <numeric>
-#include <algorithm>
+#include <iostream>
 
 typedef std::vector<int> Mon;  // ordered
 typedef std::vector<Mon> Poly;  // ordered
@@ -15,7 +12,7 @@ Poly operator^(Poly& lhs, Poly& rhs);
 
 int deg(Mon& m);
 int deg(Poly& p);
-void Simplify(Relations& rels, Poly& poly);
-void AddRel(Relations& rels, Poly& rel);
+void simplify(Relations& rels, Poly& poly);
+void add_rel(Relations& rels, Poly& rel);
 
 void test();
