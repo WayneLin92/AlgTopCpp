@@ -18,7 +18,10 @@
     <ClCompile Include="main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="mymath.cpp">
+    <ClCompile Include="algmod2.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="groebner.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

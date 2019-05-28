@@ -151,8 +151,9 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="groebner.cpp" />
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="mymath.cpp" />
+    <ClCompile Include="algmod2.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="mymath.h" />
