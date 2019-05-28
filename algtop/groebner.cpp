@@ -4,8 +4,8 @@ bool compare(const Poly& poly1, const Poly& poly2) { return deg(poly1) < deg(pol
 
 bool gcd_nonzero(const Mon& m1, const Mon& m2)
 {
-	unsigned int len = std::min(m1.size(), m2.size());
-	for (unsigned int i = 0; i < len; i++)
+	size_t len = std::min(m1.size(), m2.size());
+	for (size_t i = 0; i < len; i++)
 		if (m1[i] || m2[i])
 			return true;
 	return false;

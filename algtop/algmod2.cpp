@@ -60,7 +60,7 @@ Poly& operator+=(Poly& poly1, const Poly& poly2)
 Mon operator*(const Mon& m1, const Mon& m2)
 {
 	Mon result;
-	unsigned int i;
+	size_t i;
 	if (m1.size() <= m2.size()) {
 		for (i = 0; i < m1.size(); i++)
 			result.push_back(m1[i] + m2[i]);
@@ -77,18 +77,18 @@ Mon operator*(const Mon& m1, const Mon& m2)
 Mon operator/(const Mon& m1, const Mon& m2) // assume m2 divides m1
 {
 	Mon result = m1;
-	for (unsigned int i = 0; i < m2.size(); i++) {
+	for (size_t i = 0; i < m2.size(); i++) {
 		result[i] -= m2[i];
 	}
-	int i;
-	for (i = result.size() - 1; i >= 0 && result[i] == 0; i--);
-	result.resize(i + 1);
+	size_t i;
+	for (i = result.size(); i > 0 && result[i - 1] == 0; i--);
+	result.resize(i);
 	return result;
 }
 
 Mon& operator*=(Mon& m1, const Mon& m2)
 {
-	unsigned int i;
+	size_t i;
 	if (m1.size() <= m2.size()) {
 		for (i = 0; i < m1.size(); i++)
 			m1[i] += m2[i];
@@ -113,7 +113,7 @@ Poly operator*(const Poly& poly, const Mon& mon)
 bool divides(const Mon& m1, const Mon& m2)
 {
 	if (m1.size() <= m2.size()) {
-		for (unsigned int i = 0; i < m1.size(); i++)
+		for (size_t i = 0; i < m1.size(); i++)
 			if (m1[i] > m2[i])
 				return false;
 		return true;
@@ -124,8 +124,8 @@ bool divides(const Mon& m1, const Mon& m2)
 Mon gcd(const Mon& m1, const Mon& m2)
 {
 	Mon result;
-	unsigned int len = std::min(m1.size(), m2.size());
-	for (unsigned int i = 0; i < len; i++)
+	size_t len = std::min(m1.size(), m2.size());
+	for (size_t i = 0; i < len; i++)
 		result.push_back(std::min(m1[i], m2[i]));
 	return result;
 }
@@ -159,7 +159,7 @@ log_mon_t log_mon(const Mon& m1, const Mon& m2) // assume m2 divides m1 and m2 !
 	}
 	for (unsigned int i = 0; i < m2.size(); i++)
 		r[i] -= m2[i] * q;
-	int i;
+	size_t i;
 	for (i = r.size() - 1; i >= 0 && r[i] == 0; i--);
 	r.resize(i + 1);
 	log_mon_t result = { q, r };
