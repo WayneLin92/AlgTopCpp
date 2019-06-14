@@ -1,21 +1,18 @@
 #include "mymath.h"
 
-bool compare(const Poly& poly1, const Poly& poly2) { return deg(poly1) < deg(poly2); }
-
 bool gcd_nonzero(const Mon& m1, const Mon& m2)
 {
 	size_t len = std::min(m1.size(), m2.size());
-	for (size_t i = 0; i < len; i++)
-		if (m1[i] || m2[i])
+	for (size_t i = 0; i < len; ++i)
+		if (m1[i] && m2[i])
 			return true;
 	return false;
 }
 
-Poly& simplify(const Relations& rels, Poly& poly)
+Poly& simplify(Poly& poly, const Relations& rels)
 {
 	Poly result;
-	auto pbegin = poly.begin();
-	auto pend = poly.end();
+	auto pbegin = poly.begin(); auto pend = poly.end();
 	while (pbegin != pend) {
 		bool irreducible = true;
 		for (const Poly& rel : rels) {
@@ -26,31 +23,40 @@ Poly& simplify(const Relations& rels, Poly& poly)
 				std::set_symmetric_difference(pbegin, pend, rel1.begin(), rel1.end(),
 					std::back_inserter(tmp), std::greater<Mon>());
 				poly = std::move(tmp);
-				pbegin = poly.begin();
-				pend = poly.end();
+				pbegin = poly.begin(); pend = poly.end();
 				irreducible = false;
 				break;
 			}
 		}
 		if (irreducible) {
 			result.push_back(std::move(*pbegin));
-			pbegin++;
+			++pbegin;
 		}
 	}
 	poly = std::move(result);
 	return poly;
 }
 
-void add_rel(Relations& rels, const Poly& rel)
+struct rel_heap_t {
+	Poly poly;
+	int deg;
+};
+
+inline bool compare(const rel_heap_t& s1, const rel_heap_t& s2) { return s1.deg > s2.deg; }
+
+void add_rel(const Poly& rel, Relations& rels, std::vector<int>* pgen_degs)
 {
 	if (rel.empty())
 		return;
-	Relations heap = { rel };
+	std::vector<rel_heap_t> heap = { rel_heap_t{rel, pgen_degs == NULL ? 
+		deg(rel) : deg(rel, *pgen_degs)} };
 	while (!heap.empty()) {
 		std::pop_heap(heap.begin(), heap.end(), compare);
-		Poly r = std::move(heap.back());
+		rel_heap_t heap_ele = std::move(heap.back());
 		heap.pop_back();
-		simplify(rels, r);
+
+		Poly& r = heap_ele.poly;
+		simplify(r, rels);
 		if (!r.empty()) {
 			for (Poly& r1 : rels) {
 				if (gcd_nonzero(r[0], r1[0])) {
@@ -61,26 +67,22 @@ void add_rel(Relations& rels, const Poly& rel)
 						Mon q = mlcm / r[0];
 						Mon q1 = mlcm / r1[0];
 						Poly new_rel = r * q + r1 * q1;
-						if (!new_rel.empty()) {
-							heap.push_back(std::move(new_rel));
-							std::push_heap(heap.begin(), heap.end(), compare);
-						}
+
+						heap.push_back(rel_heap_t{ new_rel, pgen_degs == NULL ? 
+							deg(mlcm) : deg(mlcm, *pgen_degs) });
+						std::push_heap(heap.begin(), heap.end(), compare);
 					}
 				}
 			}
 			rels.erase(std::remove(rels.begin(), rels.end(), Poly()), rels.end());
-			rels.push_back(r);
+			rels.push_back(std::move(r));
 		}
 	}
 }
 
 void test()
 {
-	Poly rel1 = { {10}, {7, 3} };
-	Poly rel2 = { {7, 4}, {2, 9} };
-	Relations rels;
-	add_rel(rels, rel1);
-	add_rel(rels, rel2);
-	for (auto r : rels)
-		std::cout << r << std::endl;
+	Mon m1 = { 1, 0, 1 };
+	Mon m2 = { 0, 1, 0 };
+	std::cout << gcd_nonzero(m1, m2) << std::endl;
 }
