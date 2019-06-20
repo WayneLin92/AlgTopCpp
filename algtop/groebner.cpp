@@ -1,5 +1,45 @@
 #include "mymath.h"
 
+Polys::const_iterator GroebnerBasis::reduce(const Mon mon) const // todo: improve
+{// Return the pointer of r in m_rels if r[0] | mon otherwise return m_rels::end();
+	Polys::const_iterator p_rel = m_rels.begin();
+	for (; p_rel != m_rels.end(); ++p_rel)
+		if (divides((*p_rel)[0], mon))
+			return p_rel;
+	return p_rel;
+}
+
+Poly& GroebnerBasis::simplify(Poly& poly) const
+{
+	Poly result;
+	auto pbegin = poly.begin(); auto pend = poly.end();
+	while (pbegin != pend) {
+		auto p_rel = reduce(*pbegin);
+		if (p_rel == m_rels.end())
+			result.push_back(std::move(*pbegin++));
+		else {
+			const Poly& rel = *p_rel;
+			Mon q = *pbegin / rel[0];
+			Poly rel1 = rel * q; // TODO: improve
+			Poly tmp;
+			std::set_symmetric_difference(pbegin, pend, rel1.begin(), rel1.end(),
+				std::back_inserter(tmp), std::greater<Mon>());
+			poly = std::move(tmp);
+			pbegin = poly.begin(); pend = poly.end();
+		}
+	}
+	poly = std::move(result);
+	return poly;
+}
+
+
+struct rel_heap_t {
+	Poly poly;
+	int deg;
+};
+
+inline bool compare(const rel_heap_t& s1, const rel_heap_t& s2) { return s1.deg > s2.deg; }
+
 bool gcd_nonzero(const Mon& m1, const Mon& m2)
 {
 	size_t len = std::min(m1.size(), m2.size());
@@ -9,42 +49,7 @@ bool gcd_nonzero(const Mon& m1, const Mon& m2)
 	return false;
 }
 
-Poly& simplify(Poly& poly, const Relations& rels)
-{
-	Poly result;
-	auto pbegin = poly.begin(); auto pend = poly.end();
-	while (pbegin != pend) {
-		bool irreducible = true;
-		for (const Poly& rel : rels) {
-			if (divides(rel[0], *pbegin)) {
-				Mon q = *pbegin / rel[0];
-				Poly rel1 = rel * q; // TODO: improve
-				Poly tmp;
-				std::set_symmetric_difference(pbegin, pend, rel1.begin(), rel1.end(),
-					std::back_inserter(tmp), std::greater<Mon>());
-				poly = std::move(tmp);
-				pbegin = poly.begin(); pend = poly.end();
-				irreducible = false;
-				break;
-			}
-		}
-		if (irreducible) {
-			result.push_back(std::move(*pbegin));
-			++pbegin;
-		}
-	}
-	poly = std::move(result);
-	return poly;
-}
-
-struct rel_heap_t {
-	Poly poly;
-	int deg;
-};
-
-inline bool compare(const rel_heap_t& s1, const rel_heap_t& s2) { return s1.deg > s2.deg; }
-
-void add_rel(const Poly& rel, Relations& rels, std::vector<int>* pgen_degs)
+void GroebnerBasis::add_rel(const Poly& rel, const std::vector<int>* pgen_degs)
 {
 	if (rel.empty())
 		return;
@@ -56,9 +61,9 @@ void add_rel(const Poly& rel, Relations& rels, std::vector<int>* pgen_degs)
 		heap.pop_back();
 
 		Poly& r = heap_ele.poly;
-		simplify(r, rels);
+		simplify(r);
 		if (!r.empty()) {
-			for (Poly& r1 : rels) {
+			for (Poly& r1 : m_rels) {
 				if (gcd_nonzero(r[0], r1[0])) {
 					if (divides(r[0], r1[0]))
 						r1.clear();
@@ -74,15 +79,15 @@ void add_rel(const Poly& rel, Relations& rels, std::vector<int>* pgen_degs)
 					}
 				}
 			}
-			rels.erase(std::remove(rels.begin(), rels.end(), Poly()), rels.end());
-			rels.push_back(std::move(r));
+			m_rels.erase(std::remove_if(m_rels.begin(), m_rels.end(), [](const Poly& p) {return p.empty(); }), m_rels.end());
+			m_rels.push_back(std::move(r));
 		}
 	}
 }
 
 void test()
 {
-	Mon m1 = { 1, 0, 1 };
-	Mon m2 = { 0, 1, 0 };
-	std::cout << gcd_nonzero(m1, m2) << std::endl;
+	int a = 1, b = 2;
+	a = std::move(b);
+	std::cout << a << b << std::endl;
 }
