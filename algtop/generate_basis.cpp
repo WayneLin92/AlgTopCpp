@@ -125,36 +125,34 @@ void load_basis(sqlite3* conn, const char* table_name, std::vector<BasisMon>& ba
 	sqlite3_finalize(stmt);
 }
 
-/* last_mon_id[t] is the largest rowid of monomials in degree t */
-void load_mon_indices(sqlite3* conn, const char* table_name, std::vector<int>& last_mon_id)
+/* num_mons[t] is the number of monomials up to degree t */
+void load_mon_indices(sqlite3* conn, const char* table_name, std::vector<int>& num_mons)
 {
 	sqlite3_stmt* stmt;
-	std::string cmd = std::string("SELECT t, num_mons FROM ") + table_name + ";";
+	std::string cmd = std::string("SELECT t, MAX(mon_id) + 1 FROM ") + table_name + " GROUP BY t ORDER BY t;";
 	sqlite3_prepare_v2(conn, cmd.c_str(), cmd.length() + 1, &stmt, NULL);
 	while (sqlite3_step(stmt) == SQLITE_ROW) {
-		if (sqlite3_column_int(stmt, 0) != last_mon_id.size()) {
-			std::cout << "Error: wrong value of t in TABLE " << table_name << '\n';
-			throw 1;
-		}
-		last_mon_id.emplace_back(sqlite3_column_int(stmt, 1));
+		int t = sqlite3_column_int(stmt, 0);
+		int index = sqlite3_column_int(stmt, 1);
+		int t1 = num_mons.size();
+		if (t > t1)
+			num_mons.resize(t, t1 > 0 ? num_mons[t1 - 1] : 0);
+		num_mons.push_back(index);
 	}
 	sqlite3_finalize(stmt);
 }
 
-void generate_basis(sqlite3* conn, const char* table_name_basis, const char* table_name_indices,
-	const std::vector<Generator>& generators, const std::vector<std::vector<std::vector<int>>>& leadings, int t_max)
+void generate_basis(sqlite3* conn, const char* table_name_basis, const std::vector<Generator>& generators, 
+	const std::vector<std::vector<std::vector<int>>>& leadings, int t_max)
 {
 	/* Compile SQL statements */
-	sqlite3_stmt* stmt_insert_index;
-	std::string cmd_insert_index = std::string("INSERT INTO ") + table_name_indices + " (t, num_mons) VALUES (?1, ?2);";
-	sqlite3_prepare_v2(conn, cmd_insert_index.c_str(), cmd_insert_index.length() + 1, &stmt_insert_index, NULL);
 	sqlite3_stmt* stmt_update_basis;
 	std::string cmd_update_basis = std::string("INSERT INTO ") + table_name_basis + " (mon, s, t, v) VALUES (?1, ?2, ?3, ?4);";
 	sqlite3_prepare_v2(conn, cmd_update_basis.c_str(), cmd_update_basis.length() + 1, &stmt_update_basis, NULL);
 
 	/* Load the basis and indices. num_mons[t] is the number of monomials in degree <= t. */
 	std::vector<int> num_mons;
-	load_mon_indices(conn, table_name_indices, num_mons);
+	load_mon_indices(conn, table_name_basis, num_mons);
 	std::vector<BasisMon> basis;
 	load_basis(conn, table_name_basis, basis);
 
@@ -164,16 +162,12 @@ void generate_basis(sqlite3* conn, const char* table_name_basis, const char* tab
 		t = basis[basis.size() - 1].t + 1;
 	else {
 		/* If no monomial present insert the unit.*/
-		std::string cmd = std::string("INSERT INTO ") + table_name_basis + " (mon_id, mon, s, t, v) VALUES (0, \"\", 0, 0, 0);";
-		execute_cmd(conn, cmd.c_str());
-		sqlite3_bind_int(stmt_insert_index, 1, 0);
-		sqlite3_bind_int(stmt_insert_index, 2, 1);
-		sqlite3_step(stmt_insert_index);
-		sqlite3_reset(stmt_insert_index);
-
 		basis.push_back(BasisMon(std::vector<int>(), 0, 0, 0));
 		num_mons.push_back(1);
 		t = 1;
+
+		std::string cmd = std::string("INSERT INTO ") + table_name_basis + " (mon_id, mon, s, t, v) VALUES (0, \"\", 0, 0, 0);";
+		execute_cmd(conn, cmd.c_str());
 	}
 
 	/* Add new basis */
@@ -213,14 +207,8 @@ void generate_basis(sqlite3* conn, const char* table_name_basis, const char* tab
 			sqlite3_step(stmt_update_basis);
 			sqlite3_reset(stmt_update_basis);
 		}
-		/* Insert the size of basis up to degree t into the database */
-		sqlite3_bind_int(stmt_insert_index, 1, t);
-		sqlite3_bind_int(stmt_insert_index, 2, basis.size());
-		sqlite3_step(stmt_insert_index);
-		sqlite3_reset(stmt_insert_index);
 		execute_cmd(conn, "END TRANSACTION");
 	}
-	sqlite3_finalize(stmt_insert_index);
 	sqlite3_finalize(stmt_update_basis);
 }
 
@@ -235,7 +223,7 @@ int main_sqlite(int argc, char** argv)
 	std::vector<std::vector<std::vector<int>>> leadings;
 	load_leading_terms(conn, "E2_relations", leadings);
 
-	generate_basis(conn, "E2_basis", "E2_basis_indices", generators, leadings, 200);
+	generate_basis(conn, "tmp", generators, leadings, 30);
 
 	sqlite3_close(conn);
 	return 0;
