@@ -1,5 +1,9 @@
 #include "myparser.h"
 
+/*
+** Consume and ignore string `pattern` from istream. 
+** Set badbit error if pattern is not matched.
+*/
 void consume(std::istream& sin, const char* pattern)
 {
 	size_t i;

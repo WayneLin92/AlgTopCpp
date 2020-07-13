@@ -1,20 +1,11 @@
 #include "mymath.h"
 
-Polys::const_iterator GroebnerBasis::reduce(const Mon mon) const // todo: improve
-{// Return the pointer of r in m_rels if r[0] | mon otherwise return m_rels::end();
-	Polys::const_iterator p_rel = m_rels.begin();
-	for (; p_rel != m_rels.end(); ++p_rel)
-		if (divides((*p_rel)[0], mon))
-			return p_rel;
-	return p_rel;
-}
-
 Poly& GroebnerBasis::simplify(Poly& poly) const
 {
 	Poly result;
 	auto pbegin = poly.begin(); auto pend = poly.end();
 	while (pbegin != pend) {
-		auto p_rel = reduce(*pbegin);
+		auto p_rel = find_leading_divisor(*pbegin);
 		if (p_rel == m_rels.end())
 			result.push_back(std::move(*pbegin++));
 		else {

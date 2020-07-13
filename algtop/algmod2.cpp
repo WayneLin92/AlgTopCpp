@@ -20,19 +20,32 @@ Poly& operator+=(Poly& poly1, const Poly& poly2)
 	return poly1;
 }
 
-Mon operator*(const Mon& m1, const Mon& m2)
+std::vector<int> mul_mons(const std::vector<int>& m1, const std::vector<int>& m2) //
 {
 	Mon result;
-	if (m1.size() <= m2.size()) {
-		for (size_t i = 0; i < m1.size(); ++i)
-			result.push_back(m1[i] + m2[i]);
-		result.insert(result.end(), m2.begin() + m1.size(), m2.end());
+	size_t k = 0, l = 0;
+	while (k < m1.size() && l < m2.size()) {
+		if (m1[k] < m2[l]) {
+			result.push_back(m1[k]);
+			result.push_back(m1[k + 1]);
+			k += 2;
+		}
+		else if (m1[k] > m2[l]) {
+			result.push_back(m2[l]);
+			result.push_back(m2[l + 1]);
+			l += 2;
+		}
+		else {
+			result.push_back(m1[k]);
+			result.push_back(m1[k + 1] + m2[l + 1]);
+			k += 2;
+			l += 2;
+		}
 	}
-	else {
-		for (size_t i = 0; i < m2.size(); ++i)
-			result.push_back(m1[i] + m2[i]);
-		result.insert(result.end(), m1.begin() + m2.size(), m1.end());
-	}
+	if (k < m1.size())
+		result.insert(result.end(), m1.begin() + k, m1.end());
+	else
+		result.insert(result.end(), m2.begin() + l, m2.end());
 	return result;
 }
 
@@ -78,15 +91,43 @@ int deg(const Mon& mon, const std::vector<int>& gen_degs)
 }
 
 // other functions
-bool divides(const Mon& m1, const Mon& m2)
+bool divides(const std::vector<int>& m1, const std::vector<int>& m2)
 {
-	if (m1.size() <= m2.size()) {
-		for (size_t i = 0; i < m1.size(); ++i)
-			if (m1[i] > m2[i])
-				return false;
-		return true;
+	size_t k = 0, l = 0;
+	while (k < m1.size() && l < m2.size()) {
+		if (m1[k] < m2[l])
+			return false;
+		else if (m1[k] > m2[l])
+			l += 2;
+		else if (m1[k + 1] > m2[l + 1])
+			return false;
+		else {
+			k += 2;
+			l += 2;
+		}
 	}
-	return false;
+	if (k < m1.size())
+		return false;
+	return true;
+}
+
+bool cmp_mons(const std::vector<int>& m1, const std::vector<int>& m2)
+{
+	size_t i;
+	for (i = 0; i < m1.size() && i < m2.size(); i += 2) {
+		if (m1[i] > m2[i])
+			return true;
+		else if (m1[i] < m2[i])
+			return false;
+		else if (m1[i + 1] < m2[i + 1])
+			return true;
+		else if (m1[i + 1] > m2[i + 1])
+			return false;
+	}
+	if (i < m2.size())
+		return true;
+	else
+		return false;
 }
 
 Mon gcd(const Mon& m1, const Mon& m2)
