@@ -212,18 +212,32 @@ void generate_basis(sqlite3* conn, const char* table_name_basis, const std::vect
 	sqlite3_finalize(stmt_update_basis);
 }
 
-int main_sqlite(int argc, char** argv)
+int main_generate_basis(int argc, char** argv)
 {
 	sqlite3* conn;
 	sqlite3_open(R"(C:\Users\lwnpk\Documents\MyProgramData\Math_AlgTop\database\ss.db)", &conn);
 
+	const char *table_generators, *table_relations, *table_basis;
+	int t_max;
+	if (argc == 1) {
+		table_generators = "E2_generators";
+		table_relations = "E2_relations";
+		table_basis = "E2_basis";
+		t_max = 50;
+	}
+	else {
+		table_generators = argv[1];
+		table_relations = argv[2];
+		table_basis = argv[3];
+		t_max = int(argv[4]);
+	}
 	std::vector<Generator> generators;
-	load_generators(conn, "E2_generators", generators);
+	load_generators(conn, table_generators, generators);
 
 	std::vector<std::vector<std::vector<int>>> leadings;
-	load_leading_terms(conn, "E2_relations", leadings);
+	load_leading_terms(conn, table_relations, leadings);
 
-	generate_basis(conn, "tmp", generators, leadings, 30);
+	generate_basis(conn, table_basis, generators, leadings, 30);
 
 	sqlite3_close(conn);
 	return 0;
