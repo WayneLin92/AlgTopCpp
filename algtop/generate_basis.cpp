@@ -1,9 +1,6 @@
-#include "mymath.h"
 #include "dababase.h"
-#include "sqlite3/sqlite3.h"
-#include <iostream>
+#include "mymath.h"
 #include <sstream>
-#include <vector>
 
 
 struct Generator
@@ -14,7 +11,7 @@ struct Generator
 	int t;
 	int v;
 
-	Generator(int gen_id, const unsigned char* gen_name, int ss, int tt, int vv) : id(gen_id), name(reinterpret_cast<const char*>(gen_name)), s(ss), t(tt), v(vv) {};
+	Generator(int gen_id, const char* gen_name, int ss, int tt, int vv) : id(gen_id), name(gen_name), s(ss), t(tt), v(vv) {};
 };
 
 /* Execute simple commands.*/
@@ -26,30 +23,20 @@ void execute_cmd(sqlite3* conn, const char* cmd)
 	sqlite3_finalize(stmt);
 }
 
-int execute_cmd_int(sqlite3* conn, const char* cmd, int iCol)
-{
-	sqlite3_stmt* stmt;
-	sqlite3_prepare_v2(conn, cmd, strlen(cmd) + 1, &stmt, NULL);
-	sqlite3_step(stmt);
-	int result = sqlite3_column_int(stmt, iCol);
-	sqlite3_finalize(stmt);
-	return result;
-}
-
 std::vector<int> str_to_mon(const char* str_mon)
 {
+	std::vector<int> result;
 	if (str_mon[0] == '\0')
 		return std::vector<int>();
 	std::stringstream ss(str_mon);
-	std::vector<int> mon;
 	while (ss.good()) {
 		int i;
 		ss >> i;
-		mon.push_back(i);
+		result.push_back(i);
 		if (ss.peek() == ',')
 			ss.ignore();
 	}
-	return mon;
+	return result;
 }
 
 std::string mon_to_str(const std::vector<int>& mon)
@@ -70,7 +57,7 @@ struct BasisMon
 	int t;
 	int v;
 
-	BasisMon(const unsigned char* str_mon, int ss, int tt, int vv) : mon(str_to_mon(reinterpret_cast<const char*>(str_mon))), s(ss), t(tt), v(vv) {};
+	BasisMon(const char* str_mon, int ss, int tt, int vv) : mon(str_to_mon(str_mon)), s(ss), t(tt), v(vv) {};
 	BasisMon(std::vector<int> mon_, int ss, int tt, int vv) : mon(mon_), s(ss), t(tt), v(vv) {};
 };
 
@@ -90,28 +77,28 @@ bool cmp_basis(const BasisMon& m1, const BasisMon& m2)
 	return false;
 }
 
-void load_leading_terms(sqlite3* conn, const char* table_name, std::vector<std::vector<std::vector<int>>>& leadings)
-{
-	sqlite3_stmt* stmt;
-	std::string cmd = std::string("SELECT leading_term FROM ") + table_name + ";";
-	sqlite3_prepare_v2(conn, cmd.c_str(), cmd.length() + 1, &stmt, NULL);
-	while (sqlite3_step(stmt) == SQLITE_ROW) {
-		const unsigned char* str_leading_term = sqlite3_column_text(stmt, 0);
-		std::vector<int> mon(str_to_mon(reinterpret_cast<const char*>(str_leading_term)));
-		if (mon[0] >= leadings.size())
-			leadings.resize(mon[0] + 1);
-		leadings[mon[0]].push_back(mon);
-	}
-	sqlite3_finalize(stmt);
-}
-
 void load_generators(sqlite3* conn, const char* table_name, std::vector<Generator>& generators)
 {
 	sqlite3_stmt* stmt;
 	std::string cmd = std::string("SELECT gen_id, gen_name, s, t, v FROM ") + table_name + ";";
 	sqlite3_prepare_v2(conn, cmd.c_str(), cmd.length() + 1, &stmt, NULL);
 	while (sqlite3_step(stmt) == SQLITE_ROW)
-		generators.emplace_back(sqlite3_column_int(stmt, 0), sqlite3_column_text(stmt, 1), sqlite3_column_int(stmt, 2), sqlite3_column_int(stmt, 3), sqlite3_column_int(stmt, 4));
+		generators.emplace_back(sqlite3_column_int(stmt, 0), sqlite3_column_str(stmt, 1), sqlite3_column_int(stmt, 2), sqlite3_column_int(stmt, 3), sqlite3_column_int(stmt, 4));
+	sqlite3_finalize(stmt);
+}
+
+void load_leading_terms(sqlite3* conn, const char* table_name, std::vector<std::vector<std::vector<int>>>& leadings)
+{
+	sqlite3_stmt* stmt;
+	std::string cmd = std::string("SELECT leading_term FROM ") + table_name + ";";
+	sqlite3_prepare_v2(conn, cmd.c_str(), cmd.length() + 1, &stmt, NULL);
+	while (sqlite3_step(stmt) == SQLITE_ROW) {
+		const char* str_leading_term = sqlite3_column_str(stmt, 0);
+		std::vector<int> mon(str_to_mon(str_leading_term));
+		if ((unsigned int)mon[0] >= leadings.size())
+			leadings.resize(mon[0] + 1);
+		leadings[mon[0]].push_back(mon);
+	}
 	sqlite3_finalize(stmt);
 }
 
@@ -121,15 +108,14 @@ void load_basis(sqlite3* conn, const char* table_name, std::vector<BasisMon>& ba
 	std::string cmd = std::string("SELECT mon, s, t, v FROM ") + table_name + ";";
 	sqlite3_prepare_v2(conn, cmd.c_str(), cmd.length() + 1, &stmt, NULL);
 	while (sqlite3_step(stmt) == SQLITE_ROW)
-		basis.emplace_back(sqlite3_column_text(stmt, 0), sqlite3_column_int(stmt, 1), sqlite3_column_int(stmt, 2), sqlite3_column_int(stmt, 3));
+		basis.emplace_back(sqlite3_column_str(stmt, 0), sqlite3_column_int(stmt, 1), sqlite3_column_int(stmt, 2), sqlite3_column_int(stmt, 3));
 	sqlite3_finalize(stmt);
 }
 
-/* num_mons[t] is the number of monomials up to degree t */
 void load_mon_indices(sqlite3* conn, const char* table_name, std::vector<int>& num_mons)
 {
 	sqlite3_stmt* stmt;
-	std::string cmd = std::string("SELECT t, MAX(mon_id) + 1 FROM ") + table_name + " GROUP BY t ORDER BY t;";
+	std::string cmd = std::string("SELECT t, num_mons FROM ") + table_name + " ORDER BY t;";
 	sqlite3_prepare_v2(conn, cmd.c_str(), cmd.length() + 1, &stmt, NULL);
 	while (sqlite3_step(stmt) == SQLITE_ROW) {
 		int t = sqlite3_column_int(stmt, 0);
@@ -152,13 +138,14 @@ void generate_basis(sqlite3* conn, const char* table_name_basis, const std::vect
 
 	/* Load the basis and indices. num_mons[t] is the number of monomials in degree <= t. */
 	std::vector<int> num_mons;
-	load_mon_indices(conn, table_name_basis, num_mons);
+	std::string table_indices_t = std::string(table_name_basis) + "_indices_t";
+	load_mon_indices(conn, table_indices_t.c_str(), num_mons);
 	std::vector<BasisMon> basis;
 	load_basis(conn, table_name_basis, basis);
 
 	/* Get the current largest t value */
 	int t;
-	if (basis.size() > 0)
+	if (!basis.empty())
 		t = basis[basis.size() - 1].t + 1;
 	else {
 		/* If no monomial present insert the unit.*/
@@ -180,9 +167,9 @@ void generate_basis(sqlite3* conn, const char* table_name_basis, const std::vect
 				size_t index1 = t1 > 0 ? num_mons[t1 - 1] : 0;
 				size_t index2 = num_mons[t1];
 				for (size_t i = index1; i < index2; i++) {
-					if (basis[i].mon.size() == 0 || gen.id <= basis[i].mon[0]) {
-						std::vector<int> mon(mul_mons(basis[i].mon, { gen.id, 1 }));
-						if (gen.id >= leadings.size() || std::none_of(leadings[gen.id].begin(), leadings[gen.id].end(), 
+					if (basis[i].mon.empty() || gen.id <= basis[i].mon[0]) {
+						std::vector<int> mon(mul(basis[i].mon, { gen.id, 1 }));
+						if ((unsigned int)gen.id >= leadings.size() || std::none_of(leadings[gen.id].begin(), leadings[gen.id].end(),
 							[mon](std::vector<int> _m) { return divides(_m, mon); })) {
 							int s = basis[i].s + gen.s;
 							int v = basis[i].v + gen.v;
