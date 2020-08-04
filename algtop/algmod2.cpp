@@ -1,11 +1,9 @@
 #include "mymath.h"
-#include <sstream> ////
-#include <string> ////
 
 // operator overloading
-MonRaw mul(const MonRaw& m1, const MonRaw& m2)
+array mul(const array& m1, const array& m2)
 {
-	MonRaw result;
+	array result;
 	size_t k = 0, l = 0;
 	while (k < m1.size() && l < m2.size()) {
 		if (m1[k] < m2[l]) {
@@ -32,9 +30,9 @@ MonRaw mul(const MonRaw& m1, const MonRaw& m2)
 	return result;
 }
 
-MonRaw div(const MonRaw& m1, const MonRaw& m2)
+array div(const array& m1, const array& m2)
 {
-	MonRaw result;
+	array result;
 	size_t k = 0, l = 0;
 	while (k < m1.size() && l < m2.size()) {
 		if (m1[k] < m2[l]) {
@@ -70,28 +68,28 @@ MonRaw div(const MonRaw& m1, const MonRaw& m2)
 	return result;
 }
 
-PolyRaw add(const PolyRaw& poly1, const PolyRaw& poly2) {
-	PolyRaw result;
+array2d add(const array2d& poly1, const array2d& poly2) {
+	array2d result;
 	std::set_symmetric_difference(poly1.begin(), poly1.end(), poly2.begin(), poly2.end(),
 		std::back_inserter(result), cmp_mons);
 	return result;
 }
 
-PolyRaw mul(const PolyRaw& poly, const MonRaw& mon) {
-	PolyRaw result;
-	for (const MonRaw& m : poly)
+array2d mul(const array2d& poly, const array& mon) {
+	array2d result;
+	for (const array& m : poly)
 		result.push_back(mul(m, mon));
 	return result;
 }
 
-PolyRaw mul(const PolyRaw& poly1, const PolyRaw& poly2) {
-	PolyRaw result;
-	for (const MonRaw& mon2 : poly2)
+array2d mul(const array2d& poly1, const array2d& poly2) {
+	array2d result;
+	for (const array& mon2 : poly2)
 		result = add(result, mul(poly1, mon2));
 	return result;
 }
 
-bool cmp_mons(const MonRaw& m1, const MonRaw& m2)
+bool cmp_mons(const array& m1, const array& m2)
 {
 	size_t i;
 	for (i = 0; i < m1.size() && i < m2.size(); i += 2) {
@@ -110,7 +108,7 @@ bool cmp_mons(const MonRaw& m1, const MonRaw& m2)
 		return false;
 }
 
-bool divides(const MonRaw& m1, const MonRaw& m2)
+bool divides(const array& m1, const array& m2)
 {
 	size_t k = 0, l = 0;
 	while (k < m1.size() && l < m2.size()) {
@@ -130,9 +128,9 @@ bool divides(const MonRaw& m1, const MonRaw& m2)
 	return true;
 }
 
-MonRaw pow(const MonRaw& m, int e)
+array pow(const array& m, int e)
 {
-	MonRaw result;
+	array result;
 	for (size_t i = 0; i < m.size(); i += 2) {
 		result.push_back(m[i]);
 		result.push_back(m[i + 1] * e);
@@ -140,13 +138,13 @@ MonRaw pow(const MonRaw& m, int e)
 	return result;
 }
 
-log_result log(const MonRaw& m1, const MonRaw& m2)
+log_result log(const array& m1, const array& m2)
 {
 	if (m2.empty()) {
 		std::cout << "log with 0 base!\n";
 		throw "f50d7f56-8ca7-4efe-9b23-3c9cde40d069";
 	}
-	MonRaw r;
+	array r;
 	int q = -1;
 
 	/* Compute q */
@@ -176,35 +174,9 @@ log_result log(const MonRaw& m1, const MonRaw& m2)
 	return q == 0 ? log_result({ 0, m1 }) : log_result({ q, div(m1, pow(m2, q)) });
 }
 
-PolyRaw reduce(const PolyRaw& poly, const PolysRaw& rels)
+array gcd(const array& m1, const array& m2)
 {
-	PolyRaw result;
-	PolyRaw poly1(poly);
-	auto pbegin = poly1.begin(); auto pend = poly1.end();
-	while (pbegin != pend) {
-		PolysRaw::const_iterator p_rel = rels.begin();
-		for (; p_rel != rels.end(); ++p_rel)
-			if (divides((*p_rel)[0], *pbegin))
-				break;
-		if (p_rel == rels.end())
-			result.push_back(std::move(*pbegin++));
-		else {
-			const PolyRaw& rel = *p_rel;
-			MonRaw q = div(*pbegin, rel[0]);
-			PolyRaw rel1 = mul(rel, q); // TODO: improve
-			PolyRaw poly2;
-			std::set_symmetric_difference(pbegin, pend, rel1.begin(), rel1.end(),
-				std::back_inserter(poly2), cmp_mons);
-			poly1 = std::move(poly2);
-			pbegin = poly1.begin(); pend = poly1.end();
-		}
-	}
-	return result;
-}
-
-MonRaw gcd(const MonRaw& m1, const MonRaw& m2)
-{
-	MonRaw result;
+	array result;
 	size_t k = 0, l = 0;
 	while (k < m1.size() && l < m2.size()) {
 		if (m1[k] < m2[l])
@@ -221,7 +193,7 @@ MonRaw gcd(const MonRaw& m1, const MonRaw& m2)
 	return result;
 }
 
-bool gcd_nonzero(const MonRaw& m1, const MonRaw& m2)
+bool gcd_nonzero(const array& m1, const array& m2)
 {
 	size_t k = 0, l = 0;
 	while (k < m1.size() && l < m2.size()) {
@@ -235,9 +207,9 @@ bool gcd_nonzero(const MonRaw& m1, const MonRaw& m2)
 	return false;
 }
 
-MonRaw lcm(const MonRaw& m1, const MonRaw& m2)
+array lcm(const array& m1, const array& m2)
 {
-	MonRaw result;
+	array result;
 	size_t k = 0, l = 0;
 	while (k < m1.size() && l < m2.size()) {
 		if (m1[k] < m2[l]) {
@@ -261,13 +233,39 @@ MonRaw lcm(const MonRaw& m1, const MonRaw& m2)
 }
 
 struct rel_heap_t {
-	PolyRaw poly;
+	array2d poly;
 	int deg;
 };
 
+array2d reduce(const array2d& poly, const array3d& rels)
+{
+	array2d result;
+	array2d poly1(poly);
+	auto pbegin = poly1.begin(); auto pend = poly1.end();
+	while (pbegin != pend) {
+		array3d::const_iterator p_rel = rels.begin();
+		for (; p_rel != rels.end(); ++p_rel)
+			if (divides((*p_rel)[0], *pbegin))
+				break;
+		if (p_rel == rels.end())
+			result.push_back(std::move(*pbegin++));
+		else {
+			const array2d& rel = *p_rel;
+			array q = div(*pbegin, rel[0]);
+			array2d rel1 = mul(rel, q); // TODO: improve
+			array2d poly2;
+			std::set_symmetric_difference(pbegin, pend, rel1.begin(), rel1.end(),
+				std::back_inserter(poly2), cmp_mons);
+			poly1 = std::move(poly2);
+			pbegin = poly1.begin(); pend = poly1.end();
+		}
+	}
+	return result;
+}
+
 inline bool compare(const rel_heap_t& s1, const rel_heap_t& s2) { return s1.deg > s2.deg; }
 
-void add_rel(PolysRaw& rels, const PolyRaw& rel, const std::vector<int> gen_degs)
+void add_rel(array3d& rels, const array2d& rel, const array& gen_degs)
 {
 	if (rel.empty())
 		return;
@@ -277,25 +275,142 @@ void add_rel(PolysRaw& rels, const PolyRaw& rel, const std::vector<int> gen_degs
 		rel_heap_t heap_ele = std::move(heap.back());
 		heap.pop_back();
 
-		PolyRaw r = reduce(heap_ele.poly, rels);
+		array2d r = reduce(heap_ele.poly, rels);
 		if (!r.empty()) {
-			for (PolyRaw& r1 : rels) {
+			for (array2d& r1 : rels) {
 				if (gcd_nonzero(r[0], r1[0])) {
 					if (divides(r[0], r1[0]))
 						r1.clear();
 					else {
-						MonRaw mlcm = lcm(r[0], r1[0]);
-						MonRaw q = div(mlcm, r[0]);
-						MonRaw q1 = div(mlcm, r1[0]);
-						PolyRaw new_rel = add(mul(r, q), mul(r1, q1));
+						array mlcm = lcm(r[0], r1[0]);
+						array q = div(mlcm, r[0]);
+						array q1 = div(mlcm, r1[0]);
+						array2d new_rel = add(mul(r, q), mul(r1, q1));
 
 						heap.push_back(rel_heap_t{ new_rel, deg(mlcm, gen_degs) });
 						std::push_heap(heap.begin(), heap.end(), [](const rel_heap_t& s1, const rel_heap_t& s2) { return s1.deg > s2.deg; });
 					}
 				}
 			} 
-			rels.erase(std::remove_if(rels.begin(), rels.end(), [](const PolyRaw& p) {return p.empty(); }), rels.end());
+			rels.erase(std::remove_if(rels.begin(), rels.end(), [](const array2d& p) {return p.empty(); }), rels.end());
 			rels.push_back(std::move(r));
 		}
 	}
+}
+
+/******** Linear Algebra ********/
+array residue(const array2d& spaceV, const array& v)
+{
+	array result(v);
+	for (size_t i = 0; i < spaceV.size(); i++) {
+		if (std::binary_search(result.begin(), result.end(), spaceV[i][0])) {
+			array tmp;
+			std::set_symmetric_difference(result.begin(), result.end(), spaceV[i].begin(), spaceV[i].end(),
+				std::back_inserter(tmp));
+			result = std::move(tmp);
+		}
+	}
+	return result;
+}
+
+array residue(const array2d& spaceV, array&& v)
+{
+	array result(v);
+	for (size_t i = 0; i < spaceV.size(); i++) {
+		if (std::binary_search(result.begin(), result.end(), spaceV[i][0])) {
+			array tmp;
+			std::set_symmetric_difference(result.begin(), result.end(), spaceV[i].begin(), spaceV[i].end(),
+				std::back_inserter(tmp));
+			result = std::move(tmp);
+		}
+	}
+	return result;
+}
+
+inline void add_map(array2d& spaceV, const array& v)
+{
+	array v1 = residue(spaceV, v);
+	if (!v1.empty())
+		spaceV.push_back(std::move(v1));
+}
+
+void get_image_kernel(const array2d& fx, array2d& image, array2d& kernel)
+{
+	/* f(g[i]) = image[i] */
+	array2d g;
+	for (size_t i = 0; i < fx.size(); i++) {
+		array src = { int(i) };
+		array tgt(fx[i]);
+		for (size_t j = 0; j < image.size(); j++) {
+			if (std::binary_search(tgt.begin(), tgt.end(), image[j][0])) {
+				array tmp1;
+				std::set_symmetric_difference(tgt.begin(), tgt.end(), image[j].begin(), image[j].end(),
+					std::back_inserter(tmp1));
+				tgt = std::move(tmp1);
+
+				array tmp2;
+				std::set_symmetric_difference(src.begin(), src.end(), g[j].begin(), g[j].end(),
+					std::back_inserter(tmp2));
+				src = std::move(tmp2);
+			}
+		}
+		if (tgt.empty())
+			add_map(kernel, src);
+		else {
+			image.push_back(std::move(tgt));
+			g.push_back(std::move(src));
+		}
+	}
+}
+
+void get_image_kernel(const array& x, const array2d& fx, array2d& image, array2d& kernel)
+{
+	/* f(g[i]) = image[i] */
+	array2d g;
+	for (size_t i = 0; i < fx.size(); i++) {
+		array src = { x[i] };
+		array tgt(fx[i]);
+		for (size_t j = 0; j < image.size(); j++) {
+			if (std::binary_search(tgt.begin(), tgt.end(), image[j][0])) {
+				array tmp1;
+				std::set_symmetric_difference(tgt.begin(), tgt.end(), image[j].begin(), image[j].end(),
+					std::back_inserter(tmp1));
+				tgt = std::move(tmp1);
+
+				array tmp2;
+				std::set_symmetric_difference(src.begin(), src.end(), g[j].begin(), g[j].end(),
+					std::back_inserter(tmp2));
+				src = std::move(tmp2);
+			}
+		}
+		if (tgt.empty())
+			add_map(kernel, src);
+		else {
+			image.push_back(std::move(tgt));
+			g.push_back(std::move(src));
+		}
+	}
+}
+
+array2d quotient_space(const array2d& spaceV, const array2d& spaceW)
+{
+	array2d quotient;
+	size_t dimQuo = spaceV.size() - spaceW.size();
+	for (const auto& v : spaceV) {
+		auto v1 = residue(quotient, residue(spaceW, v));
+		if (!v1.empty()) {
+			quotient.push_back(std::move(v1));
+#if !_DEBUG
+			if (quotient.size() == dimQuo)
+				return quotient;
+#endif
+		}
+	}
+#if _DEBUG
+	if (quotient.size() != dimQuo) {
+		std::cerr << "W is not a subspace of V!\n";
+		throw "cec7f701-0911-482a-a63f-1caaa646591b";
+	}
+	return quotient;
+#endif
 }
