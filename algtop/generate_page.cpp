@@ -144,8 +144,10 @@ void generate_next_page(sqlite3* conn, const std::string& table_prefix, const st
 				/* Compute relations */
 				get_image_kernel(basis_H_new_d.reprs, image, kernel);
 				array lead_kernel;
-				for (const array& m : kernel) {
-					relations_H.push_back(indices_to_poly(m, basis_H_new_d.mons));
+				for (array& m : kernel) {
+					std::sort(m.begin(), m.end(), [&basis_H_new_d](int a, int b) {return cmp_mons(basis_H_new_d.mons[a], basis_H_new_d.mons[b]); });
+					array2d rel = indices_to_poly(m, basis_H_new_d.mons);
+					relations_H.push_back(std::move(rel));
 					int index = relations_H.back()[0][0];
 					if (size_t(index) >= leadings.size())
 						leadings.resize(size_t(index) + 1);
@@ -156,6 +158,7 @@ void generate_next_page(sqlite3* conn, const std::string& table_prefix, const st
 
 				/* Find new generators and add to basis_H */
 				quotient = quotient_space(basis_ss_d.kernel, image);
+				simplify_space(quotient);
 				for (auto& x : quotient) {
 					generators_H.emplace_back(deg, array(x));
 					basis_H.back().mons.push_back({ int(generators_H.size()) - 1, 1 });
@@ -171,16 +174,28 @@ void generate_next_page(sqlite3* conn, const std::string& table_prefix, const st
 			}
 			else {
 				/* Find new generators and add to basis_H */
-				for (array& x : basis_ss_d.kernel) {
+				for (array& x : simplify_space(basis_ss_d.kernel)) {
 					generators_H.emplace_back(deg, array(x));
 					basis_H.back().mons.push_back({ int(generators_H.size()) - 1, 1 });
 					basis_H.back().reprs.push_back(std::move(x));
 				}
 			}
 		}
+		for (auto& basis_H_new_d : basis_H_new) {
+			if (!deg_in(basis_H_new_d.deg, basis_ss)) {
+				/* Add to relations_H */
+				for (auto& mon : basis_H_new_d.mons) {
+					relations_H.push_back({ {std::move(mon)} });
+					int index = relations_H.back()[0][0];
+					if (size_t(index) >= leadings.size())
+						leadings.resize(size_t(index) + 1);
+					leadings[index].push_back(relations_H.back()[0]);
+				}
+			}
+		}
 		num_degs_t.push_back(basis_H.size());
 
-		/* Compute new basis */
+		/* Compute new basis of degree t + 1 */
 		if (t < t_max) {
 			basis_H_new.clear();
 			for (int id = 0; size_t(id) < generators_H.size(); id++) {
@@ -266,10 +281,12 @@ void generate_next_page(sqlite3* conn, const std::string& table_prefix, const st
 	execute_cmd(conn, "BEGIN TRANSACTION");
 	size_t mon_id = 0;
 	for (size_t i = 0; i < basis_H.size(); i++) {
-		for (size_t j = 0; j < basis_H[i].mons.size(); j++) {
+		array indices = range(int(basis_H[i].mons.size()));
+		std::sort(indices.begin(), indices.end(), [&basis_H, i](int a, int b) {return cmp_mons(basis_H[i].mons[a], basis_H[i].mons[b]); });
+		for (size_t j = 0; j < indices.size(); j++) {
 			sqlite3_bind_int(stmt_update_basis, 1, mon_id);
-			sqlite3_bind_str(stmt_update_basis, 2, array_to_str(basis_H[i].mons[j]));
-			sqlite3_bind_str(stmt_update_basis, 3, array_to_str(basis_H[i].reprs[j]));
+			sqlite3_bind_str(stmt_update_basis, 2, array_to_str(basis_H[i].mons[indices[j]]));
+			sqlite3_bind_str(stmt_update_basis, 3, array_to_str(basis_H[i].reprs[indices[j]]));
 			sqlite3_bind_int(stmt_update_basis, 4, basis_H[i].deg.s);
 			sqlite3_bind_int(stmt_update_basis, 5, basis_H[i].deg.t);
 			sqlite3_bind_int(stmt_update_basis, 6, basis_H[i].deg.v);

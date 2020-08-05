@@ -149,11 +149,9 @@ void generate_ss(sqlite3* conn, const std::string& table_name_basis, const char*
 
 int main_test()
 {
-	array x = { 0, 1, 2, 3, 4, 6 };
-	array2d f = { {3}, {0, 1, 2, 3}, {0, 1, 2}, {2}, {1, 2}, {0} };
-	array2d image, kernel;
-	get_image_kernel(x, f, image, kernel);
-	std::cout << image << '\n' << kernel << '\n';
+	array2d spaceV = { {1, 2, 3, 4}, {2, 3, 4}, {3} };
+	simplify_space(spaceV);
+	std::cout << spaceV << '\n';
 	return 0;
 }
 

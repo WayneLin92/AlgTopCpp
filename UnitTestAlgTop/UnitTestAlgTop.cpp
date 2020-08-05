@@ -55,5 +55,12 @@ namespace UnitTestAlgTop
 			}
 			Assert::AreEqual(true, bException);
 		};
+
+		TEST_METHOD(test_simplify_space)
+		{
+			array2d spaceV = { {1, 2, 3, 4}, {2, 3, 4}, {3} };
+			array2d answer = { {1}, {2, 4}, {3} };
+			Assert::AreEqual(array2d_to_str(answer), array2d_to_str(simplify_space(spaceV)));
+		}
 	};
 }

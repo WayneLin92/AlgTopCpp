@@ -299,31 +299,30 @@ void add_rel(array3d& rels, const array2d& rel, const array& gen_degs)
 }
 
 /******** Linear Algebra ********/
+array2d& simplify_space(array2d& spaceV)
+{
+	for (size_t i = spaceV.size() - 1; i != -1; i--)
+		for (size_t j = 0; j < i; j++)
+			if (std::binary_search(spaceV[j].begin(), spaceV[j].end(), spaceV[i][0]))
+				spaceV[j] = add_vectors(spaceV[j], spaceV[i]);
+	return spaceV;
+}
+
 array residue(const array2d& spaceV, const array& v)
 {
 	array result(v);
-	for (size_t i = 0; i < spaceV.size(); i++) {
-		if (std::binary_search(result.begin(), result.end(), spaceV[i][0])) {
-			array tmp;
-			std::set_symmetric_difference(result.begin(), result.end(), spaceV[i].begin(), spaceV[i].end(),
-				std::back_inserter(tmp));
-			result = std::move(tmp);
-		}
-	}
+	for (size_t i = 0; i < spaceV.size(); i++)
+		if (std::binary_search(result.begin(), result.end(), spaceV[i][0]))
+			result = add_vectors(result, spaceV[i]);
 	return result;
 }
 
 array residue(const array2d& spaceV, array&& v)
 {
 	array result(v);
-	for (size_t i = 0; i < spaceV.size(); i++) {
-		if (std::binary_search(result.begin(), result.end(), spaceV[i][0])) {
-			array tmp;
-			std::set_symmetric_difference(result.begin(), result.end(), spaceV[i].begin(), spaceV[i].end(),
-				std::back_inserter(tmp));
-			result = std::move(tmp);
-		}
-	}
+	for (size_t i = 0; i < spaceV.size(); i++)
+		if (std::binary_search(result.begin(), result.end(), spaceV[i][0]))
+			result = add_vectors(result, spaceV[i]);
 	return result;
 }
 
@@ -343,15 +342,8 @@ void get_image_kernel(const array2d& fx, array2d& image, array2d& kernel)
 		array tgt(fx[i]);
 		for (size_t j = 0; j < image.size(); j++) {
 			if (std::binary_search(tgt.begin(), tgt.end(), image[j][0])) {
-				array tmp1;
-				std::set_symmetric_difference(tgt.begin(), tgt.end(), image[j].begin(), image[j].end(),
-					std::back_inserter(tmp1));
-				tgt = std::move(tmp1);
-
-				array tmp2;
-				std::set_symmetric_difference(src.begin(), src.end(), g[j].begin(), g[j].end(),
-					std::back_inserter(tmp2));
-				src = std::move(tmp2);
+				tgt = add_vectors(tgt, image[j]);
+				src = add_vectors(src, g[j]);
 			}
 		}
 		if (tgt.empty())
@@ -372,15 +364,8 @@ void get_image_kernel(const array& x, const array2d& fx, array2d& image, array2d
 		array tgt(fx[i]);
 		for (size_t j = 0; j < image.size(); j++) {
 			if (std::binary_search(tgt.begin(), tgt.end(), image[j][0])) {
-				array tmp1;
-				std::set_symmetric_difference(tgt.begin(), tgt.end(), image[j].begin(), image[j].end(),
-					std::back_inserter(tmp1));
-				tgt = std::move(tmp1);
-
-				array tmp2;
-				std::set_symmetric_difference(src.begin(), src.end(), g[j].begin(), g[j].end(),
-					std::back_inserter(tmp2));
-				src = std::move(tmp2);
+				tgt = add_vectors(tgt, image[j]);
+				src = add_vectors(src, g[j]);
 			}
 		}
 		if (tgt.empty())
