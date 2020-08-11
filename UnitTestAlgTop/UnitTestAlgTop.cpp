@@ -19,6 +19,15 @@ namespace UnitTestAlgTop
 			array2d anwer = { {1, 3}, {0, 2, 1, 1}, {0, 3}, {-1, 3} };
 			Assert::AreEqual(array2d_to_str(anwer), array2d_to_str(power));
 		};
+
+		TEST_METHOD(test_evaluate)
+		{
+			array2d p = { {1, 3}, {0, 3}, {0, 1, 2, 1} };
+			array3d images = { {{1, 1}, {0, 1}}, {}, {{3, 1}} };
+			array2d fp = evaluate(p, [&images](int gen_id) {return images[gen_id]; }, {});
+			array2d anwer = { {1, 1, 3, 1}, {1, 3}, {0, 1, 3, 1}, {0, 1, 1, 2}, {0, 2, 1, 1}, {0, 3} };
+			Assert::AreEqual(array2d_to_str(anwer), array2d_to_str(fp));
+		};
 	};
 
 	TEST_CLASS(LinearAlgebra)

@@ -68,11 +68,13 @@ array2d str_to_array2d(const char* str_poly) // Warning: assume inner arrays are
 
 int main_test(int argc, char** argv)
 {
-	array2d poly = { {1, 1}, {0, 1} };
-	array3d gb = { {{0, 1, 1, 2}, {-1, 3}} };
-	array2d power = pow(poly, 3, gb);
-	array2d anwer = { {1, 3}, {0, 2, 1, 1}, {0, 3}, {-1, 3} };
-	std::cout << power << '\n';
+	array gen_degs = { 1, 1, 1 };
+	array3d rels = { {{0, 3}}, {{1, 2}, {0, 2}} };
+	array3d gb;
+	add_rels(gb, rels, gen_degs, -1);
+	array3d polys = { {{1, 1}} };
+	array4d result = ann_seq(gb, polys, gen_degs, -1);
+	std::cout << result << '\n';
 
 	//auto start = std::chrono::system_clock::now();
 

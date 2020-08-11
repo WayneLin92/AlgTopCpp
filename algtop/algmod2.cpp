@@ -39,10 +39,12 @@ array div(const array& mon1, const array& mon2)
 			result.push_back(mon1[k + 1]);
 			k += 2;
 		}
+#ifdef _DEBUG
 		else if (mon1[k] > mon2[l]) {
 			std::cout << "mon1/mon2 not divisible!\n";
 			throw "1227de8e-31a8-40ae-9ad3-85b1cd6872cf";
 		}
+#endif
 		else if (mon1[k + 1] > mon2[l + 1]) {
 			result.push_back(mon1[k]);
 			result.push_back(mon1[k + 1] - mon2[l + 1]);
@@ -53,16 +55,20 @@ array div(const array& mon1, const array& mon2)
 			k += 2;
 			l += 2;
 		}
+#ifdef _DEBUG
 		else {
 			std::cout << "mon1/mon2 not divisible!\n";
 			throw "a9c74ef9-c5ef-484a-8b53-261be63349e3";
 		}
+#endif
 	}
+#ifdef _DEBUG
 	if (l < mon2.size()) {
 		std::cout << "mon1/mon2 not divisible!\n";
 		throw "6cdd66bd-597e-4c3b-ab1d-1bf8014d84a0";
 	}
 	else
+#endif
 		result.insert(result.end(), mon1.begin() + k, mon1.end());
 	return result;
 }
@@ -216,13 +222,13 @@ array gcd(const array& m1, const array& m2)
 	return result;
 }
 
-bool gcd_nonzero(const array& m1, const array& m2)
+bool gcd_nonzero(const array& mon1, const array& mon2)
 {
 	size_t k = 0, l = 0;
-	while (k < m1.size() && l < m2.size()) {
-		if (m1[k] < m2[l])
+	while (k < mon1.size() && l < mon2.size()) {
+		if (mon1[k] < mon2[l])
 			k += 2;
-		else if (m1[k] > m2[l])
+		else if (mon1[k] > mon2[l])
 			l += 2;
 		else
 			return true;
@@ -260,6 +266,7 @@ array lcm(const array& mon1, const array& mon2)
 }
 
 /******** Linear Algebra ********/
+
 array2d& simplify_space(array2d& spaceV)
 {
 	for (size_t i = spaceV.size() - 1; i != -1; i--)
@@ -361,7 +368,8 @@ array2d quotient_space(const array2d& spaceV, const array2d& spaceW)
 	return quotient;
 }
 
-/******** Groebner basis ********/
+/******** Groebner Basis ********/
+
 array2d reduce(const array2d& poly, const array3d& gb)
 {
 	array2d result;
@@ -395,15 +403,8 @@ struct rel_heap_t {
 inline bool cmp_heap_rels(const rel_heap_t& s1, const rel_heap_t& s2) { return s1.deg > s2.deg; }
 
 template <typename Fn>
-void add_rels(array3d& gb, const array3d& rels, Fn get_deg, int deg_max)
+void add_rels(array3d& gb, std::vector<rel_heap_t>& heap, Fn get_deg, int deg_max)
 {
-	std::vector<rel_heap_t> heap;
-	for (const array2d& rel : rels) {
-		if (!rel.empty()) {
-			heap.push_back(rel_heap_t{ rel, get_deg(rel[0]) });
-			std::push_heap(heap.begin(), heap.end(), cmp_heap_rels);
-		}
-	}
 	while (!heap.empty() && (deg_max == -1 || heap.front().deg <= deg_max)) {
 		std::pop_heap(heap.begin(), heap.end(), cmp_heap_rels);
 		rel_heap_t heap_ele = std::move(heap.back());
@@ -424,12 +425,15 @@ void add_rels(array3d& gb, const array3d& rels, Fn get_deg, int deg_max)
 					}
 					else {
 						array mlcm = lcm(rel[0], g[0]);
-						array q_r = div(mlcm, rel[0]);
-						array q_g = div(mlcm, g[0]);
-						array2d new_rel = add(mul(rel, q_r), mul(g, q_g));
+						int deg = get_deg(mlcm);
+						if (deg <= deg_max) {
+							array q_r = div(mlcm, rel[0]);
+							array q_g = div(mlcm, g[0]);
+							array2d new_rel = add(mul(rel, q_r), mul(g, q_g));
 
-						heap.push_back(rel_heap_t{ std::move(new_rel), get_deg(mlcm) });
-						std::push_heap(heap.begin(), heap.end(), cmp_heap_rels);
+							heap.push_back(rel_heap_t{ std::move(new_rel), deg });
+							std::push_heap(heap.begin(), heap.end(), cmp_heap_rels);
+						}
 					}
 				}
 			}
@@ -439,9 +443,114 @@ void add_rels(array3d& gb, const array3d& rels, Fn get_deg, int deg_max)
 	}
 }
 
+template <typename Fn>
+void add_rels(array3d& gb, const array3d& rels, Fn get_deg, int deg_max)
+{
+	std::vector<rel_heap_t> heap;
+	for (const array2d& rel : rels) {
+		if (!rel.empty()) {
+			heap.push_back(rel_heap_t{ rel, get_deg(rel[0]) });
+			std::push_heap(heap.begin(), heap.end(), cmp_heap_rels);
+		}
+	}
+	add_rels(gb, heap, get_deg, deg_max);
+}
+
 void add_rels(array3d& gb, const array3d& rels, const array& gen_degs, int deg_max)
 {
-	add_rels(gb, rels, [&gen_degs](const array& m) {return deg(m, gen_degs); }, deg_max);
+	std::vector<rel_heap_t> heap;
+	for (const array2d& rel : rels) {
+		if (!rel.empty()) {
+			heap.push_back(rel_heap_t{ rel, deg(rel[0], gen_degs) });
+			std::push_heap(heap.begin(), heap.end(), cmp_heap_rels);
+		}
+	}
+	add_rels(gb, heap, [&gen_degs](const array& m) {return deg(m, gen_degs); }, deg_max);
+}
+
+template <typename Fn>
+void add_rels_freemodule(array3d& gb, std::vector<rel_heap_t>& heap, Fn get_deg, int deg_max)
+{
+	while (!heap.empty() && (deg_max == -1 || heap.front().deg <= deg_max)) {
+		std::pop_heap(heap.begin(), heap.end(), cmp_heap_rels);
+		rel_heap_t heap_ele = std::move(heap.back());
+		heap.pop_back();
+
+		array2d rel = reduce(heap_ele.poly, gb);
+		if (!rel.empty()) {
+			for (array2d& g : gb) {
+				if ((rel[0][0] > 0 || g[0][0] > 0 || rel[0][0] == g[0][0]) && gcd_nonzero(rel[0], g[0])) {
+					if (divides(rel[0], g[0])) {
+						array q = div(g[0], rel[0]);
+						array2d new_rel = add(mul(rel, q), g);
+						if (!new_rel.empty()) {
+							heap.push_back(rel_heap_t{ std::move(new_rel), get_deg(g[0]) });
+							std::push_heap(heap.begin(), heap.end(), cmp_heap_rels);
+						}
+						g.clear();
+					}
+					else {
+						array mlcm = lcm(rel[0], g[0]);
+						int deg = get_deg(mlcm);
+						if (deg <= deg_max) {
+							array q_r = div(mlcm, rel[0]);
+							array q_g = div(mlcm, g[0]);
+							array2d new_rel = add(mul(rel, q_r), mul(g, q_g));
+
+							heap.push_back(rel_heap_t{ std::move(new_rel), deg });
+							std::push_heap(heap.begin(), heap.end(), cmp_heap_rels);
+						}
+					}
+				}
+			}
+			gb.erase(std::remove_if(gb.begin(), gb.end(), [](const array2d& g) {return g.empty(); }), gb.end());
+			gb.push_back(std::move(rel));
+		}
+	}
+}
+
+array4d& indecomposables(const array3d& gb, array4d& vectors, const array& gen_degs, const array& basis_degs, int deg_max)
+{
+	if (vectors.empty())
+		return vectors;
+	array3d gb1 = gb;
+	int N = (int)basis_degs.size();
+	auto get_deg = [&gen_degs, &basis_degs, &N](const array& mon) {
+		int result = 0;
+		for (size_t i = 0; i < mon.size(); i += 2)
+			result += (mon[i] >= 0 ? gen_degs[mon[i]] : basis_degs[mon[i] + size_t(N)]) * mon[i + 1];
+		return result;
+	};
+
+	array3d rels;
+	array degs;
+	for (const array3d& v : vectors) {
+		array2d rel;
+		for (int i = 0; i < N; i++) {
+			if (!v[i].empty())
+				rel = add(rel, mul(v[i], { i - N, 1 }));
+		}
+		degs.push_back(get_deg(rel[0]));
+		rels.push_back(std::move(rel));
+	}
+	array indices = range((int)vectors.size());
+	std::sort(indices.begin(), indices.end(), [&degs](int i, int j) {return degs[i] < degs[j]; });
+
+	std::vector<rel_heap_t> heap;
+	for (int i : indices) {
+		int deg = get_deg(rels[i][0]);
+		add_rels_freemodule(gb1, heap, get_deg, deg);
+		array2d rel = reduce(rels[i], gb);
+		if (!rel.empty()) {
+			heap.push_back(rel_heap_t{ rel, deg });
+			std::push_heap(heap.begin(), heap.end(), cmp_heap_rels);
+		}
+		else
+			vectors[i].clear();
+	}
+
+	vectors.erase(std::remove_if(vectors.begin(), vectors.end(), [](const array3d& v) {return v.empty(); }), vectors.end());
+	return vectors;
 }
 
 array4d ann_seq(const array3d& gb, const array3d& polys, const array& gen_degs, int deg_max)
@@ -465,6 +574,27 @@ array4d ann_seq(const array3d& gb, const array3d& polys, const array& gen_degs, 
 			result += (mon[i] >= 0 ? gen_degs[mon[i]] : gen_degs1[mon[i] + size_t(N)]) * mon[i + 1];
 		return result;
 		}, deg_max);
-
+	for (const array2d& g : gb1) {
+		if (g[0][0] < 0) {
+			array3d result_i;
+			result_i.resize(N);
+			for (const array& m : g) {
+				auto p = m.begin();
+				for (; p < m.end() && *p < 0; p += 2);
+				array m1(m.begin(), p), m2(p, m.end());
+				result_i[m1[0] + size_t(N)] = add(result_i[m1[0] + size_t(N)], reduce(mul(evaluate({ div(m1, { m1[0], 1 }) }, [&polys, &N](int i) {return polys[i + size_t(N)]; }, gb), m2), gb));
+			}
+			result.push_back(std::move(result_i));
+		}
+	}
+	for (int i = 0; i < N; i++) {
+		for (int j = i + 1; j < N; j++) {
+			array3d result_i;
+			result_i[i] = polys[j];
+			result_i[j] = polys[i];
+			result.push_back(std::move(result_i));
+		}
+	}
+	indecomposables(gb, result, gen_degs, gen_degs1, deg_max);
 	return result;
 }

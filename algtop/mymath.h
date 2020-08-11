@@ -54,21 +54,23 @@ struct Deg
 
 /********** FUNCTIONS **********/
 // Move to a header for python in the future
-inline void load_mon(array& mon, std::istream& sin)         { load_vector(mon, sin, "(", ",", ")"); } // TODO: check if empty string is properly handled
-inline void load_poly(array2d& poly, std::istream& sin)      { load_vector(poly, sin, "{", ",", "}", load_mon); }
-inline void load_polys(array3d& polys, std::istream& sin)   { load_vector(polys, sin, "[", ",", "]", load_poly); }
-inline void dump_mon(const array& mon, std::ostream& sout)              { dump_vector(mon, sout, "(", ", ", ")"); }
-inline void dump_poly(const array2d& poly, std::ostream& sout)           { dump_vector(poly, sout, "{", ", ", "}", dump_mon); }
-inline void dump_polys(const array3d& polys, std::ostream& sout)        { dump_vector(polys, sout, "[", ", ", "]", dump_poly); }
+inline void load_array(array& mon, std::istream& sin)         { load_vector(mon, sin, "(", ",", ")"); } // TODO: check if empty string is properly handled
+inline void load_array2d(array2d& poly, std::istream& sin)      { load_vector(poly, sin, "{", ",", "}", load_array); }
+inline void load_array3d(array3d& polys, std::istream& sin)   { load_vector(polys, sin, "[", ",", "]", load_array2d); }
+inline void dump_array(const array& mon, std::ostream& sout)              { dump_vector(mon, sout, "(", ", ", ")"); }
+inline void dump_array2d(const array2d& poly, std::ostream& sout)           { dump_vector(poly, sout, "{", ", ", "}", dump_array); }
+inline void dump_array3d(const array3d& polys, std::ostream& sout)        { dump_vector(polys, sout, "[", ", ", "]", dump_array2d); }
+inline void dump_array4d(const array4d& a, std::ostream& sout) { dump_vector(a, sout, "[", ", ", "]", dump_array3d); }
 
-inline std::istream& operator>>(std::istream& sin, array& mon)        { load_mon(mon, sin); return sin; }
-inline std::istream& operator>>(std::istream& sin, array2d& poly)      { load_poly(poly, sin); return sin; }
-inline std::istream& operator>>(std::istream& sin, array3d& polys)    { load_polys(polys, sin); return sin; }
-inline std::ostream& operator<<(std::ostream& sout, const array& mon)        { dump_mon(mon, sout); return sout; }
-inline std::ostream& operator<<(std::ostream& sout, const array2d& poly)      { dump_poly(poly, sout); return sout; }
-inline std::ostream& operator<<(std::ostream& sout, const array3d& polys)    { dump_polys(polys, sout); return sout; }
+inline std::istream& operator>>(std::istream& sin, array& mon)        { load_array(mon, sin); return sin; }
+inline std::istream& operator>>(std::istream& sin, array2d& poly)      { load_array2d(poly, sin); return sin; }
+inline std::istream& operator>>(std::istream& sin, array3d& polys)    { load_array3d(polys, sin); return sin; }
+inline std::ostream& operator<<(std::ostream& sout, const array& mon)        { dump_array(mon, sout); return sout; }
+inline std::ostream& operator<<(std::ostream& sout, const array2d& poly)      { dump_array2d(poly, sout); return sout; }
+inline std::ostream& operator<<(std::ostream& sout, const array3d& polys)    { dump_array3d(polys, sout); return sout; }
+inline std::ostream& operator<<(std::ostream& sout, const array4d& a) { dump_array4d(a, sout); return sout; }
 
-inline std::ostream& operator<<(std::ostream& sout, const Poly& poly) { dump_poly(poly.data, sout); return sout; }
+inline std::ostream& operator<<(std::ostream& sout, const Poly& poly) { dump_array2d(poly.data, sout); return sout; }
 
 /*--------- algmod2.cpp ---------*/
 /* Functions for Monomials and Polynomials
@@ -84,6 +86,21 @@ array2d add(const array2d& poly1, const array2d& poly2);
 array2d mul(const array2d& poly, const array& mon); // TODO: add begin-end version of these functions
 array2d mul(const array2d& poly1, const array2d& poly2);
 array2d pow(const array2d& poly, int n, const array3d& gb);
+
+template <typename Fn>
+array2d evaluate(const array2d& poly, Fn map, const array3d& gb)
+{
+	array2d result;
+	for (const array& m : poly) {
+		array2d fm = { {} };
+		for (size_t i = 0; i < m.size(); i += 2) {
+			fm = mul(fm, pow(map(m[i]), m[i + 1], gb));
+		}
+		result = add(result, fm);
+	}
+	return result;
+}
+
 inline Mon operator*(const Mon& m1, const Mon& m2) { return mul(m1.data, m2.data); }
 inline Poly operator+(const Poly& p1, const Poly& p2) { return add(p1.data, p2.data); }
 inline Poly operator+=(Poly& p1, const Poly& p2) { return p1 = add(p1.data, p2.data); }
