@@ -147,18 +147,8 @@ void generate_ss(sqlite3* conn, const std::string& table_name_basis, const char*
 	sqlite3_finalize(stmt_update_basis);
 }
 
-int main_test()
-{
-	array2d spaceV = { {1, 2, 3, 4}, {2, 3, 4}, {3} };
-	simplify_space(spaceV);
-	std::cout << spaceV << '\n';
-	return 0;
-}
-
 int main_generate_ss(int argc, char** argv)
 {
-	//return main_test();
-
 	sqlite3* conn;
 	sqlite3_open(R"(C:\Users\lwnpk\Documents\MyProgramData\Math_AlgTop\database\ss.db)", &conn);
 

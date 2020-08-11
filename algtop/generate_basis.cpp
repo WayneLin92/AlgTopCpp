@@ -170,13 +170,13 @@ void generate_basis(sqlite3* conn, const std::string& table_name_basis, const st
 int main_generate_basis(int argc, char** argv)
 {
 	sqlite3* conn;
-	sqlite3_open(R"(C:\Users\lwnpk\Documents\MyProgramData\Math_AlgTop\database\ss_test.db)", &conn);
+	sqlite3_open(R"(C:\Users\lwnpk\Documents\MyProgramData\Math_AlgTop\database\ss.db)", &conn);
 
 	std::string table_prefix;
 	int t_max;
 	if (argc == 1) {
 		table_prefix = "E4";
-		t_max = 50;
+		t_max = 200;
 	}
 	else {
 		table_prefix = argv[1];

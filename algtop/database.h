@@ -59,4 +59,6 @@ int main_generate_ss(int argc, char** argv);
 /* generate_next_page.cpp */
 int main_generate_next_page(int argc, char** argv);
 
+int main_test(int argc, char** argv);
+
 #endif /* DATABSE_H */

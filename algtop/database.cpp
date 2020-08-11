@@ -1,5 +1,6 @@
 #include "database.h"
 #include <sstream>
+//#include <chrono>
 
 std::string array_to_str(array::const_iterator pbegin, array::const_iterator pend)
 {
@@ -63,4 +64,20 @@ array2d str_to_array2d(const char* str_poly) // Warning: assume inner arrays are
 		}
 	}
 	return result;
+}
+
+int main_test(int argc, char** argv)
+{
+	array2d poly = { {1, 1}, {0, 1} };
+	array3d gb = { {{0, 1, 1, 2}, {-1, 3}} };
+	array2d power = pow(poly, 3, gb);
+	array2d anwer = { {1, 3}, {0, 2, 1, 1}, {0, 3}, {-1, 3} };
+	std::cout << power << '\n';
+
+	//auto start = std::chrono::system_clock::now();
+
+	//auto end = std::chrono::system_clock::now();
+	//std::chrono::duration<double> elapsed = end - start;
+	//std::cout << "Elapsed time: " << elapsed.count() << "s\n";
+	return 0;
 }
