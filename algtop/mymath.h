@@ -12,6 +12,7 @@ typedef std::vector<array2d> array3d;
 typedef std::vector<array3d> array4d;
 
 /********** STRUCTS AND CLASSES **********/
+
 struct Mon
 {
 	array data;
@@ -54,6 +55,7 @@ struct Deg
 
 /********** FUNCTIONS **********/
 // Move to a header for python in the future
+
 inline void load_array(array& mon, std::istream& sin)         { load_vector(mon, sin, "(", ",", ")"); } // TODO: check if empty string is properly handled
 inline void load_array2d(array2d& poly, std::istream& sin)      { load_vector(poly, sin, "{", ",", "}", load_array); }
 inline void load_array3d(array3d& polys, std::istream& sin)   { load_vector(polys, sin, "[", ",", "]", load_array2d); }

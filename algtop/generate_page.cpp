@@ -1,5 +1,6 @@
 #include "database.h"
-#include <sstream>
+
+/********** STRUCTS AND CLASSES **********/
 
 struct Basis_d
 {
@@ -34,6 +35,8 @@ struct Basis_H_d
 	array2d mons;
 	array2d reprs;
 };
+
+/********** FUNCTIONS **********/
 
 inline array2d indices_to_poly(const array& indices, const std::vector<Basis_d>& basis, const Deg& deg)
 {
