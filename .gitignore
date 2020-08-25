@@ -341,7 +341,7 @@ ASALocalRun/
 healthchecksdb
 *.vcxproj
 *.filters
+
+# Custom
 /algtop/myparser.h
-/algtop/relations-5.txt
-/algtop/relations-7.txt
-/algtop/relations-8.txt
+/profiler reports/

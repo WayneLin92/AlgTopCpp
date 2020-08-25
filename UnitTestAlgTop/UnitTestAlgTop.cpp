@@ -45,18 +45,38 @@ namespace UnitTestAlgTop
 			Assert::AreEqual(array_to_str(expected), array_to_str(r1));
 		};
 
-		TEST_METHOD(test_get_image_kernel)
+		TEST_METHOD(test_set_linear_map)
 		{
 			array x = { 1, 2, 3 };
 			array2d fx = { {1, 3, 4}, {2, 4, 5}, {1, 2, 3, 5} };
-			array2d image, kernel;
-			get_image_kernel(x, fx, image, kernel);
+			array2d image, kernel, g;
+			set_linear_map(x, fx, image, kernel, g);
 			Assert::AreEqual(array2d_to_str(array2d({ {1, 3, 4}, {2, 4, 5} })), array2d_to_str(image));
 			Assert::AreEqual(array2d_to_str(array2d({ {1, 2, 3} })), array2d_to_str(kernel));
 			
-			image.clear(); kernel.clear();
-			get_image_kernel(fx, image, kernel);
+			image.clear(); kernel.clear(); g.clear();
+			set_linear_map(fx, image, kernel, g);
 			Assert::AreEqual(array2d_to_str(array2d({ {0, 1, 2} })), array2d_to_str(kernel));
+		};
+		TEST_METHOD(test_get_image)
+		{
+			array2d spaceV = { {1, 2, 3, 4}, {2, 3, 4}, {3, 4}, {4} };
+			array2d f = { {1}, {2, 5}, {3}, {4} };
+			array v = { 2, 3 };
+			array answer = { 2, 4, 5 };
+			Assert::AreEqual(array_to_str(answer), array_to_str(get_image(spaceV, f, v)));
+#ifdef _DEBUG
+			v = { 2, 5 };
+			bool bException = false;
+			try {
+				get_image(spaceV, f, v);
+			}
+			catch (const char* e) {
+				Assert::AreEqual("6a4fe8a1-608e-466c-ab5e-5fae459ce1b9", e);
+				bException = true;
+			}
+			Assert::AreEqual(true, bException);
+#endif
 		};
 
 		TEST_METHOD(test_quotient)

@@ -59,7 +59,7 @@ void generate_ss(sqlite3* conn, const std::string& table_name_basis, const char*
 
 	std::vector<std::array<int, 5>> indices_tsv;
 	std::string table_indices_tsv = std::string(table_name_basis) + "_indices_stv";
-	load_mon_indices_tsv(conn, table_indices_tsv, indices_tsv);
+	//load_mon_indices_tsv(conn, table_indices_tsv, indices_tsv);
 	std::cout << "num_mons_tsv loaded! Size=" << indices_tsv.size() << '\n';
 
 	std::vector<DgaBasisMon> basis;
@@ -78,34 +78,36 @@ void generate_ss(sqlite3* conn, const std::string& table_name_basis, const char*
 			std::cout << "t=" << t << '\n';
 		}
 
-		array range;
-		for (int i = 0; i < b - a; i++)
-			range.push_back(i);
+		array range_ = range(0, b - a);
 
 		int i;
 		array lead_image;
-		for (i = a; i < b; i++) {
+		for (i = a; i < b; ++i) {
 			if (basis_ss[i].base_indices.empty())
 				break;
 			lead_image.push_back(basis_ss[i].base_indices[0]);
 		}
 		std::sort(lead_image.begin(), lead_image.end());
 
-		array x;
-		std::set_symmetric_difference(range.begin(), range.end(), lead_image.begin(), lead_image.end(), std::back_inserter(x));
+		/*if (!lead_image.empty() && lead_image.back() >= b - a) {
+			std::cout << "range_=" << range_ << '\n';
+			std::cout << "lead_image=" << lead_image << '\n';
+			std::cout << "test: " << t << " " << s << " " << v << " " << a << " " << b << '\n';
+		}*/
+		array x = add_vectors(range_, lead_image);
 
 		array2d fx;
 		for (int xi : x)
 			fx.push_back(basis[size_t(a) + xi].diff_indices);
 
-		array2d image, kernel;
-		get_image_kernel(x, fx, image, kernel);
+		array2d image, kernel, g;
+		set_linear_map(x, fx, image, kernel, g);
 
 		/* fill with the kernel after the image */
 		array lead_kernel;
 		for (size_t j = 0; j < kernel.size(); j++) {
 			lead_kernel.push_back(kernel[j][0]);
-			basis_ss[i + j] = BasisSS(std::move(kernel[j]), array(), N - r, s, t, v);
+			basis_ss[i + j] = BasisSS(std::move(kernel[j]), array(), T_MAX - r, s, t, v);
 		}
 		std::sort(lead_kernel.begin(), lead_kernel.end());
 
@@ -118,7 +120,7 @@ void generate_ss(sqlite3* conn, const std::string& table_name_basis, const char*
 		array rest;
 		std::set_symmetric_difference(x.begin(), x.end(), lead_kernel.begin(), lead_kernel.end(), std::back_inserter(rest));
 		for (size_t j = 0; j < rest.size(); j++) {
-			basis_ss[i + kernel.size() + j] = BasisSS({ rest[j] }, std::move(basis[size_t(a) + rest[j]].diff_indices), N, s, t, v);
+			basis_ss[i + kernel.size() + j] = BasisSS({ rest[j] }, std::move(basis[size_t(a) + rest[j]].diff_indices), T_MAX, s, t, v);
 		}
 	}
 
@@ -150,14 +152,14 @@ void generate_ss(sqlite3* conn, const std::string& table_name_basis, const char*
 int main_generate_ss(int argc, char** argv)
 {
 	sqlite3* conn;
-	sqlite3_open(R"(C:\Users\lwnpk\Documents\MyProgramData\Math_AlgTop\database\ss.db)", &conn);
+	sqlite3_open(R"(C:\Users\lwnpk\Documents\MyProgramData\Math_AlgTop\database\tmp.db)", &conn);
 
 	const char* table_basis, * table_ss;
 	int t_max;
 	if (argc == 1) {
-		table_basis = "E2_basis";
-		table_ss = "E2_ss";
-		t_max = 50;
+		table_basis = "E2t_basis";
+		table_ss = "E2t_ss";
+		t_max = 74;
 	}
 	else {
 		table_basis = argv[1];

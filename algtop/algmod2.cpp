@@ -266,6 +266,32 @@ array lcm(const array& mon1, const array& mon2)
 	return result;
 }
 
+array2d get_diff(const array& mon, const array3d& diffs)
+{
+	array2d result;
+	for (size_t k = 0; k < mon.size(); k += 2) {
+		if (mon[k + 1] % 2) {
+			array m1 = div(mon, { mon[k], 1 });
+			result = add(result, mul({ std::move(m1) }, diffs[mon[k]]));
+		}
+	}
+	return result;
+}
+
+array2d get_diff(const array2d& poly, const array3d& diffs)
+{
+	array2d result;
+	for (const array& m : poly) {
+		for (size_t k = 0; k < m.size(); k += 2) {
+			if (m[k + 1] % 2) {
+				array m1 = div(m, { m[k], m[k + 1] });
+				result = add(result, mul({ std::move(m1) }, diffs[m[k]]));
+			}
+		}
+	}
+	return result;
+}
+
 /******** Linear Algebra ********/
 
 array2d& simplify_space(array2d& spaceV)
@@ -280,7 +306,7 @@ array2d& simplify_space(array2d& spaceV)
 array residue(const array2d& spaceV, const array& v)
 {
 	array result(v);
-	for (size_t i = 0; i < spaceV.size(); i++)
+	for (size_t i = 0; i < spaceV.size(); ++i)
 		if (std::binary_search(result.begin(), result.end(), spaceV[i][0]))
 			result = add_vectors(result, spaceV[i]);
 	return result;
@@ -289,7 +315,7 @@ array residue(const array2d& spaceV, const array& v)
 array residue(const array2d& spaceV, array&& v)
 {
 	array result(v);
-	for (size_t i = 0; i < spaceV.size(); i++)
+	for (size_t i = 0; i < spaceV.size(); ++i)
 		if (std::binary_search(result.begin(), result.end(), spaceV[i][0]))
 			result = add_vectors(result, spaceV[i]);
 	return result;
@@ -302,11 +328,10 @@ inline void add_map(array2d& spaceV, const array& v)
 		spaceV.push_back(std::move(v1));
 }
 
-void get_image_kernel(const array2d& fx, array2d& image, array2d& kernel)
+void set_linear_map(const array2d& fx, array2d& image, array2d& kernel, array2d& g)
 {
 	/* f(g[i]) = image[i] */
-	array2d g;
-	for (size_t i = 0; i < fx.size(); i++) {
+	for (size_t i = 0; i < fx.size(); ++i) {
 		array src = { int(i) };
 		array tgt(fx[i]);
 		for (size_t j = 0; j < image.size(); j++) {
@@ -324,11 +349,10 @@ void get_image_kernel(const array2d& fx, array2d& image, array2d& kernel)
 	}
 }
 
-void get_image_kernel(const array& x, const array2d& fx, array2d& image, array2d& kernel)
+void set_linear_map(const array& x, const array2d& fx, array2d& image, array2d& kernel, array2d& g)
 {
 	/* f(g[i]) = image[i] */
-	array2d g;
-	for (size_t i = 0; i < fx.size(); i++) {
+	for (size_t i = 0; i < fx.size(); ++i) {
 		array src = { x[i] };
 		array tgt(fx[i]);
 		for (size_t j = 0; j < image.size(); j++) {
@@ -346,19 +370,32 @@ void get_image_kernel(const array& x, const array2d& fx, array2d& image, array2d
 	}
 }
 
+array get_image(const array2d& spaceV, const array2d& f, const array& v)
+{
+	array result;
+	array v1(v);
+	for (size_t i = 0; i < spaceV.size() && !v1.empty(); ++i)
+		if (std::binary_search(v1.begin(), v1.end(), spaceV[i][0])) {
+			v1 = add_vectors(v1, spaceV[i]);
+			result = add_vectors(result, f[i]);
+		}
+#if _DEBUG
+	if (!v1.empty()) {
+		std::cerr << "v is not in space V!\n";
+		throw "6a4fe8a1-608e-466c-ab5e-5fae459ce1b9";
+	}
+#endif
+	return result;
+}
+
 array2d quotient_space(const array2d& spaceV, const array2d& spaceW)
 {
 	array2d quotient;
 	size_t dimQuo = spaceV.size() - spaceW.size();
-	for (const auto& v : spaceV) {
-		auto v1 = residue(quotient, residue(spaceW, v));
-		if (!v1.empty()) {
+	for (size_t i = 0; i < spaceV.size() && quotient.size() < dimQuo; i++) {
+		auto v1 = residue(quotient, residue(spaceW, spaceV[i]));
+		if (!v1.empty())
 			quotient.push_back(std::move(v1));
-#if !_DEBUG
-			if (quotient.size() == dimQuo)
-				return quotient;
-#endif
-		}
 	}
 #if _DEBUG
 	if (quotient.size() != dimQuo) {
@@ -528,7 +565,7 @@ array4d& indecomposables(const array3d& gb, array4d& vectors, const array& gen_d
 	array degs;
 	for (const array3d& v : vectors) {
 		array2d rel;
-		for (int i = 0; i < N; i++) {
+		for (int i = 0; i < N; ++i) {
 			if (!v[i].empty())
 				rel = add(rel, mul(v[i], { i - N, 1 }));
 		}
@@ -564,7 +601,7 @@ array4d ann_seq(const array3d& gb, const array3d& polys, const array& gen_degs, 
 	array3d rels;
 	array gen_degs1;
 	int N = (int)polys.size();
-	for (int i = 0; i < N; i++) {
+	for (int i = 0; i < N; ++i) {
 		array2d p = polys[i];
 		gen_degs1.push_back(deg(p, gen_degs));
 		p.push_back({ i - N, 1 });
@@ -572,10 +609,10 @@ array4d ann_seq(const array3d& gb, const array3d& polys, const array& gen_degs, 
 	}
 	array3d gb1 = gb;
 	add_rels(gb1, rels, [&gen_degs, &gen_degs1, &N](const array& mon) {
-		int result = 0;
+		int result_ = 0;
 		for (size_t i = 0; i < mon.size(); i += 2)
-			result += (mon[i] >= 0 ? gen_degs[mon[i]] : gen_degs1[mon[i] + size_t(N)]) * mon[i + 1];
-		return result;
+			result_ += (mon[i] >= 0 ? gen_degs[mon[i]] : gen_degs1[mon[i] + size_t(N)]) * mon[i + 1];
+		return result_;
 		}, deg_max);
 	for (const array2d& g : gb1) {
 		if (g[0][0] < 0) {
@@ -590,12 +627,15 @@ array4d ann_seq(const array3d& gb, const array3d& polys, const array& gen_degs, 
 			result.push_back(std::move(result_i));
 		}
 	}
-	for (int i = 0; i < N; i++) {
+	for (int i = 0; i < N; ++i) {
 		for (int j = i + 1; j < N; j++) {
-			array3d result_i;
-			result_i[i] = polys[j];
-			result_i[j] = polys[i];
-			result.push_back(std::move(result_i));
+			if (gen_degs1[i] + gen_degs1[j] <= deg_max) {
+				array3d result_i;
+				result_i.resize(N);
+				result_i[i] = polys[j];
+				result_i[j] = polys[i];
+				result.push_back(std::move(result_i));
+			}
 		}
 	}
 	indecomposables(gb, result, gen_degs, gen_degs1);
