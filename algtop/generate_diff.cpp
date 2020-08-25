@@ -1,5 +1,7 @@
 #include "database.h"
 
+/********** STRUCTS AND CLASSES **********/
+
 struct DgaBasis
 {
 	array2d basis;
@@ -7,6 +9,8 @@ struct DgaBasis
 	array2d diffs_indices;
 	array3d diffs;
 };
+
+/********** FUNCTIONS **********/
 
 void load_gen_diffs(sqlite3* conn, const std::string& table_name, array3d& diffs)
 {
@@ -111,8 +115,8 @@ void generate_mon_diffs(sqlite3* conn, const std::string& table_prefix, int r)
 					int gen_id = basis_d.basis[i].front();
 					array mon1 = div(basis_d.basis[i], { gen_id, 1 });
 					Deg d1 = d - gen_degs[gen_id];
-					size_t index_mon1 = std::lower_bound(basis[d1].basis.begin(), basis[d1].basis.end(), mon1, cmp_mons) - basis[d1].basis.begin();
-					basis_d.diffs[i] = reduce(add(mul(gen_diffs[gen_id], mon1), mul({ { gen_id, 1 } }, basis[d1].diffs[index_mon1])), gb);
+					size_t index_mon1 = std::lower_bound(basis.at(d1).basis.begin(), basis.at(d1).basis.end(), mon1, cmp_mons) - basis.at(d1).basis.begin();
+					basis_d.diffs[i] = reduce(add(mul(gen_diffs[gen_id], mon1), mul({ { gen_id, 1 } }, basis.at(d1).diffs[index_mon1])), gb);
 					Deg d_diff = d + Deg{ 1, 0, -r };
 					diff_indices = poly_to_indices(basis_d.diffs[i], basis[d_diff].basis);
 					basis_d.diffs_determined[i] = true;

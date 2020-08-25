@@ -1,4 +1,4 @@
-#ifndef DATABSE_H
+#ifndef DATABSE_H// TODO: save greobner basis as array4d
 #define DATABSE_H
 
 #include "mymath.h"

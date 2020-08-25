@@ -500,11 +500,11 @@ void add_rels(array3d& gb, const array3d& rels, const array& gen_degs, int deg_m
 	std::vector<rel_heap_t> heap;
 	for (const array2d& rel : rels) {
 		if (!rel.empty()) {
-			heap.push_back(rel_heap_t{ rel, deg(rel[0], gen_degs) });
+			heap.push_back(rel_heap_t{ rel, get_deg(rel[0], gen_degs) });
 			std::push_heap(heap.begin(), heap.end(), cmp_heap_rels);
 		}
 	}
-	add_rels(gb, heap, [&gen_degs](const array& m) {return deg(m, gen_degs); }, -1, deg_max);
+	add_rels(gb, heap, [&gen_degs](const array& m) {return get_deg(m, gen_degs); }, -1, deg_max);
 }
 
 template <typename Fn>
@@ -603,7 +603,7 @@ array4d ann_seq(const array3d& gb, const array3d& polys, const array& gen_degs, 
 	int N = (int)polys.size();
 	for (int i = 0; i < N; ++i) {
 		array2d p = polys[i];
-		gen_degs1.push_back(deg(p, gen_degs));
+		gen_degs1.push_back(get_deg(p, gen_degs));
 		p.push_back({ i - N, 1 });
 		rels.push_back(std::move(p));
 	}

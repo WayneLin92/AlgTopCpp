@@ -88,19 +88,19 @@ void generate_basis(sqlite3* conn, const std::string& table_prefix, int t_max, b
 	for (int t = t_min; t <= t_max; t++) {
 		std::map<Deg, array2d> basis_new;
 		std::cout << "t=" << t << "          \r";
-		for (int i = 0; i < (int)gen_degs.size(); ++i) {
-			int t1 = t - gen_degs[i].t;
+		for (int gen_id = (int)gen_degs.size() - 1; gen_id >= 0; --gen_id) {
+			int t1 = t - gen_degs[gen_id].t;
 			if (t1 >= 0) {
 				auto p1 = basis.lower_bound(Deg{ 0, t1, 0 });
 				auto p2 = basis.lower_bound(Deg{ 0, t1 + 1, 0 });
 				for (auto p = p1; p != p2; ++p) {
 					for (const auto& m : p->second) {
-						if (m.empty() || i <= m[0]) {
-							array mon(mul(m, { i, 1 }));
-							if ((size_t)i >= leadings.size() || std::none_of(leadings[i].begin(), leadings[i].end(),
-								[&mon](array _m) { return divides(_m, mon); })) {
-								int s = p->first.s + gen_degs[i].s;
-								int v = p->first.v + gen_degs[i].v;
+						if (m.empty() || gen_id <= m[0]) {
+							array mon(mul(m, { gen_id, 1 }));
+							if ((size_t)gen_id >= leadings.size() || std::none_of(leadings[gen_id].begin(), leadings[gen_id].end(),
+								[&mon](const array& _m) { return divides(_m, mon); })) {
+								int s = p->first.s + gen_degs[gen_id].s;
+								int v = p->first.v + gen_degs[gen_id].v;
 								basis_new[Deg{ s, t, v }].push_back(std::move(mon));
 							}
 						}

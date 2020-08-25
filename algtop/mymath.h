@@ -116,12 +116,12 @@ array pow(const array& m, int e);
 /* m1 = m2^q * r */
 int log(const array& m1, const array& m2, array& r);
 
-inline int deg(const array& mon) { int result = 0; for (size_t i = 0; i < mon.size(); i += 2) result += mon[i + 1]; return result; };
-inline int deg(const array2d& poly) { return poly.size() ? deg(poly[0]) : -1; };
-inline int deg(const array& mon, const array& gen_degs) { int result = 0; for (size_t i = 0; i < mon.size(); i += 2) result += gen_degs[mon[i]] * mon[i + 1]; return result; };
-inline Deg deg(const array& mon, const std::vector<Deg>& gen_degs) { Deg result({ 0, 0, 0 }); for (size_t i = 0; i < mon.size(); i += 2) result += gen_degs[mon[i]] * mon[i + 1]; return result; };
-inline int deg(const array2d& p, const array& gen_degs) { return p.size() ? deg(p[0], gen_degs) : -1; }
-inline Deg deg(const array2d& p, const std::vector<Deg>& gen_degs) { return p.size() ? deg(p[0], gen_degs) : Deg({ -1, -1, -1 }); }
+inline int get_deg(const array& mon) { int result = 0; for (size_t i = 0; i < mon.size(); i += 2) result += mon[i + 1]; return result; };
+inline int get_deg(const array2d& poly) { return poly.size() ? get_deg(poly[0]) : -1; };
+inline int get_deg(const array& mon, const array& gen_degs) { int result = 0; for (size_t i = 0; i < mon.size(); i += 2) result += gen_degs[mon[i]] * mon[i + 1]; return result; };
+inline Deg get_deg(const array& mon, const std::vector<Deg>& gen_degs) { Deg result({ 0, 0, 0 }); for (size_t i = 0; i < mon.size(); i += 2) result += gen_degs[mon[i]] * mon[i + 1]; return result; };
+inline int get_deg(const array2d& p, const array& gen_degs) { return p.size() ? get_deg(p[0], gen_degs) : -1; }
+inline Deg get_deg(const array2d& p, const std::vector<Deg>& gen_degs) { return p.size() ? get_deg(p[0], gen_degs) : Deg({ -1, -1, -1 }); }
 /* cmp_mons(m1, m2) returns true if e1 < e2 in lexicographical order where e1, e2 are arrays of exponents. */
 bool cmp_mons(const array& m1, const array& m2);
 array gcd(const array& m1, const array& m2);
