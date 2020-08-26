@@ -156,20 +156,25 @@ std::map<Deg, DgaBasis1> get_basis_bi(const std::vector<Deg>& gen_degs, const ar
 	return result;
 }
 
-/* return a basis for t<=t_max */
-std::map<Deg, array2d> get_basis(const array3d& leadings, const std::vector<Deg>& gen_degs, int t_max)
+/* build the basis for t<=t_max */
+void get_basis(const array3d& leadings, const std::vector<Deg>& gen_degs, std::map<Deg, array2d>& basis, int t_max)
 {
-	std::map<Deg, array2d> result;
-	result[Deg{ 0, 0, 0 }].push_back({});
+	int t_min;
+	if (basis.empty()) {
+		basis[Deg{ 0, 0, 0 }].push_back({}); /* if no monomial present insert the unit */
+		t_min = 1;
+	}
+	else
+		t_min = basis.rbegin()->first.t + 1;
 
-	for (int t = 1; t <= t_max; ++t) {
+	for (int t = t_min; t <= t_max; ++t) {
 		std::map<Deg, array2d> basis_new;
 		std::cout << "Computing basis, t=" << t << "          \r";
 		for (int gen_id = (int)gen_degs.size() - 1; gen_id >= 0; --gen_id) { /* 58 is the gen_id of b1 */
 			int t1 = t - gen_degs[gen_id].t;
 			if (t1 >= 0) {
-				auto p1 = result.lower_bound(Deg{ 0, t1, 0 });
-				auto p2 = result.lower_bound(Deg{ 0, t1 + 1, 0 });
+				auto p1 = basis.lower_bound(Deg{ 0, t1, 0 });
+				auto p2 = basis.lower_bound(Deg{ 0, t1 + 1, 0 });
 				for (auto p = p1; p != p2; ++p) {
 					for (auto p_m = p->second.begin(); p_m != p->second.end(); ++p_m) {
 						if (p_m->empty() || gen_id <= p_m->front()) {
@@ -185,9 +190,8 @@ std::map<Deg, array2d> get_basis(const array3d& leadings, const std::vector<Deg>
 				}
 			}
 		}
-		result.merge(basis_new);
+		basis.merge(basis_new);
 	}
-	return result;
 }
 
 void get_basis_E2t(const std::map<Deg, DgaBasis1>& basis_E2, const std::map<Deg, DgaBasis1>& basis_bi, array2d* p_basis, array3d* p_diffs, const Deg& deg)
@@ -290,7 +294,7 @@ void generate_E4bk(sqlite3* conn, const std::string& table_prefix, const std::st
 	std::map<Deg, DgaBasis1> basis_bi = get_basis_bi(gen_degs_E2t, diffs_E2t, t_max);
 	std::cout << "basis_bi loaded! Size=" << basis_bi.size() << '\n';
 
-	/* Compute new generators */
+	/* compute new generators */
 
 	array4d b_ = ann_seq(gb, { a }, gen_degs_t, t_max);
 	std::cout << "b_=" << b_ << '\n';
@@ -322,7 +326,7 @@ void generate_E4bk(sqlite3* conn, const std::string& table_prefix, const std::st
 		reprs.push_back(add(mul(evaluate(b[i], [&reprs](int i) {return reprs[i]; }, gb_E2t), { bk_gen_id, 1 }), ab_inv[i]));
 	}
 
-	/* Compute the relations */
+	/* compute the relations */
 
 	add_rels(gb, { a }, gen_degs_t, t_max); /* Add relations dx=0 */
 	leadings.clear();
@@ -345,43 +349,53 @@ void generate_E4bk(sqlite3* conn, const std::string& table_prefix, const std::st
 			}
 	std::sort(rel_degs.begin(), rel_degs.end());
 
-	array3d rels;
-	std::map<Deg, array2d> basis = get_basis(leadings, gen_degs, rel_degs.empty() ? 0 : rel_degs.back().t);
-	for (size_t i = 0; i < rel_degs.size(); ++i) {
-		const Deg d = rel_degs[i];
-		std::cout << i << '/' << rel_degs.size() << ' ' << "deg=" << '(' << d.s << ", " << d.t << ", " << d.v << ')' << "          \r";
-		const array2d& basis_d = basis[d];
-		array2d basis_d_E2t;// = get_basis(leadings_E2t, gen_degs_E2t, d);
-		get_basis_E2t(basis_E2, basis_bi, &basis_d_E2t, nullptr, d);
-		array2d basis_d1_E2t;// = get_basis(leadings_E2t, gen_degs_E2t, d - Deg{ 1, 0, -2 });
-		array3d diffs_d_E2t;
-		get_basis_E2t(basis_E2, basis_bi, &basis_d1_E2t, &diffs_d_E2t, d - Deg{ 1, 0, -2 });
-		array indices = range((int)basis_d1_E2t.size());
-		std::sort(indices.begin(), indices.end(), [&basis_d1_E2t](int i1, int i2) {return cmp_mons(basis_d1_E2t[i1], basis_d1_E2t[i2]); });
-		std::sort(basis_d_E2t.begin(), basis_d_E2t.end(), cmp_mons);
-		std::sort(basis_d1_E2t.begin(), basis_d1_E2t.end(), cmp_mons);
+	
+	std::map<Deg, array2d> basis;
+	size_t i = 0;
+	std::vector<rel_heap_t> heap;
+	for (int t = 1; t <= t_max; ++t) {
+		get_basis(leadings, gen_degs, basis, t);
+		for (; i < rel_degs.size() && rel_degs[i].t == t; ++i) {
+			const Deg d = rel_degs[i];
+			std::cout << i << '/' << rel_degs.size() << ' ' << "deg=" << '(' << d.s << ", " << d.t << ", " << d.v << ')' << "          \r";
+			array2d& basis_d = basis[d];
+			array2d basis_d_E2t;
+			get_basis_E2t(basis_E2, basis_bi, &basis_d_E2t, nullptr, d);
+			array2d basis_d1_E2t;
+			array3d diffs_d_E2t;
+			get_basis_E2t(basis_E2, basis_bi, &basis_d1_E2t, &diffs_d_E2t, d - Deg{ 1, 0, -2 });
+			array indices = range((int)basis_d1_E2t.size());
+			std::sort(indices.begin(), indices.end(), [&basis_d1_E2t](int i1, int i2) {return cmp_mons(basis_d1_E2t[i1], basis_d1_E2t[i2]); });
+			std::sort(basis_d_E2t.begin(), basis_d_E2t.end(), cmp_mons);
+			std::sort(basis_d1_E2t.begin(), basis_d1_E2t.end(), cmp_mons);
 
-		array2d map_diff;
-		for (int i : indices)
-			map_diff.push_back(poly_to_indices(reduce(diffs_d_E2t[indices[i]], gb_E2t), basis_d_E2t));
-		array2d image_diff, kernel_diff, g_diff;
-		set_linear_map(map_diff, image_diff, kernel_diff, g_diff);
+			array2d map_diff;
+			for (int i : indices)
+				map_diff.push_back(poly_to_indices(reduce(diffs_d_E2t[indices[i]], gb_E2t), basis_d_E2t));
+			array2d image_diff, kernel_diff, g_diff;
+			set_linear_map(map_diff, image_diff, kernel_diff, g_diff);
 
-		array2d map_repr;
-		for (const array& mon : basis_d) {
-			array repr = residue(image_diff, poly_to_indices(evaluate({ mon }, [&reprs](int i) {return reprs[i]; }, gb_E2t), basis_d_E2t));
-			map_repr.push_back(std::move(repr));
+			array2d map_repr;
+			for (const array& mon : basis_d) {
+				array repr = residue(image_diff, poly_to_indices(evaluate({ mon }, [&reprs](int i) {return reprs[i]; }, gb_E2t), basis_d_E2t));
+				map_repr.push_back(std::move(repr));
+			}
+			array2d image_repr, kernel_repr, g_repr;
+			set_linear_map(map_repr, image_repr, kernel_repr, g_repr);
+			for (const array& rel_indices : kernel_repr) {
+				heap.push_back(rel_heap_t{ indices_to_poly(rel_indices, basis_d), t });
+				std::push_heap(heap.begin(), heap.end(), cmp_heap_rels);
+			}
+			for (const array& rel_indices : kernel_repr)
+				basis_d[rel_indices[0]].clear();
+			basis_d.erase(std::remove_if(basis_d.begin(), basis_d.end(), [](const array& m) {return m.empty(); }), basis_d.end());
 		}
-		array2d image_repr, kernel_repr, g_repr;
-		set_linear_map(map_repr, image_repr, kernel_repr, g_repr);
-		for (const array& rel_indices : kernel_repr)
-			rels.push_back(indices_to_poly(rel_indices, basis_d));
+		add_rels(gb, heap, gen_degs_t, t, t_max);
+		leadings.clear();
+		leadings.resize(gen_degs.size());
+		for (const array2d& g : gb)
+			leadings[g[0][0]].push_back(g[0]);
 	}
-
-	size_t old_gb_size = gb.size();
-	add_rels(gb, rels, gen_degs_t, t_max);
-	std::cout << "Groebner size increases by " << gb.size() - old_gb_size << '\n';
-
 
 	/* Save generators */
 	sqlite3_stmt* stmt_update_generators;
@@ -449,24 +463,25 @@ int main_generate_E4t(int argc, char** argv)
 	//return main_test1(argc, argv);
 
 	sqlite3* conn;
-	sqlite3_open(R"(C:\Users\lwnpk\Documents\MyProgramData\Math_AlgTop\database\ss.db)", &conn);
+	sqlite3_open(R"(C:\Users\lwnpk\Documents\MyProgramData\Math_AlgTop\database\tmp.db)", &conn);
 
 	auto start = std::chrono::system_clock::now();
 
-	//74: 0, 54, 75, 113, 172, 249
-	int t_max = 200;
-	//std::cout << "E4b1\n";
-	//generate_E4bk(conn, "E4", "E4b1", { {0, 1} }, 58, t_max);
+	//74: 0, 54, 75, 113, 172, 252
+	//200: 0, 431
+	int t_max = 74;
+	std::cout << "E4b1\n";
+	generate_E4bk(conn, "E4", "E4b1", { {0, 1} }, 58, t_max);
 	std::cout << "E4b2\n";
-	generate_E4bk(conn, "E4b1", "E4b2", { {431, 1} }, 59, t_max);
-	//std::cout << "E4b3\n";
-	//generate_E4bk(conn, "E4b2", "E4b3", { {75, 1} }, 60, t_max);
-	//std::cout << "E4b4\n";
-	//generate_E4bk(conn, "E4b3", "E4b4", { {113, 1} }, 61, t_max);
-	//std::cout << "E4b5\n";
-	//generate_E4bk(conn, "E4b4", "E4b5", { {172, 1} }, 62, t_max);
-	//std::cout << "E4b6\n";
-	//generate_E4bk(conn, "E4b5", "E4b6", { {249, 1} }, 63, t_max);
+	generate_E4bk(conn, "E4b1", "E4b2", { {54, 1} }, 59, t_max);
+	std::cout << "E4b3\n";
+	generate_E4bk(conn, "E4b2", "E4b3", { {75, 1} }, 60, t_max);
+	std::cout << "E4b4\n";
+	generate_E4bk(conn, "E4b3", "E4b4", { {113, 1} }, 61, t_max);
+	std::cout << "E4b5\n";
+	generate_E4bk(conn, "E4b4", "E4b5", { {172, 1} }, 62, t_max);
+	std::cout << "E4b6\n";
+	generate_E4bk(conn, "E4b5", "E4b6", { {252, 1} }, 63, t_max);
 	//std::cout << "E4b7\n";
 	//generate_E4bk(conn, "E4b6", "E4b7", 64);
 

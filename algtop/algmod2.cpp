@@ -95,6 +95,22 @@ array2d mul(const array2d& poly1, const array2d& poly2) {
 	return result;
 }
 
+array2d pow(const array2d& poly, int n)
+{
+	array2d result = { {} };
+	if (n == 0)
+		return result;
+	array2d power = poly;
+	while (n) {
+		if (n & 1)
+			result = mul(result, power);
+		n >>= 1;
+		if (n)
+			power = mul(power, power);
+	}
+	return result;
+}
+
 array2d pow(const array2d& poly, int n, const array3d& gb)
 {
 	array2d result = { {} };
@@ -168,7 +184,7 @@ array pow(const array& m, int e)
 	return result;
 }
 
-int log(const array& m1, const array& m2, array& r)
+int log(const array& m1, const array& m2)
 {
 	if (m2.empty()) {
 		std::cout << "log with 0 base!\n";
@@ -199,8 +215,6 @@ int log(const array& m1, const array& m2, array& r)
 	}
 	if (l < m2.size())
 		q = 0;
-
-	r = div(m1, pow(m2, q));
 	return q;
 }
 
@@ -408,11 +422,10 @@ array2d quotient_space(const array2d& spaceV, const array2d& spaceW)
 
 /******** Groebner Basis ********/
 
-array2d reduce(const array2d& poly, const array3d& gb)
+array2d reduce(array2d poly, const array3d& gb)
 {
 	array2d result;
-	array2d poly1(poly);
-	auto pbegin = poly1.begin(); auto pend = poly1.end();
+	auto pbegin = poly.begin(); auto pend = poly.end();
 	while (pbegin != pend) {
 		array3d::const_iterator pGb = gb.begin();
 		for (; pGb != gb.end(); ++pGb)
@@ -422,27 +435,20 @@ array2d reduce(const array2d& poly, const array3d& gb)
 			result.push_back(std::move(*pbegin++));
 		else {
 			array q = div(*pbegin, (*pGb)[0]);
-			array2d rel1 = mul(*pGb, q); // TODO: improve by using log
-			array2d poly2;
+			array2d rel1 = mul(*pGb, q);
+			array2d poly1;
 			std::set_symmetric_difference(pbegin, pend, rel1.begin(), rel1.end(),
-				std::back_inserter(poly2), cmp_mons);
-			poly1 = std::move(poly2);
-			pbegin = poly1.begin(); pend = poly1.end();
+				std::back_inserter(poly1), cmp_mons);
+			poly = std::move(poly1);
+			pbegin = poly.begin(); pend = poly.end();
 		}
 	}
 	return result;
 }
 
-struct rel_heap_t {
-	array2d poly;
-	int deg;
-};
-
-inline bool cmp_heap_rels(const rel_heap_t& s1, const rel_heap_t& s2) { return s1.deg > s2.deg; }
-
 /* Comsume relations from heap that is at most in degree `deg` while adding new relations to heap that is at most in degree `deg_max`. */
 template <typename Fn>
-void add_rels(array3d& gb, std::vector<rel_heap_t>& heap, Fn get_deg, int deg, int deg_max)
+void add_rels(array3d& gb, std::vector<rel_heap_t>& heap, Fn _get_deg, int deg, int deg_max)
 {
 	while (!heap.empty() && (deg == -1 ? (deg_max == -1 || heap.front().deg <= deg_max) : heap.front().deg <= deg)) {
 		std::pop_heap(heap.begin(), heap.end(), cmp_heap_rels);
@@ -457,14 +463,14 @@ void add_rels(array3d& gb, std::vector<rel_heap_t>& heap, Fn get_deg, int deg, i
 						array q = div(g[0], rel[0]);
 						array2d new_rel = add(mul(rel, q), g);
 						if (!new_rel.empty()) {
-							heap.push_back(rel_heap_t{ std::move(new_rel), get_deg(g[0]) });
+							heap.push_back(rel_heap_t{ std::move(new_rel), _get_deg(g[0]) });
 							std::push_heap(heap.begin(), heap.end(), cmp_heap_rels);
 						}
 						g.clear();
 					}
 					else {
 						array mlcm = lcm(rel[0], g[0]);
-						int deg_new_rel = get_deg(mlcm);
+						int deg_new_rel = _get_deg(mlcm);
 						if (deg_max == -1 || deg_new_rel <= deg_max) {
 							array q_r = div(mlcm, rel[0]);
 							array q_g = div(mlcm, g[0]);
@@ -483,16 +489,21 @@ void add_rels(array3d& gb, std::vector<rel_heap_t>& heap, Fn get_deg, int deg, i
 }
 
 template <typename Fn>
-void add_rels(array3d& gb, const array3d& rels, Fn get_deg, int deg_max)
+void add_rels(array3d& gb, const array3d& rels, Fn _get_deg, int deg_max)
 {
 	std::vector<rel_heap_t> heap;
 	for (const array2d& rel : rels) {
 		if (!rel.empty()) {
-			heap.push_back(rel_heap_t{ rel, get_deg(rel[0]) });
+			heap.push_back(rel_heap_t{ rel, _get_deg(rel[0]) });
 			std::push_heap(heap.begin(), heap.end(), cmp_heap_rels);
 		}
 	}
-	add_rels(gb, heap, get_deg, -1, deg_max);
+	add_rels(gb, heap, _get_deg, -1, deg_max);
+}
+
+void add_rels(array3d& gb, std::vector<rel_heap_t>& heap, const array& gen_degs, int t, int deg_max)
+{
+	add_rels(gb, heap, [&gen_degs](const array& m) {return get_deg(m, gen_degs); }, t, deg_max);
 }
 
 void add_rels(array3d& gb, const array3d& rels, const array& gen_degs, int deg_max)

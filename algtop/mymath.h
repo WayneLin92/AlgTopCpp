@@ -1,5 +1,7 @@
 #ifndef MYMATH_H
 #define MYMATH_H
+// TODO: greobner basis array4d version
+// TODO: polynomial array version
 
 #include "myparser.h"
 #include <algorithm>
@@ -67,6 +69,11 @@ struct Deg
 	};
 };
 
+struct rel_heap_t {
+	array2d poly;
+	int deg;
+};
+
 /********** FUNCTIONS **********/
 // Move to a header for python in the future
 
@@ -102,7 +109,12 @@ array div(const array& mon1, const array& mon2);
 array2d add(const array2d& poly1, const array2d& poly2);
 array2d mul(const array2d& poly, const array& mon); // TODO: add begin-end version of these functions
 array2d mul(const array2d& poly1, const array2d& poly2);
+array pow(const array& m, int e);
+array2d pow(const array2d& poly, int n);
 array2d pow(const array2d& poly, int n, const array3d& gb);
+bool divides(const array& m1, const array& m2);
+/* return the largest integer e where m1 = m2^e * r */
+int log(const array& m1, const array& m2);
 
 inline Mon operator*(const Mon& m1, const Mon& m2) { return mul(m1.data, m2.data); }
 inline Poly operator+(const Poly& p1, const Poly& p2) { return add(p1.data, p2.data); }
@@ -111,10 +123,6 @@ inline Poly operator*(const Poly& p, const Mon& m) { return mul(p.data, m.data);
 inline Poly operator*(const Mon& m, const Poly& p) { return mul(p.data, m.data); }
 inline Poly operator*(const Poly& p1, const Poly& p2) { return mul(p1.data, p2.data); }
 
-bool divides(const array& m1, const array& m2);
-array pow(const array& m, int e);
-/* m1 = m2^q * r */
-int log(const array& m1, const array& m2, array& r);
 
 inline int get_deg(const array& mon) { int result = 0; for (size_t i = 0; i < mon.size(); i += 2) result += mon[i + 1]; return result; };
 inline int get_deg(const array2d& poly) { return poly.size() ? get_deg(poly[0]) : -1; };
@@ -174,7 +182,10 @@ array2d quotient_space(const array2d& spaceV, const array2d& spaceW);
 */
 
 /* Reduce `poly` by groebner basis `rels` */
-array2d reduce(const array2d& poly, const array3d& gb);
+array2d reduce(array2d poly, const array3d& gb);
+inline bool cmp_heap_rels(const rel_heap_t& s1, const rel_heap_t& s2) { return s1.deg > s2.deg; }
+/* Comsume relations from heap that is at most in degree `deg` while adding new relations to heap that is at most in degree `deg_max`. */
+void add_rels(array3d& gb, std::vector<rel_heap_t>& heap, const array& gen_degs, int t, int deg_max);
 /* Add new relations `rels` to groebner basis `gb` */
 void add_rels(array3d& gb, const array3d& rels, const array& gen_degs, int deg_max);
 /* return a_{ij} such that a_{i1}p_1+...+a_{in}p_n=0 */
