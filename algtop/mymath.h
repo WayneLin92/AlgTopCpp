@@ -96,6 +96,15 @@ inline std::ostream& operator<<(std::ostream& sout, const array4d& a) { dump_arr
 inline std::ostream& operator<<(std::ostream& sout, const Poly& poly) { dump_array2d(poly.data, sout); return sout; }
 inline std::ostream& operator<<(std::ostream& sout, const Deg& d) { sout << '(' << d.s << ',' << d.t << ',' << d.v << ')'; return sout; }
 
+inline void hash_combine(std::size_t& seed, int v) { seed ^= std::hash<int>{}(v)+0x9e3779b9 + (seed << 6) + (seed >> 2); }
+inline size_t hash_range(const array& mon)
+{
+	size_t seed = 0;
+	for (int i : mon)
+		hash_combine(seed, i);
+	return seed;
+}
+
 /*--------- algmod2.cpp ---------*/
 /* Functions for Monomials and Polynomials
 **

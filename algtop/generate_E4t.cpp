@@ -169,7 +169,6 @@ void get_basis(const array3d& leadings, const std::vector<Deg>& gen_degs, std::m
 
 	for (int t = t_min; t <= t_max; ++t) {
 		std::map<Deg, array2d> basis_new;
-		std::cout << "Computing basis, t=" << t << "          \r";
 		for (int gen_id = (int)gen_degs.size() - 1; gen_id >= 0; --gen_id) { /* 58 is the gen_id of b1 */
 			int t1 = t - gen_degs[gen_id].t;
 			if (t1 >= 0) {
@@ -216,7 +215,7 @@ void get_basis_E2t(const std::map<Deg, DgaBasis1>& basis_E2, const std::map<Deg,
 						}
 			}
 		}
-	}		
+	}
 }
 
 /* Assume poly is a boundary. Return the chain with it as boundary */
@@ -348,8 +347,8 @@ void generate_E4bk(sqlite3* conn, const std::string& table_prefix, const std::st
 				break;
 			}
 	std::sort(rel_degs.begin(), rel_degs.end());
+	rel_degs.erase(std::unique(rel_degs.begin(), rel_degs.end()), rel_degs.end());
 
-	
 	std::map<Deg, array2d> basis;
 	size_t i = 0;
 	std::vector<rel_heap_t> heap;
@@ -390,7 +389,8 @@ void generate_E4bk(sqlite3* conn, const std::string& table_prefix, const std::st
 				basis_d[rel_indices[0]].clear();
 			basis_d.erase(std::remove_if(basis_d.begin(), basis_d.end(), [](const array& m) {return m.empty(); }), basis_d.end());
 		}
-		add_rels(gb, heap, gen_degs_t, t, t_max);
+		
+		add_rels(gb, heap, gen_degs_t, std::min(t + 1, t_max), t_max);
 		leadings.clear();
 		leadings.resize(gen_degs.size());
 		for (const array2d& g : gb)
@@ -441,34 +441,17 @@ void generate_E4bk(sqlite3* conn, const std::string& table_prefix, const std::st
 
 int main_test1(int argc, char** argv)
 {
-	//array a = { 1, 2, 3, 4 };
-	//std::cout << std::hash<array>(a);
-	sqlite3* conn;
-	sqlite3_open(R"(C:\Users\lwnpk\Documents\MyProgramData\Math_AlgTop\database\ss.db)", &conn);
-
-	/* Load basis */
-
-	std::map<Deg, array2d> basis;
-	load_basis(conn, "E2_basis", basis);
-	for (const auto& pair : basis) {
-		std::cout << pair.first << ": " << pair.second.size() << '\n';
-	}
-
-	sqlite3_close(conn);
-	return 0;
-}
-
-int main_generate_E4t(int argc, char** argv)
-{
-	//return main_test1(argc, argv);
-
 	sqlite3* conn;
 	sqlite3_open(R"(C:\Users\lwnpk\Documents\MyProgramData\Math_AlgTop\database\tmp.db)", &conn);
 
-	auto start = std::chrono::system_clock::now();
+	/*execute_cmd(conn, "DELETE FROM E4b1_generators; DELETE FROM E4b1_relations;"
+		"DELETE FROM E4b2_generators; DELETE FROM E4b2_relations;"
+		"DELETE FROM E4b3_generators; DELETE FROM E4b3_relations;"
+		"DELETE FROM E4b4_generators; DELETE FROM E4b4_relations;"
+		"DELETE FROM E4b5_generators; DELETE FROM E4b5_relations;"
+		"DELETE FROM E4b6_generators; DELETE FROM E4b6_relations;");*/
 
-	//74: 0, 54, 75, 113, 172, 252
-	//200: 0, 431
+	auto start = std::chrono::system_clock::now();
 	int t_max = 74;
 	std::cout << "E4b1\n";
 	generate_E4bk(conn, "E4", "E4b1", { {0, 1} }, 58, t_max);
@@ -481,7 +464,40 @@ int main_generate_E4t(int argc, char** argv)
 	std::cout << "E4b5\n";
 	generate_E4bk(conn, "E4b4", "E4b5", { {172, 1} }, 62, t_max);
 	std::cout << "E4b6\n";
-	generate_E4bk(conn, "E4b5", "E4b6", { {252, 1} }, 63, t_max);
+	generate_E4bk(conn, "E4b5", "E4b6", { {253, 1} }, 63, t_max);
+
+
+
+	auto end = std::chrono::system_clock::now();
+	std::chrono::duration<double> elapsed = end - start;
+	std::cout << "Elapsed time: " << elapsed.count() << "s\n";
+
+	sqlite3_close(conn);
+	return 0;
+}
+
+int main_generate_E4t(int argc, char** argv)
+{
+	//return main_test1(argc, argv);
+
+	sqlite3* conn;
+	sqlite3_open(R"(C:\Users\lwnpk\Documents\MyProgramData\Math_AlgTop\database\ss.db)", &conn);
+
+	auto start = std::chrono::system_clock::now();
+
+	int t_max = 200;
+	/*std::cout << "E4b1\n";
+	generate_E4bk(conn, "E4", "E4b1", { {0, 1} }, 58, t_max);*/
+	//std::cout << "E4b2\n";
+	//generate_E4bk(conn, "E4b1", "E4b2", { {431, 1} }, 59, t_max);
+	//std::cout << "E4b3\n";
+	//generate_E4bk(conn, "E4b2", "E4b3", { {646, 1} }, 60, t_max);
+	std::cout << "E4b4\n";
+	generate_E4bk(conn, "E4b3", "E4b4", { {1064, 1} }, 61, t_max);
+	/*std::cout << "E4b5\n";
+	generate_E4bk(conn, "E4b4", "E4b5", { {172, 1} }, 62, t_max);
+	std::cout << "E4b6\n";
+	generate_E4bk(conn, "E4b5", "E4b6", { {252, 1} }, 63, t_max);*/
 	//std::cout << "E4b7\n";
 	//generate_E4bk(conn, "E4b6", "E4b7", 64);
 
