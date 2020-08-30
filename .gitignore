@@ -345,3 +345,4 @@ healthchecksdb
 # Custom
 /algtop/myparser.h
 /profiler reports/
+*.txt

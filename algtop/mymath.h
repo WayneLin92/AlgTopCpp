@@ -1,33 +1,25 @@
 #ifndef MYMATH_H
 #define MYMATH_H
 // TODO: greobner basis array4d version
-// TODO: polynomial array version
+// TODO: monomial std::vector<MonPow> version
 
 #include "myparser.h"
 #include <algorithm>
 #include <numeric>
 
-/* sparse monomial i1, e1, i2, e2, ... */
-typedef std::vector<int>     array;
-typedef std::vector<array>   array2d;
-typedef std::vector<array2d> array3d;
-typedef std::vector<array3d> array4d;
-
 /********** STRUCTS AND CLASSES **********/
+/* sparse monomial i1, e1, i2, e2, ... */
+using array = std::vector<int>;
+using array2d = std::vector<array>;
+using array3d = std::vector<array2d>;
+using array4d = std::vector<array3d>;
+using arrayInd = array::const_iterator;
 
-struct Mon
-{
-	array data;
-	Mon(array data_) : data(data_) {};
-};
-
-struct Poly
-{
-	array2d data;
-	Poly() {};
-	Poly(array2d data_) : data(data_) {};
-	Poly(Mon mon) : data({ mon.data }) {};
-};
+struct MonPow { int gen, exp; };
+using Mon = std::vector<MonPow>;
+using Poly = std::vector<Mon>;
+using Poly1d = std::vector<Poly>;
+using Poly2d = std::vector<Poly1d>;
 
 struct Deg
 {
@@ -93,7 +85,6 @@ inline std::ostream& operator<<(std::ostream& sout, const array2d& poly)      { 
 inline std::ostream& operator<<(std::ostream& sout, const array3d& polys)    { dump_array3d(polys, sout); return sout; }
 inline std::ostream& operator<<(std::ostream& sout, const array4d& a) { dump_array4d(a, sout); return sout; }
 
-inline std::ostream& operator<<(std::ostream& sout, const Poly& poly) { dump_array2d(poly.data, sout); return sout; }
 inline std::ostream& operator<<(std::ostream& sout, const Deg& d) { sout << '(' << d.s << ',' << d.t << ',' << d.v << ')'; return sout; }
 
 inline void hash_combine(std::size_t& seed, int v) { seed ^= std::hash<int>{}(v)+0x9e3779b9 + (seed << 6) + (seed >> 2); }
@@ -122,16 +113,9 @@ array pow(const array& m, int e);
 array2d pow(const array2d& poly, int n);
 array2d pow(const array2d& poly, int n, const array3d& gb);
 bool divides(const array& m1, const array& m2);
+bool divides(arrayInd pFirst1, arrayInd pLast1, arrayInd pFirst2, arrayInd pLast2);
 /* return the largest integer e where m1 = m2^e * r */
 int log(const array& m1, const array& m2);
-
-inline Mon operator*(const Mon& m1, const Mon& m2) { return mul(m1.data, m2.data); }
-inline Poly operator+(const Poly& p1, const Poly& p2) { return add(p1.data, p2.data); }
-inline Poly operator+=(Poly& p1, const Poly& p2) { return p1 = add(p1.data, p2.data); }
-inline Poly operator*(const Poly& p, const Mon& m) { return mul(p.data, m.data); }
-inline Poly operator*(const Mon& m, const Poly& p) { return mul(p.data, m.data); }
-inline Poly operator*(const Poly& p1, const Poly& p2) { return mul(p1.data, p2.data); }
-
 
 inline int get_deg(const array& mon) { int result = 0; for (size_t i = 0; i < mon.size(); i += 2) result += mon[i + 1]; return result; };
 inline int get_deg(const array2d& poly) { return poly.size() ? get_deg(poly[0]) : -1; };

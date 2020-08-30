@@ -1,5 +1,6 @@
 #include "mymath.h"
 
+/******** Monomials and Polynomials ********/
 
 array mul(const array& mon1, const array& mon2)
 {
@@ -166,6 +167,24 @@ bool divides(const array& m1, const array& m2)
 		}
 	}
 	if (k < m1.size())
+		return false;
+	return true;
+}
+
+bool divides(arrayInd pFirst1, const arrayInd pLast1, arrayInd pFirst2, const arrayInd pLast2)
+{
+	while (pFirst1 != pLast1 && pFirst2 != pLast2) {
+		if (*pFirst1 < *pFirst2)
+			return false;
+		else if (*pFirst1 > *pFirst2)
+			pFirst2 += 2;
+		else if (*(++pFirst1) > *(++pFirst2))
+			return false;
+		else {
+			++pFirst1; ++pFirst2;
+		}
+	}
+	if (pFirst1 != pLast1)
 		return false;
 	return true;
 }

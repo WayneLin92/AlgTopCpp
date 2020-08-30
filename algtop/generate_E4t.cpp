@@ -1,5 +1,7 @@
 #include "database.h"
 #include <chrono>
+#include <fstream>
+#include <future>
 
 /********** STRUCTS AND CLASSES **********/
 
@@ -237,6 +239,43 @@ array2d d_inv(const array2d& poly, const array3d& gb, const array3d& leadings, c
 	return indices_to_poly(get_image(image, g, poly_to_indices(poly, basis_in_poly)), basis_in_result);
 }
 
+std::vector<rel_heap_t> find_relations(Deg d, array2d& basis_d, const std::map<Deg, DgaBasis1>& basis_E2, const std::map<Deg, DgaBasis1>& basis_bi, const array3d& gb_E2t, const array3d& reprs)
+{
+	array2d basis_d_E2t;
+	get_basis_E2t(basis_E2, basis_bi, &basis_d_E2t, nullptr, d);
+	array2d basis_d1_E2t;
+	array3d diffs_d_E2t;
+	get_basis_E2t(basis_E2, basis_bi, &basis_d1_E2t, &diffs_d_E2t, d - Deg{ 1, 0, -2 });
+	array indices = range((int)basis_d1_E2t.size());
+	std::sort(indices.begin(), indices.end(), [&basis_d1_E2t](int i1, int i2) {return cmp_mons(basis_d1_E2t[i1], basis_d1_E2t[i2]); });
+	std::sort(basis_d_E2t.begin(), basis_d_E2t.end(), cmp_mons);
+	std::sort(basis_d1_E2t.begin(), basis_d1_E2t.end(), cmp_mons);
+
+	array2d map_diff;
+	for (int i : indices)
+		map_diff.push_back(poly_to_indices(reduce(diffs_d_E2t[indices[i]], gb_E2t), basis_d_E2t));
+	array2d image_diff, kernel_diff, g_diff;
+	set_linear_map(map_diff, image_diff, kernel_diff, g_diff);
+
+	array2d map_repr;
+	for (const array& mon : basis_d) {
+		array repr = residue(image_diff, poly_to_indices(evaluate({ mon }, [&reprs](int i) {return reprs[i]; }, gb_E2t), basis_d_E2t));
+		map_repr.push_back(std::move(repr));
+	}
+	array2d image_repr, kernel_repr, g_repr;
+	set_linear_map(map_repr, image_repr, kernel_repr, g_repr);
+
+	std::vector<rel_heap_t> result;
+	for (const array& rel_indices : kernel_repr)
+		result.push_back(rel_heap_t{ indices_to_poly(rel_indices, basis_d), d.t });
+
+	for (const array& rel_indices : kernel_repr)
+		basis_d[rel_indices[0]].clear();
+	basis_d.erase(std::remove_if(basis_d.begin(), basis_d.end(), [](const array& m) {return m.empty(); }), basis_d.end());
+
+	return result;
+}
+
 void generate_E4bk(sqlite3* conn, const std::string& table_prefix, const std::string& table1_prefix, const array2d& a, int bk_gen_id, int t_max)
 {
 	/* load generators */
@@ -349,46 +388,33 @@ void generate_E4bk(sqlite3* conn, const std::string& table_prefix, const std::st
 	std::sort(rel_degs.begin(), rel_degs.end());
 	rel_degs.erase(std::unique(rel_degs.begin(), rel_degs.end()), rel_degs.end());
 
+	std::ofstream myfile;
+	myfile.open("rel_gens.txt");
+	for (const auto& d : rel_degs)
+		myfile << d << '\n';
+	myfile.close();
+
 	std::map<Deg, array2d> basis;
 	size_t i = 0;
 	std::vector<rel_heap_t> heap;
 	for (int t = 1; t <= t_max; ++t) {
 		get_basis(leadings, gen_degs, basis, t);
+
+		std::vector<std::future<std::vector<rel_heap_t>>> futures;
 		for (; i < rel_degs.size() && rel_degs[i].t == t; ++i) {
 			const Deg d = rel_degs[i];
-			std::cout << i << '/' << rel_degs.size() << ' ' << "deg=" << '(' << d.s << ", " << d.t << ", " << d.v << ')' << "          \r";
 			array2d& basis_d = basis[d];
-			array2d basis_d_E2t;
-			get_basis_E2t(basis_E2, basis_bi, &basis_d_E2t, nullptr, d);
-			array2d basis_d1_E2t;
-			array3d diffs_d_E2t;
-			get_basis_E2t(basis_E2, basis_bi, &basis_d1_E2t, &diffs_d_E2t, d - Deg{ 1, 0, -2 });
-			array indices = range((int)basis_d1_E2t.size());
-			std::sort(indices.begin(), indices.end(), [&basis_d1_E2t](int i1, int i2) {return cmp_mons(basis_d1_E2t[i1], basis_d1_E2t[i2]); });
-			std::sort(basis_d_E2t.begin(), basis_d_E2t.end(), cmp_mons);
-			std::sort(basis_d1_E2t.begin(), basis_d1_E2t.end(), cmp_mons);
-
-			array2d map_diff;
-			for (int i : indices)
-				map_diff.push_back(poly_to_indices(reduce(diffs_d_E2t[indices[i]], gb_E2t), basis_d_E2t));
-			array2d image_diff, kernel_diff, g_diff;
-			set_linear_map(map_diff, image_diff, kernel_diff, g_diff);
-
-			array2d map_repr;
-			for (const array& mon : basis_d) {
-				array repr = residue(image_diff, poly_to_indices(evaluate({ mon }, [&reprs](int i) {return reprs[i]; }, gb_E2t), basis_d_E2t));
-				map_repr.push_back(std::move(repr));
-			}
-			array2d image_repr, kernel_repr, g_repr;
-			set_linear_map(map_repr, image_repr, kernel_repr, g_repr);
-			for (const array& rel_indices : kernel_repr) {
-				heap.push_back(rel_heap_t{ indices_to_poly(rel_indices, basis_d), t });
+			futures.push_back(std::async(std::launch::async, find_relations, d, std::ref(basis_d), std::ref(basis_E2), std::ref(basis_bi), std::ref(gb_E2t), std::ref(reprs)));
+		}
+		for (size_t j = 0; j < futures.size(); ++j) {
+			futures[j].wait();
+			std::cout << "t=" << t << " completed thread=" << j + 1 << '/' << futures.size() << "          \r";
+		}
+		for (auto& f : futures)
+			for (auto& rel : f.get()) {
+				heap.push_back(std::move(rel));
 				std::push_heap(heap.begin(), heap.end(), cmp_heap_rels);
 			}
-			for (const array& rel_indices : kernel_repr)
-				basis_d[rel_indices[0]].clear();
-			basis_d.erase(std::remove_if(basis_d.begin(), basis_d.end(), [](const array& m) {return m.empty(); }), basis_d.end());
-		}
 		
 		add_rels(gb, heap, gen_degs_t, std::min(t + 1, t_max), t_max);
 		leadings.clear();
@@ -444,12 +470,18 @@ int main_test1(int argc, char** argv)
 	sqlite3* conn;
 	sqlite3_open(R"(C:\Users\lwnpk\Documents\MyProgramData\Math_AlgTop\database\tmp.db)", &conn);
 
-	/*execute_cmd(conn, "DELETE FROM E4b1_generators; DELETE FROM E4b1_relations;"
-		"DELETE FROM E4b2_generators; DELETE FROM E4b2_relations;"
-		"DELETE FROM E4b3_generators; DELETE FROM E4b3_relations;"
-		"DELETE FROM E4b4_generators; DELETE FROM E4b4_relations;"
-		"DELETE FROM E4b5_generators; DELETE FROM E4b5_relations;"
-		"DELETE FROM E4b6_generators; DELETE FROM E4b6_relations;");*/
+	execute_cmd(conn, "DELETE FROM E4b1_generators;");
+	execute_cmd(conn, "DELETE FROM E4b1_relations;");
+	execute_cmd(conn, "DELETE FROM E4b2_generators;");
+	execute_cmd(conn, "DELETE FROM E4b2_relations;");
+	execute_cmd(conn, "DELETE FROM E4b3_generators;");
+	execute_cmd(conn, "DELETE FROM E4b3_relations;");
+	execute_cmd(conn, "DELETE FROM E4b4_generators;");
+	execute_cmd(conn, "DELETE FROM E4b4_relations;");
+	execute_cmd(conn, "DELETE FROM E4b5_generators;");
+	execute_cmd(conn, "DELETE FROM E4b5_relations;");
+	execute_cmd(conn, "DELETE FROM E4b6_generators;");
+	execute_cmd(conn, "DELETE FROM E4b6_relations;");
 
 	auto start = std::chrono::system_clock::now();
 	int t_max = 74;
@@ -478,14 +510,14 @@ int main_test1(int argc, char** argv)
 
 int main_generate_E4t(int argc, char** argv)
 {
-	//return main_test1(argc, argv);
+	return main_test1(argc, argv);
 
 	sqlite3* conn;
 	sqlite3_open(R"(C:\Users\lwnpk\Documents\MyProgramData\Math_AlgTop\database\ss.db)", &conn);
 
 	auto start = std::chrono::system_clock::now();
 
-	int t_max = 200;
+	int t_max = 189;
 	/*std::cout << "E4b1\n";
 	generate_E4bk(conn, "E4", "E4b1", { {0, 1} }, 58, t_max);*/
 	//std::cout << "E4b2\n";

@@ -24,7 +24,7 @@ namespace UnitTestAlgTop
 		{
 			array2d p = { {1, 3}, {0, 3}, {0, 1, 2, 1} };
 			array3d images = { {{1, 1}, {0, 1}}, {}, {{3, 1}} };
-			array2d fp = evaluate(p, [&images](int gen_id) {return images[gen_id]; }, {});
+			array2d fp = evaluate(p, [&images](int gen_id) {return images[gen_id]; }, array3d{});
 			array2d anwer = { {1, 1, 3, 1}, {1, 3}, {0, 1, 3, 1}, {0, 1, 1, 2}, {0, 2, 1, 1}, {0, 3} };
 			Assert::AreEqual(array2d_to_str(anwer), array2d_to_str(fp));
 		};
@@ -116,7 +116,7 @@ namespace UnitTestAlgTop
 		TEST_METHOD(test_groebner_B7)
 		{
 			array gen_degs;
-			int n_max = 7;
+			int n_max = 8;
 			for (int d = 1; d <= n_max; d++) {
 				for (int i = 0; i <= n_max - d; i++) {
 					int j = i + d;
@@ -127,7 +127,7 @@ namespace UnitTestAlgTop
 			for (int d = 2; d <= n_max; d++) {
 				for (int i = 0; i <= n_max - d; i++) {
 					int j = i + d;
-					Poly rel;
+					array2d rel;
 					for (int k = i + 1; k < j; k++) {
 						int a = (1 << k) - (1 << i);
 						int b = (1 << j) - (1 << k);
@@ -135,16 +135,20 @@ namespace UnitTestAlgTop
 						auto p2 = std::find(gen_degs.begin(), gen_degs.end(), b);
 						int index1 = int(p1 - gen_degs.begin());
 						int index2 = int(p2 - gen_degs.begin());
-						rel += index1 < index2 ? Mon({ index1, 1, index2, 1 }) : Mon({ index2, 1, index1, 1 });
+						rel = add(rel, index1 < index2 ? array2d{ { index1, 1, index2, 1 } } : array2d{ { index2, 1, index1, 1 } });
 					}
-					rels.push_back(std::move(rel.data));
+					rels.push_back(std::move(rel));
 				}
 			}
 
-			array3d gb;
+			array4d gb;
 			add_rels(gb, rels, gen_degs, -1);
-			int answer = 65;
-			Assert::AreEqual(answer, int(gb.size()));
+			size_t gb_size = 0;
+			for (auto& p = gb.cbegin(); p != gb.cend(); ++p)
+				gb_size += p->size();
+			//size_t gb_size = gb.size();
+			size_t answer = 163;
+			Assert::AreEqual(answer, gb_size);
 		}
 
 		TEST_METHOD(test_groebner)
