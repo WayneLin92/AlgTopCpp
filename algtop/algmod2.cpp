@@ -345,7 +345,7 @@ array residue(const array2d& spaceV, const array& v)
 	return result;
 }
 
-array residue(const array2d& spaceV, array&& v)
+array residue(const array2d& spaceV, array&& v)//
 {
 	array result(v);
 	for (size_t i = 0; i < spaceV.size(); ++i)

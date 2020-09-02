@@ -510,7 +510,7 @@ int main_test1(int argc, char** argv)
 
 int main_generate_E4t(int argc, char** argv)
 {
-	return main_test1(argc, argv);
+	//return main_test1(argc, argv);
 
 	sqlite3* conn;
 	sqlite3_open(R"(C:\Users\lwnpk\Documents\MyProgramData\Math_AlgTop\database\ss.db)", &conn);
@@ -524,11 +524,11 @@ int main_generate_E4t(int argc, char** argv)
 	//generate_E4bk(conn, "E4b1", "E4b2", { {431, 1} }, 59, t_max);
 	//std::cout << "E4b3\n";
 	//generate_E4bk(conn, "E4b2", "E4b3", { {646, 1} }, 60, t_max);
-	std::cout << "E4b4\n";
-	generate_E4bk(conn, "E4b3", "E4b4", { {1064, 1} }, 61, t_max);
-	/*std::cout << "E4b5\n";
-	generate_E4bk(conn, "E4b4", "E4b5", { {172, 1} }, 62, t_max);
-	std::cout << "E4b6\n";
+	//std::cout << "E4b4\n";
+	//generate_E4bk(conn, "E4b3", "E4b4", { {1064, 1} }, 61, t_max);
+	std::cout << "E4b5\n";
+	generate_E4bk(conn, "E4b4", "E4b5", { {1849, 1} }, 62, t_max);
+	/*std::cout << "E4b6\n";
 	generate_E4bk(conn, "E4b5", "E4b6", { {252, 1} }, 63, t_max);*/
 	//std::cout << "E4b7\n";
 	//generate_E4bk(conn, "E4b6", "E4b7", 64);

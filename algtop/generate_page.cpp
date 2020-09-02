@@ -147,8 +147,6 @@ void generate_next_page(sqlite3* conn, const std::string& table_prefix, const st
 		for (; i < basis_ss.size() && basis_ss[i].deg.t == t; ++i) {
 			auto& basis_ss_d = basis_ss[i];
 			const auto& deg = basis_ss_d.deg;
-			if (deg == Deg({ 7, 90, 8 }))
-				std::cout << deg.s << ", " << deg.t << "< " << deg.v << " test\n";
 			basis_H.push_back(Basis_H_d({ deg, {}, {} }));
 			if (deg_in(deg, basis_H_new)) {
 				auto& basis_H_new_d = get_item_by_deg(basis_H_new, deg);
