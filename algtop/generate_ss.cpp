@@ -49,8 +49,6 @@ void generate_ss(sqlite3* conn, const std::string& table_name_basis, const std::
 		for (const auto& base : basis_ss_d.basis_ind)
 			lead_image.push_back(base.front());
 		std::sort(lead_image.begin(), lead_image.end());
-		if (!lead_image.empty() && (range_.empty() || lead_image.back() > range_.back()))
-			std::cout << "test\n";
 
 		array x = add_vectors(range_, lead_image);
 
