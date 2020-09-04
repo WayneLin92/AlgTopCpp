@@ -1,6 +1,6 @@
 #include "CppUnitTest.h"
 #include "../algtop/database.h"
-#include "../algtop/database.cpp"
+#include "../algtop/my_utilities.cpp"
 #include "../algtop/algmod2.cpp"
 
 using namespace Microsoft::VisualStudio::CppUnitTestFramework;
@@ -141,7 +141,7 @@ namespace UnitTestAlgTop
 				}
 			}
 
-			array4d gb;
+			array3d gb;
 			add_rels(gb, rels, gen_degs, -1);
 			size_t gb_size = 0;
 			for (auto& p = gb.cbegin(); p != gb.cend(); ++p)

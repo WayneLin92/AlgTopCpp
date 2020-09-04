@@ -1,4 +1,4 @@
-#include "database.h"
+#include "main.h"
 #include <chrono>
 #include <fstream>
 #include <future>
@@ -181,11 +181,8 @@ void get_basis(const array3d& leadings, const std::vector<Deg>& gen_degs, std::m
 						if (p_m->empty() || gen_id <= p_m->front()) {
 							array mon(mul(*p_m, { gen_id, 1 }));
 							if ((size_t)gen_id >= leadings.size() || std::none_of(leadings[gen_id].begin(), leadings[gen_id].end(),
-								[&mon](const array& _m) { return divides(_m, mon); })) {
-								int s = p->first.s + gen_degs[gen_id].s;
-								int v = p->first.v + gen_degs[gen_id].v;
-								basis_new[Deg{ s, t, v }].push_back(std::move(mon));
-							}
+								[&mon](const array& _m) { return divides(_m, mon); }))
+								basis_new[p->first + gen_degs[gen_id]].push_back(std::move(mon));
 						}
 					}
 				}
@@ -510,7 +507,7 @@ int main_test1(int argc, char** argv)
 
 int main_generate_E4t(int argc, char** argv)
 {
-	//return main_test1(argc, argv);
+	return main_test1(argc, argv);
 
 	sqlite3* conn;
 	sqlite3_open(R"(C:\Users\lwnpk\Documents\MyProgramData\Math_AlgTop\database\ss.db)", &conn);

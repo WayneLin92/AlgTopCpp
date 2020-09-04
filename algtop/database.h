@@ -3,18 +3,50 @@
 
 #include "mymath.h"
 #include "sqlite3/sqlite3.h"
-#include <iostream>
-#include <vector>
-#include <array>
 #include <map>
 
 constexpr auto T_MAX = 10000;
-inline const char* sqlite3_column_str(sqlite3_stmt* stmt, int iCol) { return reinterpret_cast<const char*>(sqlite3_column_text(stmt, iCol)); }
-inline int sqlite3_bind_str(sqlite3_stmt* stmt, int iCol, const std::string& str) { return sqlite3_bind_text(stmt, iCol, str.c_str(), -1, SQLITE_TRANSIENT); }
-inline int sqlite3_prepare_v100(sqlite3* db, const char* zSql, sqlite3_stmt** ppStmt) { return sqlite3_prepare_v2(db, zSql, int(strlen(zSql)) + 1, ppStmt, NULL); }
-inline int sqlite3_prepare_v100(sqlite3* db, std::string sql, sqlite3_stmt** ppStmt) { return sqlite3_prepare_v2(db, sql.c_str(), int(sql.size()) + 1, ppStmt, NULL); }
 
-/*--------- database.cpp ---------*/
+class Database
+{
+public:
+	Database() : m_conn(nullptr) {}
+	~Database() { sqlite3_close(m_conn); }
+	void init(const char* filename) { if (sqlite3_open(filename, &m_conn) != SQLITE_OK) throw "8de81e80-b37a-467b-90e1-638388477988"; }
+public:
+	void execute_cmd(const std::string& cmd) const;
+	void sqlite3_prepare_v100(const char* zSql, sqlite3_stmt** ppStmt) const { if (sqlite3_prepare_v2(m_conn, zSql, int(strlen(zSql)) + 1, ppStmt, NULL) != SQLITE_OK) throw "bce2dcfe-2759-4745-8693-db1f27e23e32"; }
+	void sqlite3_prepare_v100(const std::string& sql, sqlite3_stmt** ppStmt) const { if (sqlite3_prepare_v2(m_conn, sql.c_str(), int(sql.size()) + 1, ppStmt, NULL) != SQLITE_OK) throw "da6ab7f6-4294-4134-8a0c-64ca14122fae"; }
+public:
+	std::vector<Deg> load_gen_degs(const std::string& table_name) const;
+	array3d load_leading_terms(const std::string& table_name) const;
+	std::map<Deg, array2d> load_basis(const std::string& table_name) const;
+
+	void save_basis(const std::string& table_name, const std::map<Deg, array2d>& basis_new) const;
+private:
+	sqlite3* m_conn;
+};
+
+class Statement
+{
+public:
+	Statement() : m_stmt(nullptr) {}
+	~Statement() { sqlite3_finalize(m_stmt); }
+	void init(const Database& db, const std::string& cmd) { db.sqlite3_prepare_v100(cmd, &m_stmt); }
+public:
+	void bind_str(int iCol, const std::string& str) const { if (sqlite3_bind_text(m_stmt, iCol, str.c_str(), -1, SQLITE_TRANSIENT) != SQLITE_OK) throw "29cc3b21-1edb-4f1e-891b-1acdfabd6c36"; }
+	void bind_int(int iCol, int i) const { if (sqlite3_bind_int(m_stmt, iCol, i) != SQLITE_OK) throw "a61e05b2-0cd7-41eb-b3a6-c9d520e61b0b"; }
+	const char* column_str(int iCol) const { return reinterpret_cast<const char*>(sqlite3_column_text(m_stmt, iCol)); }
+	int column_int(int iCol) const { return sqlite3_column_int(m_stmt, iCol); }
+	int step() const { return sqlite3_step(m_stmt); }
+	int reset() const { return sqlite3_reset(m_stmt); }
+private:
+	sqlite3_stmt* m_stmt;
+};
+
+
+/*--------- my_utilities.cpp ---------*/
+
 std::string array_to_str(array::const_iterator pbegin, array::const_iterator pend);
 array str_to_array(const char* str_mon);
 std::string array2d_to_str(array2d::const_iterator pbegin, array2d::const_iterator pend);
@@ -22,51 +54,6 @@ array2d str_to_array2d(const char* str_poly);
 
 inline std::string array_to_str(const array& a) { return array_to_str(a.begin(), a.end()); };
 inline std::string array2d_to_str(const array2d& a) { return array2d_to_str(a.begin(), a.end()); };
-
-template<typename DegOrderedList>
-inline bool deg_in(const Deg& deg, const DegOrderedList& basis) {
-	auto pEle = std::lower_bound(basis.begin(), basis.end(), deg, [](const typename DegOrderedList::value_type& ele, const Deg& deg) {
-		return ele.deg < deg; });
-	return pEle < basis.end() && pEle->deg == deg;
-}
-
-template<typename DegOrderedList>
-inline auto& get_item_by_deg(DegOrderedList& basis, const Deg& deg)
-{
-	auto pEle = std::lower_bound(basis.begin(), basis.end(), deg, [](const typename DegOrderedList::value_type& ele, const Deg& deg) { 
-		return ele.deg < deg; });
-	return *pEle;
-}
-
-/*--------- generate_basis.cpp ---------*/
-
-/* Execute simple commands.*/
-void execute_cmd(sqlite3* conn, const std::string& cmd);
-int main_generate_basis(int argc, char** argv);
-void load_gen_degs(sqlite3* conn, const std::string& table_name, std::vector<Deg>& gen_degs);
-void load_basis(sqlite3* conn, const std::string& table_name, std::map<Deg, array2d>& basis);
-void load_leading_terms(sqlite3* conn, const std::string& table_name, array3d& leadings);
-
-/*--------- generate_mon_diffs.cpp ---------*/
-
-int main_generate_diff(int argc, char** argv);
-void load_gen_diffs(sqlite3* conn, const std::string& table_name, array3d& diffs);
-void load_gb(sqlite3* conn, const std::string& table_name, array3d& gb);
-inline std::pair<int, int> get_ab(const std::vector<std::array<int, 5>>& indices_tsv, int s, int t, int v)
-{
-	auto row = std::lower_bound(indices_tsv.begin(), indices_tsv.end(), std::array<int, 5>({ t, s, v, 0, 0 }));
-	return std::pair<int, int>({ (*row)[3], (*row)[4] });
-}
-
-/*--------- generate_ss.cpp ---------*/
-
-int main_generate_ss(int argc, char** argv);
-
-/* generate_next_page.cpp */
-
-int main_generate_next_page(int argc, char** argv);
-array poly_to_indices(const array2d& poly, const array2d& basis);
-array2d indices_to_poly(const array& indices, const array2d& basis);
 
 inline int get_index(const array2d& basis, const array& mon)
 {
@@ -80,9 +67,13 @@ inline int get_index(const array2d& basis, const array& mon)
 	return int(index - basis.begin());
 }
 
-/*--------- generate_E4t.cpp ---------*/
+array poly_to_indices(const array2d& poly, const array2d& basis);
+array2d indices_to_poly(const array& indices, const array2d& basis);
 
-int main_generate_E4t(int argc, char** argv);
-int main_test(int argc, char** argv);
+inline const char* sqlite3_column_str(sqlite3_stmt* stmt, int iCol) { return reinterpret_cast<const char*>(sqlite3_column_text(stmt, iCol)); }//
+inline int sqlite3_bind_str(sqlite3_stmt* stmt, int iCol, const std::string& str) { return sqlite3_bind_text(stmt, iCol, str.c_str(), -1, SQLITE_TRANSIENT); }//
+inline int sqlite3_prepare_v100(sqlite3* db, const char* zSql, sqlite3_stmt** ppStmt) { return sqlite3_prepare_v2(db, zSql, int(strlen(zSql)) + 1, ppStmt, NULL); }//
+inline int sqlite3_prepare_v100(sqlite3* db, std::string sql, sqlite3_stmt** ppStmt) { return sqlite3_prepare_v2(db, sql.c_str(), int(sql.size()) + 1, ppStmt, NULL); }//
+
 
 #endif /* DATABSE_H */

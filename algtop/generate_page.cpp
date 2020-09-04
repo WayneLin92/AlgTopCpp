@@ -1,4 +1,4 @@
-#include "database.h"
+#include "main.h"
 
 /********** STRUCTS AND CLASSES **********/
 
@@ -9,22 +9,6 @@ struct BasisSS1
 };
 
 /********** FUNCTIONS **********/
-
-array2d indices_to_poly(const array& indices, const array2d& basis)
-{
-	array2d result;
-	for (int i : indices)
-		result.push_back(basis[i]);
-	return result;
-}
-
-array poly_to_indices(const array2d& poly, const array2d& basis)
-{
-	array result;
-	for (const array& mon : poly)
-		result.push_back(get_index(basis, mon));
-	return result;
-}
 
 void load_basis_ss(sqlite3* conn, const std::string& table_name_ss, std::map<Deg, BasisSS1>& basis_ss, int r)
 {
@@ -74,8 +58,8 @@ void generate_next_page(sqlite3* conn, const std::string& table_prefix, const st
 	std::map<Deg, array2d> mon_reprs_H_new;
 
 	int t_max = basis_ss.crbegin()->first.t;
-	int prev_t = 0;
 	for (int t = 1; t <= t_max; ++t){
+		std::cout << "generate next page, t=" << t << "          \r";
 		auto p1_ss = basis_ss.lower_bound(Deg{ 0, t, 0 });
 		auto p2_ss = basis_ss.lower_bound(Deg{ 0, t + 1, 0 });
 		for (auto p_ss = p1_ss; p_ss != p2_ss; ++p_ss) {

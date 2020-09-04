@@ -1,68 +1,69 @@
 #include "database.h"
-#include <sstream>
 
-/*********** FUNCTIONS **********/
 
-std::string array_to_str(array::const_iterator pbegin, array::const_iterator pend)
+void Database::execute_cmd(const std::string& cmd) const
 {
-	std::stringstream ss;
-	for (auto p = pbegin; p < pend; p++) {
-		ss << *p;
-		if (p + 1 < pend)
-			ss << ",";
-	}
-	return ss.str();
+	sqlite3_stmt* stmt;
+	sqlite3_prepare_v100(cmd, &stmt);
+	sqlite3_step(stmt);
+	sqlite3_finalize(stmt);
 }
 
-array str_to_array(const char* str_mon)
+std::vector<Deg> Database::load_gen_degs(const std::string& table_name) const
 {
-	array result;
-	if (str_mon[0] == '\0')
-		return array();
-	std::stringstream ss(str_mon);
-	while (ss.good()) {
-		int i;
-		ss >> i;
-		result.push_back(i);
-		if (ss.peek() == ',')
-			ss.ignore();
-	}
-	return result;
+	std::vector<Deg> gen_degs;
+	Statement stmt;
+	stmt.init(*this, "SELECT s, t, v FROM " + table_name + " ORDER BY gen_id;");
+	while (stmt.step() == SQLITE_ROW)
+		gen_degs.emplace_back(stmt.column_int(0), stmt.column_int(1), stmt.column_int(2));
+	std::cout << "gen_degs loaded from " << table_name << ", size=" << gen_degs.size() << '\n';
+	return gen_degs;
 }
 
-std::string array2d_to_str(array2d::const_iterator pbegin, array2d::const_iterator pend) /* Warning: assume inner arrays are all nontrivial */
+array3d Database::load_leading_terms(const std::string& table_name) const
 {
-	std::stringstream ss;
-	for (auto pMon = pbegin; pMon < pend; pMon++) {
-		for (auto p = pMon->begin(); p < pMon->end(); p++) {
-			ss << *p;
-			if (p + 1 < pMon->end())
-				ss << ",";
+	array3d leadings;
+	Statement stmt;
+	stmt.init(*this, "SELECT leading_term FROM " + table_name + ";");
+	while (stmt.step() == SQLITE_ROW) {
+		array mon(str_to_array(stmt.column_str(0)));
+		if (size_t(mon[0]) >= leadings.size())
+			leadings.resize(size_t(mon[0]) + 1);
+		leadings[mon[0]].push_back(mon);
+	}
+	std::cout << "leadings loaded from " << table_name << ", size=" << leadings.size() << '\n';
+	return leadings;
+}
+
+std::map<Deg, array2d> Database::load_basis(const std::string& table_name) const
+{
+	std::map<Deg, array2d> basis;
+	Statement stmt;
+	stmt.init(*this, "SELECT s, t, v, mon FROM " + table_name + " ORDER BY mon_id;");
+	while (stmt.step() == SQLITE_ROW) {
+		Deg d = { stmt.column_int(0), stmt.column_int(1), stmt.column_int(2) };
+		basis[d].push_back(str_to_array(stmt.column_str(3)));
+	}
+	std::cout << "basis loaded from " << table_name << ", size=" << basis.size() << '\n';
+	return basis;
+}
+
+
+void Database::save_basis(const std::string& table_name, const std::map<Deg, array2d>& basis) const
+{
+	Statement stmt;
+	stmt.init(*this, "INSERT INTO " + table_name + " (mon, s, t, v) VALUES (?1, ?2, ?3, ?4);");
+
+	execute_cmd("BEGIN TRANSACTION");
+	for (auto& [deg, basis_d] : basis) {
+		for (auto& m : basis_d) {
+			stmt.bind_str(1, array_to_str(m));
+			stmt.bind_int(2, deg.s);
+			stmt.bind_int(3, deg.t);
+			stmt.bind_int(4, deg.v);
+			stmt.step();
+			stmt.reset();
 		}
-		if (pMon + 1 < pend)
-			ss << ";";
 	}
-	return ss.str();
-}
-
-array2d str_to_array2d(const char* str_poly) /* Warning: assume inner arrays are all nontrivial */
-{
-	array2d result;
-	if (str_poly[0] == '\0')
-		return array2d();
-	std::stringstream ss(str_poly);
-	while (ss.good()) {
-		int i;
-		ss >> i;
-		if (result.empty())
-			result.push_back(array());
-		result.back().push_back(i);
-		if (ss.peek() == ',')
-			ss.ignore();
-		else if (ss.peek() == ';') {
-			ss.ignore();
-			result.push_back(array());
-		}
-	}
-	return result;
+	execute_cmd("END TRANSACTION");
 }

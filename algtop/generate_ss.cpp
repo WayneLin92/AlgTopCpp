@@ -1,4 +1,4 @@
-#include "database.h"
+#include "main.h"
 
 struct BasisSS
 {
