@@ -8,18 +8,24 @@
 #include <numeric>
 
 /********** STRUCTS AND CLASSES **********/
-/* sparse monomial i1, e1, i2, e2, ... */
 using array = std::vector<int>;
 using array2d = std::vector<array>;
 using array3d = std::vector<array2d>;
 using array4d = std::vector<array3d>;
 using arrayInd = array::const_iterator;
 
-struct MonPow { int gen, exp; };
-using Mon = std::vector<MonPow>;
+struct MonPow {
+	int gen, exp;
+	MonPow(int g, int e) : gen(g), exp(e) {}
+	bool operator<(const MonPow& rhs) const { return gen > rhs.gen || (gen == rhs.gen && exp < rhs.exp); }
+};
+using Mon = std::vector<MonPow>; // only monomials in the same degree are comparable
 using Poly = std::vector<Mon>;
 using Poly1d = std::vector<Poly>;
 using Poly2d = std::vector<Poly1d>;
+using Mon1d = std::vector<Mon>;
+using Mon2d = std::vector<Mon1d>;
+using MonInd = Mon::const_iterator;
 
 struct Deg
 {
@@ -62,36 +68,47 @@ struct Deg
 };
 
 struct rel_heap_t {
-	array2d poly;
+	Poly poly;
 	int deg;
 };
 
 /********** FUNCTIONS **********/
 // Move to a header for python in the future
 
-inline void load_array(array& mon, std::istream& sin)         { load_vector(mon, sin, "(", ",", ")"); } // TODO: check if empty string is properly handled
-inline void load_array2d(array2d& poly, std::istream& sin)      { load_vector(poly, sin, "{", ",", "}", load_array); }
-inline void load_array3d(array3d& polys, std::istream& sin)   { load_vector(polys, sin, "[", ",", "]", load_array2d); }
-inline void dump_array(const array& mon, std::ostream& sout)              { dump_vector(mon, sout, "(", ", ", ")"); }
-inline void dump_array2d(const array2d& poly, std::ostream& sout)           { dump_vector(poly, sout, "{", ", ", "}", dump_array); }
-inline void dump_array3d(const array3d& polys, std::ostream& sout)        { dump_vector(polys, sout, "[", ", ", "]", dump_array2d); }
+inline void load_array(array& mon, std::istream& sin) { load_vector(mon, sin, "(", ",", ")"); } // TODO: check if empty string is properly handled
+inline void load_array2d(array2d& poly, std::istream& sin) { load_vector(poly, sin, "{", ",", "}", load_array); }
+inline void load_array3d(array3d& polys, std::istream& sin) { load_vector(polys, sin, "[", ",", "]", load_array2d); }
+inline void dump_array(const array& mon, std::ostream& sout) { dump_vector(mon, sout, "(", ", ", ")"); }
+inline void dump_array2d(const array2d& poly, std::ostream& sout) { dump_vector(poly, sout, "{", ", ", "}", dump_array); }
+inline void dump_array3d(const array3d& polys, std::ostream& sout) { dump_vector(polys, sout, "[", ", ", "]", dump_array2d); }
 inline void dump_array4d(const array4d& a, std::ostream& sout) { dump_vector(a, sout, "[", ", ", "]", dump_array3d); }
 
-inline std::istream& operator>>(std::istream& sin, array& mon)        { load_array(mon, sin); return sin; }
-inline std::istream& operator>>(std::istream& sin, array2d& poly)      { load_array2d(poly, sin); return sin; }
-inline std::istream& operator>>(std::istream& sin, array3d& polys)    { load_array3d(polys, sin); return sin; }
-inline std::ostream& operator<<(std::ostream& sout, const array& mon)        { dump_array(mon, sout); return sout; }
-inline std::ostream& operator<<(std::ostream& sout, const array2d& poly)      { dump_array2d(poly, sout); return sout; }
-inline std::ostream& operator<<(std::ostream& sout, const array3d& polys)    { dump_array3d(polys, sout); return sout; }
-inline std::ostream& operator<<(std::ostream& sout, const array4d& a) { dump_array4d(a, sout); return sout; }
+void dump_MonPow(const MonPow& p, std::ostream& sout);
+inline void dump_Mon(const Mon& mon, std::ostream& sout) { dump_vector(mon, sout, "", "", "", dump_MonPow); }
+inline void dump_Poly(const Poly& poly, std::ostream& sout) { dump_vector(poly, sout, "", "+", "", dump_Mon); }
+inline void dump_Poly1d(const Poly1d& polys, std::ostream& sout) { dump_vector(polys, sout, "(", ", ", ")", dump_Poly); }
+inline void dump_Poly2d(const Poly2d& polys, std::ostream& sout) { dump_vector(polys, sout, "[", ", ", "]", dump_Poly1d); }
 
+inline std::istream& operator>>(std::istream& sin, array& mon) { load_array(mon, sin); return sin; }
+inline std::istream& operator>>(std::istream& sin, array2d& poly) { load_array2d(poly, sin); return sin; }
+inline std::istream& operator>>(std::istream& sin, array3d& polys) { load_array3d(polys, sin); return sin; }
+
+inline std::ostream& operator<<(std::ostream& sout, const array& mon) { dump_array(mon, sout); return sout; }
+inline std::ostream& operator<<(std::ostream& sout, const array2d& poly) { dump_array2d(poly, sout); return sout; }
+inline std::ostream& operator<<(std::ostream& sout, const array3d& polys) { dump_array3d(polys, sout); return sout; }
+inline std::ostream& operator<<(std::ostream& sout, const array4d& a) { dump_array4d(a, sout); return sout; }
 inline std::ostream& operator<<(std::ostream& sout, const Deg& d) { sout << '(' << d.s << ',' << d.t << ',' << d.v << ')'; return sout; }
+inline std::ostream& operator<<(std::ostream& sout, const MonPow& p) { dump_MonPow(p, sout); return sout; }
+inline std::ostream& operator<<(std::ostream& sout, const Mon& mon) { dump_Mon(mon, sout); return sout; }
+inline std::ostream& operator<<(std::ostream& sout, const Poly& poly) { dump_Poly(poly, sout); return sout; }
+inline std::ostream& operator<<(std::ostream& sout, const Poly1d& polys) { dump_Poly1d(polys, sout); return sout; }
+inline std::ostream& operator<<(std::ostream& sout, const Poly2d& polys) { dump_Poly2d(polys, sout); return sout; }
 
 inline void hash_combine(std::size_t& seed, int v) { seed ^= std::hash<int>{}(v)+0x9e3779b9 + (seed << 6) + (seed >> 2); }
-inline size_t hash_range(const array& mon)
+inline size_t hash_range(const array& a)
 {
 	size_t seed = 0;
-	for (int i : mon)
+	for (int i : a)
 		hash_combine(seed, i);
 	return seed;
 }
@@ -101,36 +118,34 @@ inline size_t hash_range(const array& mon)
 **
 ** A monomial m is an array of i1, e1, i2, e2, ...
 ** Monomials are ordered lexicographically by exponents after filling in zero exponents.
-** A polynomials is an increasing squence of monomials.
+** A polynomials is an increasing sequence of monomials.
 */
 
-array mul(const array& mon1, const array& mon2);
-array div(const array& mon1, const array& mon2);
-array2d add(const array2d& poly1, const array2d& poly2);
-array2d mul(const array2d& poly, const array& mon); // TODO: add begin-end version of these functions
-array2d mul(const array2d& poly1, const array2d& poly2);
-array pow(const array& m, int e);
-array2d pow(const array2d& poly, int n);
-array2d pow(const array2d& poly, int n, const array3d& gb);
-bool divides(const array& m1, const array& m2);
-bool divides(arrayInd pFirst1, arrayInd pLast1, arrayInd pFirst2, arrayInd pLast2);
+Mon mul(const Mon& mon1, const Mon& mon2);
+Mon div(const Mon& mon1, const Mon& mon2);
+Poly add(const Poly& poly1, const Poly& poly2);
+Poly mul(const Poly& poly, const Mon& mon);
+inline Poly mul(const Mon& mon, const Poly& poly) { return mul(poly, mon); }
+Poly mul(const Poly& poly1, const Poly& poly2);
+Mon pow(const Mon& m, int e);
+Poly pow(const Poly& poly, int n);
+Poly pow(const Poly& poly, int n, const Poly1d& gb);
+bool divides(const Mon& m1, const Mon& m2);
 /* return the largest integer e where m1 = m2^e * r */
-int log(const array& m1, const array& m2);
+int log(const Mon& m1, const Mon& m2);
 
-inline int get_deg(const array& mon) { int result = 0; for (size_t i = 0; i < mon.size(); i += 2) result += mon[i + 1]; return result; };
-inline int get_deg(const array2d& poly) { return poly.size() ? get_deg(poly[0]) : -1; };
-inline int get_deg(const array& mon, const array& gen_degs) { int result = 0; for (size_t i = 0; i < mon.size(); i += 2) result += gen_degs[mon[i]] * mon[i + 1]; return result; };
-inline Deg get_deg(const array& mon, const std::vector<Deg>& gen_degs) { Deg result({ 0, 0, 0 }); for (size_t i = 0; i < mon.size(); i += 2) result += gen_degs[mon[i]] * mon[i + 1]; return result; };
-inline int get_deg_t(const array& mon, const std::vector<Deg>& gen_degs) { int result = 0; for (size_t i = 0; i < mon.size(); i += 2) result += gen_degs[mon[i]].t * mon[i + 1]; return result; };
-inline int get_deg(const array2d& p, const array& gen_degs) { return p.size() ? get_deg(p[0], gen_degs) : -1; }
-inline Deg get_deg(const array2d& p, const std::vector<Deg>& gen_degs) { return p.size() ? get_deg(p[0], gen_degs) : Deg({ -1, -1, -1 }); }
-/* cmp_mons(m1, m2) returns true if e1 < e2 in lexicographical order where e1, e2 are arrays of exponents. */
-bool cmp_mons(const array& m1, const array& m2);
-array gcd(const array& m1, const array& m2);
-array lcm(const array& m1, const array& m2);
+inline int get_deg(const Mon& mon) { int result = 0; for (MonInd p = mon.begin(); p != mon.end(); ++p) result += p->exp; return result; };
+inline int get_deg(const Poly& poly) { return poly.size() ? get_deg(poly[0]) : -1; };
+inline int get_deg(const Mon& mon, const array& gen_degs) { int result = 0; for (MonInd p = mon.begin(); p != mon.end(); ++p) result += gen_degs[p->gen] * p->exp; return result; };
+inline Deg get_deg(const Mon& mon, const std::vector<Deg>& gen_degs) { Deg result({ 0, 0, 0 }); for (MonInd p = mon.begin(); p != mon.end(); ++p) result += gen_degs[p->gen] * p->exp; return result; };
+inline int get_deg_t(const Mon& mon, const std::vector<Deg>& gen_degs) { int result = 0; for (MonInd p = mon.begin(); p != mon.end(); ++p) result += gen_degs[p->gen].t * p->exp; return result; };
+inline int get_deg(const Poly& p, const array& gen_degs) { return p.size() ? get_deg(p[0], gen_degs) : -1; }
+inline Deg get_deg(const Poly& p, const std::vector<Deg>& gen_degs) { return p.size() ? get_deg(p[0], gen_degs) : Deg({ -1, -1, -1 }); }
+Mon gcd(const Mon& m1, const Mon& m2);
+Mon lcm(const Mon& m1, const Mon& m2);
 
-array2d get_diff(const array& mon, const array3d& diffs);
-array2d get_diff(const array2d& poly, const array3d& diffs);
+Poly get_diff(const Mon& mon, const Poly1d& diffs);
+Poly get_diff(const Poly& poly, const Poly1d& diffs);
 
 /* Linear Algebra Mod 2
 **
@@ -176,23 +191,23 @@ array2d quotient_space(const array2d& spaceV, const array2d& spaceW);
 */
 
 /* Reduce `poly` by groebner basis `rels` */
-array2d reduce(array2d poly, const array3d& gb);
+Poly reduce(Poly poly, const Poly1d& gb);
 inline bool cmp_heap_rels(const rel_heap_t& s1, const rel_heap_t& s2) { return s1.deg > s2.deg; }
 /* Comsume relations from heap that is at most in degree `deg` while adding new relations to heap that is at most in degree `deg_max`. */
-void add_rels(array3d& gb, std::vector<rel_heap_t>& heap, const array& gen_degs, int t, int deg_max);
+void add_rels(Poly1d& gb, std::vector<rel_heap_t>& heap, const array& gen_degs, int t, int deg_max);
 /* Add new relations `rels` to groebner basis `gb` */
-void add_rels(array3d& gb, const array3d& rels, const array& gen_degs, int deg_max);
+void add_rels(Poly1d& gb, const Poly1d& rels, const array& gen_degs, int deg_max);
 /* return a_{ij} such that a_{i1}p_1+...+a_{in}p_n=0 */
-array4d ann_seq(const array3d& gb, const array3d& polys, const array& gen_degs, int deg_max);
+Poly2d ann_seq(const Poly1d& gb, const Poly1d& polys, const array& gen_degs, int deg_max);
 
 template <typename Fn>
-array2d evaluate(const array2d& poly, Fn map, const array3d& gb)
+Poly evaluate(const Poly& poly, Fn map, const Poly1d& gb)
 {
-	array2d result;
-	for (const array& m : poly) {
-		array2d fm = { {} };
-		for (size_t i = 0; i < m.size(); i += 2)
-			fm = reduce(mul(fm, pow(map(m[i]), m[i + 1], gb)), gb);
+	Poly result;
+	for (const Mon& m : poly) {
+		Poly fm = { {} };
+		for (MonInd p = m.begin(); p != m.end(); ++p)
+			fm = reduce(mul(fm, pow(map(p->gen), p->exp, gb)), gb);
 		result = add(result, fm);
 	}
 	return result;

@@ -2,106 +2,93 @@
 
 /******** Monomials and Polynomials ********/
 
-array mul(const array& mon1, const array& mon2)
+Mon mul(const Mon& mon1, const Mon& mon2)
 {
-	array result;
-	size_t k = 0, l = 0;
-	while (k < mon1.size() && l < mon2.size()) {
-		if (mon1[k] < mon2[l]) {
-			result.push_back(mon1[k]);
-			result.push_back(mon1[k + 1]);
-			k += 2;
-		}
-		else if (mon1[k] > mon2[l]) {
-			result.push_back(mon2[l]);
-			result.push_back(mon2[l + 1]);
-			l += 2;
-		}
+	Mon result;
+	MonInd k = mon1.begin(), l = mon2.begin();
+	while (k != mon1.end() && l != mon2.end()) {
+		if (k->gen < l->gen)
+			result.push_back(*k++);
+		else if (k->gen > l->gen)
+			result.push_back(*l++);
 		else {
-			result.push_back(mon1[k]);
-			result.push_back(mon1[k + 1] + mon2[l + 1]);
-			k += 2;
-			l += 2;
+			result.emplace_back(k->gen, k->exp + l->exp);
+			k++; l++;
 		}
 	}
-	if (k < mon1.size())
-		result.insert(result.end(), mon1.begin() + k, mon1.end());
+	if (k != mon1.end())
+		result.insert(result.end(), k, mon1.end());
 	else
-		result.insert(result.end(), mon2.begin() + l, mon2.end());
+		result.insert(result.end(), l, mon2.end());
 	return result;
 }
 
-array div(const array& mon1, const array& mon2)
+Mon div(const Mon& mon1, const Mon& mon2)
 {
-	array result;
-	size_t k = 0, l = 0;
-	while (k < mon1.size() && l < mon2.size()) {
-		if (mon1[k] < mon2[l]) {
-			result.push_back(mon1[k]);
-			result.push_back(mon1[k + 1]);
-			k += 2;
-		}
+	Mon result;
+	MonInd k = mon1.begin(), l = mon2.begin();
+	while (k != mon1.end() && l != mon2.end()) {
+		if (k->gen < l->gen)
+			result.push_back(*k++);
 #ifdef _DEBUG
-		else if (mon1[k] > mon2[l]) {
+		else if (k->gen > l->gen){
 			std::cout << "mon1/mon2 not divisible!\n";
-			throw "1227de8e-31a8-40ae-9ad3-85b1cd6872cf";
+			throw "1227de8e";
 		}
 #endif
-		else if (mon1[k + 1] > mon2[l + 1]) {
-			result.push_back(mon1[k]);
-			result.push_back(mon1[k + 1] - mon2[l + 1]);
-			k += 2;
-			l += 2;
+		else if (k->exp > l->exp) {
+			result.emplace_back(k->gen, k->exp - l->exp);
+			k++; l++;
 		}
-		else if (mon1[k + 1] == mon2[l + 1]) {
-			k += 2;
-			l += 2;
+		else if (k->exp == l->exp) {
+			k++;
+			l++;
 		}
 #ifdef _DEBUG
 		else {
 			std::cout << "mon1/mon2 not divisible!\n";
-			throw "a9c74ef9-c5ef-484a-8b53-261be63349e3";
+			throw "a9c74ef9";
 		}
 #endif
 	}
 #ifdef _DEBUG
-	if (l < mon2.size()) {
+	if (l != mon2.end()) {
 		std::cout << "mon1/mon2 not divisible!\n";
-		throw "6cdd66bd-597e-4c3b-ab1d-1bf8014d84a0";
+		throw "6cdd66bd";
 	}
 	else
 #endif
-		result.insert(result.end(), mon1.begin() + k, mon1.end());
+		result.insert(result.end(), k, mon1.end());
 	return result;
 }
 
-array2d add(const array2d& poly1, const array2d& poly2) {
-	array2d result;
+Poly add(const Poly& poly1, const Poly& poly2) {
+	Poly result;
 	std::set_symmetric_difference(poly1.begin(), poly1.end(), poly2.begin(), poly2.end(),
-		std::back_inserter(result), cmp_mons);
+		std::back_inserter(result));
 	return result;
 }
 
-array2d mul(const array2d& poly, const array& mon) {
-	array2d result;
-	for (const array& m : poly)
+Poly mul(const Poly& poly, const Mon& mon) {
+	Poly result;
+	for (const Mon& m : poly)
 		result.push_back(mul(m, mon));
 	return result;
 }
 
-array2d mul(const array2d& poly1, const array2d& poly2) {
-	array2d result;
-	for (const array& mon2 : poly2)
+Poly mul(const Poly& poly1, const Poly& poly2) {
+	Poly result;
+	for (const Mon& mon2 : poly2)
 		result = add(result, mul(poly1, mon2));
 	return result;
 }
 
-array2d pow(const array2d& poly, int n)
+Poly pow(const Poly& poly, int n)
 {
-	array2d result = { {} };
+	Poly result = { {} };
 	if (n == 0)
 		return result;
-	array2d power = poly;
+	Poly power = poly;
 	while (n) {
 		if (n & 1)
 			result = mul(result, power);
@@ -112,12 +99,12 @@ array2d pow(const array2d& poly, int n)
 	return result;
 }
 
-array2d pow(const array2d& poly, int n, const array3d& gb)
+Poly pow(const Poly& poly, int n, const Poly1d& gb)
 {
-	array2d result = { {} };
+	Poly result = { {} };
 	if (n == 0)
 		return result;
-	array2d power = poly;
+	Poly power = poly;
 	while (n) {
 		if (n & 1)
 			result = reduce(mul(result, power), gb);
@@ -128,198 +115,141 @@ array2d pow(const array2d& poly, int n, const array3d& gb)
 	return result;
 }
 
-bool cmp_mons(const array& m1, const array& m2)
+bool divides(const Mon& mon1, const Mon& mon2)
 {
-	if (m1.empty())  /* 1 is the biggest monomial */
-		return false;
-	else if (m2.empty())
-		return true;
-	size_t i;
-	for (i = 0; i < m1.size() && i < m2.size(); i += 2) {
-		if (m1[i] > m2[i])
-			return true;
-		else if (m1[i] < m2[i])
+	MonInd k = mon1.begin(), l = mon2.begin();
+	while (k != mon1.end() && l != mon2.end()) {
+		if (k->gen < l->gen)
 			return false;
-		else if (m1[i + 1] < m2[i + 1])
-			return true;
-		else if (m1[i + 1] > m2[i + 1])
-			return false;
-	}
-	if (i < m2.size())
-		return true;
-	else
-		return false;
-}
-
-bool divides(const array& m1, const array& m2)
-{
-	size_t k = 0, l = 0;
-	while (k < m1.size() && l < m2.size()) {
-		if (m1[k] < m2[l])
-			return false;
-		else if (m1[k] > m2[l])
-			l += 2;
-		else if (m1[k + 1] > m2[l + 1])
+		else if (k->gen > l->gen)
+			l++;
+		else if (k->exp > l->exp)
 			return false;
 		else {
-			k += 2;
-			l += 2;
+			k++;
+			l++;
 		}
 	}
-	if (k < m1.size())
+	if (k != mon1.end())
 		return false;
 	return true;
 }
 
-bool divides(arrayInd pFirst1, const arrayInd pLast1, arrayInd pFirst2, const arrayInd pLast2)
-{
-	while (pFirst1 != pLast1 && pFirst2 != pLast2) {
-		if (*pFirst1 < *pFirst2)
-			return false;
-		else if (*pFirst1 > *pFirst2)
-			pFirst2 += 2;
-		else if (*(++pFirst1) > *(++pFirst2))
-			return false;
-		else {
-			++pFirst1; ++pFirst2;
-		}
-	}
-	if (pFirst1 != pLast1)
-		return false;
-	return true;
-}
-
-array pow(const array& m, int e)
+Mon pow(const Mon& m, int e)
 {
 	if (e == 0)
-		return array();
+		return {};
 	else if (e == 1)
 		return m;
-	array result;
-	for (size_t i = 0; i < m.size(); i += 2) {
-		result.push_back(m[i]);
-		result.push_back(m[i + 1] * e);
-	}
+	Mon result;
+	for (MonInd p = m.begin(); p != m.end(); ++p)
+		result.emplace_back(p->gen, p->exp * e);
 	return result;
 }
 
-int log(const array& m1, const array& m2)
+int log(const Mon& mon1, const Mon& mon2)
 {
-	if (m2.empty()) {
+	if (mon2.empty()) {
 		std::cout << "log with 0 base!\n";
-		throw "f50d7f56-8ca7-4efe-9b23-3c9cde40d069";
+		throw "f50d7f56";
 	}
 	int q = -1;
 
 	/* Compute q */
-	size_t k = 0, l = 0;
-	while (k < m1.size() && l < m2.size()) {
-		if (m1[k] < m2[l])
-			k += 2;
-		else if (m1[k] > m2[l]) {
+	MonInd k = mon1.begin(), l = mon2.begin();
+	while (k != mon1.end() && l != mon2.end()) {
+		if (k->gen < l->gen)
+			k++;
+		else if (k->gen > l->gen) {
 			q = 0;
 			break;
 		}
-		else if (m1[k + 1] < m2[l + 1]) {
+		else if (k->exp < l->exp) {
 			q = 0;
 			break;
 		}
 		else {
-			int q1 = m1[k + 1] / m2[l + 1];
+			int q1 = k->exp / l->exp;
 			if (q == -1 || q > q1)
 				q = q1;
-			k += 2;
-			l += 2;
+			k++;
+			l++;
 		}
 	}
-	if (l < m2.size())
+	if (l != mon2.end())
 		q = 0;
 	return q;
 }
 
-array gcd(const array& m1, const array& m2)
+Mon gcd(const Mon& mon1, const Mon& mon2)
 {
-	array result;
-	size_t k = 0, l = 0;
-	while (k < m1.size() && l < m2.size()) {
-		if (m1[k] < m2[l])
-			k += 2;
-		else if (m1[k] > m2[l])
-			l += 2;
+	Mon result;
+	MonInd k = mon1.begin(), l = mon2.begin();
+	while (k != mon1.end() && l != mon2.end()) {
+		if (k->gen < l->gen)
+			k++;
+		else if (k->gen > l->gen)
+			l++;
 		else {
-			result.push_back(m1[k]);
-			result.push_back(std::min(m1[k + 1], m2[l + 1]));
-			k += 2;
-			l += 2;
+			result.emplace_back(k->gen, std::min(k->exp, l->exp));
+			k++; l++;
 		}
 	}
 	return result;
 }
 
-bool gcd_nonzero(const array& mon1, const array& mon2)
+bool gcd_nonzero(const Mon& mon1, const Mon& mon2)
 {
-	size_t k = 0, l = 0;
-	while (k < mon1.size() && l < mon2.size()) {
-		if (mon1[k] < mon2[l])
-			k += 2;
-		else if (mon1[k] > mon2[l])
-			l += 2;
+	MonInd k = mon1.begin(), l = mon2.begin();
+	while (k != mon1.end() && l != mon2.end()) {
+		if (k->gen < l->gen)
+			k++;
+		else if (k->gen > l->gen)
+			l++;
 		else
 			return true;
 	}
 	return false;
 }
 
-array lcm(const array& mon1, const array& mon2)
+Mon lcm(const Mon& mon1, const Mon& mon2)
 {
-	array result;
-	size_t k = 0, l = 0;
-	while (k < mon1.size() && l < mon2.size()) {
-		if (mon1[k] < mon2[l]) {
-			result.push_back(mon1[k]);
-			result.push_back(mon1[k + 1]);
-			k += 2;
-		}
-		else if (mon1[k] > mon2[l]) {
-			result.push_back(mon2[l]);
-			result.push_back(mon2[l + 1]);
-			l += 2;
-		}
+	Mon result;
+	MonInd k = mon1.begin(), l = mon2.begin();
+	while (k != mon1.end() && l != mon2.end()) {
+		if (k->gen < l->gen)
+			result.push_back(*k++);
+		else if (k->gen > l->gen)
+			result.push_back(*l++);
 		else {
-			result.push_back(mon1[k]);
-			result.push_back(std::max(mon1[k + 1], mon2[l + 1]));
-			k += 2;
-			l += 2;
+			result.emplace_back(k->gen, std::max(k->exp, l->exp));
+			k++; l++;
 		}
 	}
-	if (k < mon1.size())
-		result.insert(result.end(), mon1.begin() + k, mon1.end());
+	if (k != mon1.end())
+		result.insert(result.end(), k, mon1.end());
 	else
-		result.insert(result.end(), mon2.begin() + l, mon2.end());
+		result.insert(result.end(), l, mon2.end());
 	return result;
 }
 
-array2d get_diff(const array& mon, const array3d& diffs)
+Poly get_diff(const Mon& mon, const Poly1d& diffs)
 {
-	array2d result;
-	for (size_t k = 0; k < mon.size(); k += 2) {
-		if (mon[k + 1] % 2) {
-			array m1 = div(mon, { mon[k], 1 });
-			result = add(result, mul({ std::move(m1) }, diffs[mon[k]]));
-		}
+	Poly result;
+	for (MonInd k = mon.begin(); k != mon.end(); ++k) {
+		if (k->exp % 2)
+			result = add(result, mul(diffs[k->gen], div(mon, { { k->gen, 1 } })));
 	}
 	return result;
 }
 
-array2d get_diff(const array2d& poly, const array3d& diffs)
+Poly get_diff(const Poly& poly, const Poly1d& diffs)
 {
-	array2d result;
-	for (const array& m : poly) {
-		for (size_t k = 0; k < m.size(); k += 2) {
-			if (m[k + 1] % 2) {
-				array m1 = div(m, { m[k], m[k + 1] });
-				result = add(result, mul({ std::move(m1) }, diffs[m[k]]));
-			}
+	Poly result;
+	for (const Mon& mon : poly) {
+		for (MonInd k = mon.begin(); k != mon.end(); ++k) {
+			if (k->exp % 2)
+				result = add(result, mul(diffs[k->gen], div(mon, { { k->gen, 1 } })));
 		}
 	}
 	return result;
@@ -415,7 +345,7 @@ array get_image(const array2d& spaceV, const array2d& f, const array& v)
 #if _DEBUG
 	if (!v1.empty()) {
 		std::cerr << "v is not in space V!\n";
-		throw "6a4fe8a1-608e-466c-ab5e-5fae459ce1b9";
+		throw "6a4fe8a1";
 	}
 #endif
 	return result;
@@ -425,15 +355,20 @@ array2d quotient_space(const array2d& spaceV, const array2d& spaceW)
 {
 	array2d quotient;
 	size_t dimQuo = spaceV.size() - spaceW.size();
+#if _DEBUG
+	for (size_t i = 0; i < spaceV.size(); i++) {
+#else
 	for (size_t i = 0; i < spaceV.size() && quotient.size() < dimQuo; i++) {
+#endif
 		auto v1 = residue(quotient, residue(spaceW, spaceV[i]));
+		std::cout << "quotient=" << quotient << " spaceV[i]=" << spaceV[i] << " v1=" << v1 << '\n';
 		if (!v1.empty())
 			quotient.push_back(std::move(v1));
 	}
 #if _DEBUG
 	if (quotient.size() != dimQuo) {
 		std::cerr << "W is not a subspace of V!\n";
-		throw "cec7f701-0911-482a-a63f-1caaa646591b";
+		throw "cec7f701";
 	}
 #endif
 	return quotient;
@@ -441,23 +376,23 @@ array2d quotient_space(const array2d& spaceV, const array2d& spaceW)
 
 /******** Groebner Basis ********/
 
-array2d reduce(array2d poly, const array3d& gb)
+Poly reduce(Poly poly, const Poly1d& gb)
 {
-	array2d result;
+	Poly result;
 	auto pbegin = poly.begin(); auto pend = poly.end();
 	while (pbegin != pend) {
-		array3d::const_iterator pGb = gb.begin();
+		auto pGb = gb.begin();
 		for (; pGb != gb.end(); ++pGb)
 			if (divides((*pGb)[0], *pbegin))
 				break;
 		if (pGb == gb.end())
 			result.push_back(std::move(*pbegin++));
 		else {
-			array q = div(*pbegin, (*pGb)[0]);
-			array2d rel1 = mul(*pGb, q);
-			array2d poly1;
+			Mon q = div(*pbegin, (*pGb)[0]);
+			Poly rel1 = mul(*pGb, q);
+			Poly poly1;
 			std::set_symmetric_difference(pbegin, pend, rel1.begin(), rel1.end(),
-				std::back_inserter(poly1), cmp_mons);
+				std::back_inserter(poly1));
 			poly = std::move(poly1);
 			pbegin = poly.begin(); pend = poly.end();
 		}
@@ -467,20 +402,20 @@ array2d reduce(array2d poly, const array3d& gb)
 
 /* Comsume relations from heap that is at most in degree `deg` while adding new relations to heap that is at most in degree `deg_max`. */
 template <typename Fn>
-void add_rels(array3d& gb, std::vector<rel_heap_t>& heap, Fn _get_deg, int deg, int deg_max)
+void add_rels(Poly1d& gb, std::vector<rel_heap_t>& heap, Fn _get_deg, int deg, int deg_max)
 {
 	while (!heap.empty() && (deg == -1 ? (deg_max == -1 || heap.front().deg <= deg_max) : heap.front().deg <= deg)) {
 		std::pop_heap(heap.begin(), heap.end(), cmp_heap_rels);
 		rel_heap_t heap_ele = std::move(heap.back());
 		heap.pop_back();
 
-		array2d rel = reduce(heap_ele.poly, gb);
+		Poly rel = reduce(heap_ele.poly, gb);
 		if (!rel.empty()) {
-			for (array2d& g : gb) {
+			for (Poly& g : gb) {
 				if (gcd_nonzero(rel[0], g[0])) {
 					if (divides(rel[0], g[0])) {
-						array q = div(g[0], rel[0]);
-						array2d new_rel = add(mul(rel, q), g);
+						Mon q = div(g[0], rel[0]);
+						Poly new_rel = add(mul(rel, q), g);
 						if (!new_rel.empty()) {
 							heap.push_back(rel_heap_t{ std::move(new_rel), _get_deg(g[0]) });
 							std::push_heap(heap.begin(), heap.end(), cmp_heap_rels);
@@ -488,12 +423,12 @@ void add_rels(array3d& gb, std::vector<rel_heap_t>& heap, Fn _get_deg, int deg, 
 						g.clear();
 					}
 					else {
-						array mlcm = lcm(rel[0], g[0]);
+						Mon mlcm = lcm(rel[0], g[0]);
 						int deg_new_rel = _get_deg(mlcm);
 						if (deg_max == -1 || deg_new_rel <= deg_max) {
-							array q_r = div(mlcm, rel[0]);
-							array q_g = div(mlcm, g[0]);
-							array2d new_rel = add(mul(rel, q_r), mul(g, q_g));
+							Mon q_r = div(mlcm, rel[0]);
+							Mon q_g = div(mlcm, g[0]);
+							Poly new_rel = add(mul(rel, q_r), mul(g, q_g));
 
 							heap.push_back(rel_heap_t{ std::move(new_rel), deg_new_rel });
 							std::push_heap(heap.begin(), heap.end(), cmp_heap_rels);
@@ -501,17 +436,17 @@ void add_rels(array3d& gb, std::vector<rel_heap_t>& heap, Fn _get_deg, int deg, 
 					}
 				}
 			}
-			gb.erase(std::remove_if(gb.begin(), gb.end(), [](const array2d& g) {return g.empty(); }), gb.end());
+			gb.erase(std::remove_if(gb.begin(), gb.end(), [](const Poly& g) {return g.empty(); }), gb.end());
 			gb.push_back(std::move(rel));
 		}
 	}
 }
 
 template <typename Fn>
-void add_rels(array3d& gb, const array3d& rels, Fn _get_deg, int deg_max)
+void add_rels(Poly1d& gb, const Poly1d& rels, Fn _get_deg, int deg_max)
 {
 	std::vector<rel_heap_t> heap;
-	for (const array2d& rel : rels) {
+	for (const Poly& rel : rels) {
 		if (!rel.empty()) {
 			heap.push_back(rel_heap_t{ rel, _get_deg(rel[0]) });
 			std::push_heap(heap.begin(), heap.end(), cmp_heap_rels);
@@ -520,38 +455,38 @@ void add_rels(array3d& gb, const array3d& rels, Fn _get_deg, int deg_max)
 	add_rels(gb, heap, _get_deg, -1, deg_max);
 }
 
-void add_rels(array3d& gb, std::vector<rel_heap_t>& heap, const array& gen_degs, int t, int deg_max)
+void add_rels(Poly1d& gb, std::vector<rel_heap_t>& heap, const array& gen_degs, int t, int deg_max)
 {
-	add_rels(gb, heap, [&gen_degs](const array& m) {return get_deg(m, gen_degs); }, t, deg_max);
+	add_rels(gb, heap, [&gen_degs](const Mon& m) {return get_deg(m, gen_degs); }, t, deg_max);
 }
 
-void add_rels(array3d& gb, const array3d& rels, const array& gen_degs, int deg_max)
+void add_rels(Poly1d& gb, const Poly1d& rels, const array& gen_degs, int deg_max)
 {
 	std::vector<rel_heap_t> heap;
-	for (const array2d& rel : rels) {
+	for (const Poly& rel : rels) {
 		if (!rel.empty()) {
 			heap.push_back(rel_heap_t{ rel, get_deg(rel[0], gen_degs) });
 			std::push_heap(heap.begin(), heap.end(), cmp_heap_rels);
 		}
 	}
-	add_rels(gb, heap, [&gen_degs](const array& m) {return get_deg(m, gen_degs); }, -1, deg_max);
+	add_rels(gb, heap, [&gen_degs](const Mon& m) {return get_deg(m, gen_degs); }, -1, deg_max);
 }
 
 template <typename Fn>
-void add_rels_freemodule(array3d& gb, std::vector<rel_heap_t>& heap, Fn get_deg, int deg, int deg_max)
+void add_rels_freemodule(Poly1d& gb, std::vector<rel_heap_t>& heap, Fn get_deg, int deg, int deg_max)
 {
 	while (!heap.empty() && (deg == -1 ? (deg_max == -1 || heap.front().deg <= deg_max) : heap.front().deg <= deg)) {
 		std::pop_heap(heap.begin(), heap.end(), cmp_heap_rels);
 		rel_heap_t heap_ele = std::move(heap.back());
 		heap.pop_back();
 
-		array2d rel = reduce(heap_ele.poly, gb);
+		Poly rel = reduce(heap_ele.poly, gb);
 		if (!rel.empty()) {
-			for (array2d& g : gb) {
-				if ((rel[0][0] >= 0 || g[0][0] >= 0 || rel[0][0] == g[0][0]) && gcd_nonzero(rel[0], g[0])) {
+			for (Poly& g : gb) {
+				if ((rel[0][0].gen >= 0 || g[0][0].gen >= 0 || rel[0][0].gen == g[0][0].gen) && gcd_nonzero(rel[0], g[0])) {
 					if (divides(rel[0], g[0])) {
-						array q = div(g[0], rel[0]);
-						array2d new_rel = add(mul(rel, q), g);
+						Mon q = div(g[0], rel[0]);
+						Poly new_rel = add(mul(rel, q), g);
 						if (!new_rel.empty()) {
 							heap.push_back(rel_heap_t{ std::move(new_rel), get_deg(g[0]) });
 							std::push_heap(heap.begin(), heap.end(), cmp_heap_rels);
@@ -559,12 +494,12 @@ void add_rels_freemodule(array3d& gb, std::vector<rel_heap_t>& heap, Fn get_deg,
 						g.clear();
 					}
 					else {
-						array mlcm = lcm(rel[0], g[0]);
+						Mon mlcm = lcm(rel[0], g[0]);
 						int deg_new_rel = get_deg(mlcm);
 						if (deg_max == -1 || deg_new_rel <= deg_max) {
-							array q_r = div(mlcm, rel[0]);
-							array q_g = div(mlcm, g[0]);
-							array2d new_rel = add(mul(rel, q_r), mul(g, q_g));
+							Mon q_r = div(mlcm, rel[0]);
+							Mon q_g = div(mlcm, g[0]);
+							Poly new_rel = add(mul(rel, q_r), mul(g, q_g));
 
 							heap.push_back(rel_heap_t{ std::move(new_rel), deg_new_rel });
 							std::push_heap(heap.begin(), heap.end(), cmp_heap_rels);
@@ -572,32 +507,32 @@ void add_rels_freemodule(array3d& gb, std::vector<rel_heap_t>& heap, Fn get_deg,
 					}
 				}
 			}
-			gb.erase(std::remove_if(gb.begin(), gb.end(), [](const array2d& g) {return g.empty(); }), gb.end());
+			gb.erase(std::remove_if(gb.begin(), gb.end(), [](const Poly& g) {return g.empty(); }), gb.end());
 			gb.push_back(std::move(rel));
 		}
 	}
 }
 
-array4d& indecomposables(const array3d& gb, array4d& vectors, const array& gen_degs, const array& basis_degs)
+Poly2d& indecomposables(const Poly1d& gb, Poly2d& vectors, const array& gen_degs, const array& basis_degs)
 {
 	if (vectors.empty())
 		return vectors;
-	array3d gb1 = gb;
+	Poly1d gb1 = gb;
 	int N = (int)basis_degs.size();
-	auto get_deg = [&gen_degs, &basis_degs, &N](const array& mon) {
+	auto get_deg = [&gen_degs, &basis_degs, &N](const Mon& mon) {
 		int result = 0;
-		for (size_t i = 0; i < mon.size(); i += 2)
-			result += (mon[i] >= 0 ? gen_degs[mon[i]] : basis_degs[mon[i] + size_t(N)]) * mon[i + 1];
+		for (MonInd p = mon.begin(); p != mon.end(); ++p)
+			result += (p->gen >= 0 ? gen_degs[p->gen] : basis_degs[p->gen + size_t(N)]) * p->exp;
 		return result;
 	};
 
-	array3d rels;
+	Poly1d rels;
 	array degs;
-	for (const array3d& v : vectors) {
-		array2d rel;
+	for (const Poly1d& v : vectors) {
+		Poly rel;
 		for (int i = 0; i < N; ++i) {
 			if (!v[i].empty())
-				rel = add(rel, mul(v[i], { i - N, 1 }));
+				rel = add(rel, mul(v[i], { {i - N, 1} }));
 		}
 		degs.push_back(get_deg(rel[0]));
 		rels.push_back(std::move(rel));
@@ -610,7 +545,7 @@ array4d& indecomposables(const array3d& gb, array4d& vectors, const array& gen_d
 	for (int i : indices) {
 		int deg = get_deg(rels[i][0]);
 		add_rels_freemodule(gb1, heap, get_deg, deg, deg_max);
-		array2d rel = reduce(rels[i], gb1);
+		Poly rel = reduce(rels[i], gb1);
 		if (!rel.empty()) {
 			heap.push_back(rel_heap_t{ std::move(rel), deg });
 			std::push_heap(heap.begin(), heap.end(), cmp_heap_rels);
@@ -619,40 +554,40 @@ array4d& indecomposables(const array3d& gb, array4d& vectors, const array& gen_d
 			vectors[i].clear();
 	}
 
-	vectors.erase(std::remove_if(vectors.begin(), vectors.end(), [](const array3d& v) {return v.empty(); }), vectors.end());
+	vectors.erase(std::remove_if(vectors.begin(), vectors.end(), [](const Poly1d& v) {return v.empty(); }), vectors.end());
 	return vectors;
 }
 
-array4d ann_seq(const array3d& gb, const array3d& polys, const array& gen_degs, int deg_max)
+Poly2d ann_seq(const Poly1d& gb, const Poly1d& polys, const array& gen_degs, int deg_max)
 {
-	array4d result;
+	Poly2d result;
 	if (polys.empty())
 		return result;
-	array3d rels;
+	Poly1d rels;
 	array gen_degs1;
 	int N = (int)polys.size();
 	for (int i = 0; i < N; ++i) {
-		array2d p = polys[i];
+		Poly p = polys[i];
 		gen_degs1.push_back(get_deg(p, gen_degs));
-		p.push_back({ i - N, 1 });
+		p.push_back({ {i - N, 1} });
 		rels.push_back(std::move(p));
 	}
-	array3d gb1 = gb;
-	add_rels(gb1, rels, [&gen_degs, &gen_degs1, &N](const array& mon) {
+	Poly1d gb1 = gb;
+	add_rels(gb1, rels, [&gen_degs, &gen_degs1, &N](const Mon& mon) {
 		int result_ = 0;
-		for (size_t i = 0; i < mon.size(); i += 2)
-			result_ += (mon[i] >= 0 ? gen_degs[mon[i]] : gen_degs1[mon[i] + size_t(N)]) * mon[i + 1];
+		for (MonInd p = mon.begin(); p != mon.end(); ++p)
+			result_ += (p->gen >= 0 ? gen_degs[p->gen] : gen_degs1[p->gen + size_t(N)]) * p->exp;
 		return result_;
 		}, deg_max);
-	for (const array2d& g : gb1) {
-		if (g[0][0] < 0) {
-			array3d result_i;
+	for (const Poly& g : gb1) {
+		if (g[0][0].gen < 0) {
+			Poly1d result_i;
 			result_i.resize(N);
-			for (const array& m : g) {
-				auto p = m.begin();
-				for (; p < m.end() && *p < 0; p += 2);
-				array m1(m.begin(), p), m2(p, m.end());
-				result_i[m1[0] + size_t(N)] = add(result_i[m1[0] + size_t(N)], reduce(mul(evaluate({ div(m1, { m1[0], 1 }) }, [&polys, &N](int i) {return polys[i + size_t(N)]; }, gb), m2), gb));
+			for (const Mon& m : g) {
+				MonInd p = m.begin();
+				for (; p != m.end() && p->gen < 0; ++p);
+				Mon m1(m.begin(), p), m2(p, m.end());
+				result_i[m1[0].gen + size_t(N)] = add(result_i[m1[0].gen + size_t(N)], reduce(mul(evaluate({ div(m1, { {m1[0].gen, 1} }) }, [&polys, &N](int i) {return polys[i + size_t(N)]; }, gb), m2), gb));
 			}
 			result.push_back(std::move(result_i));
 		}
@@ -660,7 +595,7 @@ array4d ann_seq(const array3d& gb, const array3d& polys, const array& gen_degs, 
 	for (int i = 0; i < N; ++i) {
 		for (int j = i + 1; j < N; j++) {
 			if (gen_degs1[i] + gen_degs1[j] <= deg_max) {
-				array3d result_i;
+				Poly1d result_i;
 				result_i.resize(N);
 				result_i[i] = polys[j];
 				result_i[j] = polys[i];

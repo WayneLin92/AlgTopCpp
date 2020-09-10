@@ -7,8 +7,8 @@ void generate_basis(const Database& db, const std::string& table_prefix, int t_m
 	if (drop_existing)
 		db.execute_cmd("DELETE FROM " + table_prefix + "_basis;");
 	std::vector<Deg> gen_degs = db.load_gen_degs(table_prefix + "_generators");
-	array3d leadings = db.load_leading_terms(table_prefix + "_relations");
-	std::map<Deg, array2d> basis = db.load_basis(table_prefix + "_basis");
+	Mon2d leadings = db.load_leading_terms(table_prefix + "_relations");
+	std::map<Deg, Mon1d> basis = db.load_basis(table_prefix + "_basis");
 
 	/* starting t value */
 	int t_min;
@@ -22,7 +22,7 @@ void generate_basis(const Database& db, const std::string& table_prefix, int t_m
 
 	/* Add new basis */
 	for (int t = t_min; t <= t_max; t++) {
-		std::map<Deg, array2d> basis_new;
+		std::map<Deg, Mon1d> basis_new;
 		std::cout << "t=" << t << "          \r";
 		for (int gen_id = (int)gen_degs.size() - 1; gen_id >= 0; --gen_id) {
 			int t1 = t - gen_degs[gen_id].t;
@@ -31,10 +31,10 @@ void generate_basis(const Database& db, const std::string& table_prefix, int t_m
 				auto p2 = basis.lower_bound(Deg{ 0, t1 + 1, 0 });
 				for (auto p = p1; p != p2; ++p) {
 					for (const auto& m : p->second) {
-						if (m.empty() || gen_id <= m[0]) {
-							array mon(mul(m, { gen_id, 1 }));
+						if (m.empty() || gen_id <= m[0].gen) {
+							Mon mon(mul(m, { {gen_id, 1} }));
 							if ((size_t)gen_id >= leadings.size() || std::none_of(leadings[gen_id].begin(), leadings[gen_id].end(),
-								[&mon](const array& _m) { return divides(_m, mon); }))
+								[&mon](const Mon& _m) { return divides(_m, mon); }))
 								basis_new[p->first + gen_degs[gen_id]].push_back(std::move(mon));
 						}
 					}
@@ -53,10 +53,10 @@ void generate_mon_diffs(const Database& db, const std::string& table_prefix, int
 	/* load gen_degs, gen_diffs, gb and basis */
 
 	std::vector<Deg> gen_degs = db.load_gen_degs(table_prefix + "_generators");
-	array3d gen_diffs = db.load_gen_diffs(table_prefix + "_generators");
-	array3d gb = db.load_gb(table_prefix + "_relations");
-	std::map<Deg, array2d> basis = db.load_basis(table_prefix + "_basis");
-	std::map<Deg, array3d> mon_diffs = db.load_mon_diffs(table_prefix + "_basis", basis, r);
+	Poly1d gen_diffs = db.load_gen_diffs(table_prefix + "_generators");
+	Poly1d gb = db.load_gb(table_prefix + "_relations");
+	std::map<Deg, Mon1d> basis = db.load_basis(table_prefix + "_basis");
+	std::map<Deg, Poly1d> mon_diffs = db.load_mon_diffs(table_prefix + "_basis", basis, r);
 
 	/* compute diffs */
 
@@ -79,17 +79,17 @@ void generate_mon_diffs(const Database& db, const std::string& table_prefix, int
 			if (basis_d[i].empty())
 				mon_diffs[d].push_back({});
 			else {
-				int gen_id = basis_d[i].front();
-				array mon1 = div(basis_d[i], { gen_id, 1 });
+				int gen_id = basis_d[i].front().gen;
+				Mon mon1 = div(basis_d[i], { {gen_id, 1} });
 				Deg d1 = d - gen_degs[gen_id];
-				size_t index_mon1 = std::lower_bound(basis.at(d1).begin(), basis.at(d1).end(), mon1, cmp_mons) - basis.at(d1).begin();
-				mon_diffs[d].push_back(reduce(add(mul(gen_diffs[gen_id], mon1), mul({ { gen_id, 1 } }, mon_diffs[d1][index_mon1])), gb));
+				size_t index_mon1 = std::lower_bound(basis.at(d1).begin(), basis.at(d1).end(), mon1) - basis.at(d1).begin();
+				mon_diffs[d].push_back(reduce(add(mul(gen_diffs[gen_id], mon1), mul({ {gen_id, 1} }, mon_diffs[d1][index_mon1])), gb));
 				Deg d_diff = d + Deg{ 1, 0, -r };
-				diff_indices = poly_to_indices(mon_diffs[d][i], basis[d_diff]);
+				diff_indices = Poly_to_indices(mon_diffs[d][i], basis[d_diff]);
 			}
 			std::string str_diff(array_to_str(diff_indices));
 			stmt.bind_str(1, str_diff);
-			stmt.bind_str(2, array_to_str(basis_d[i]));
+			stmt.bind_str(2, Mon_to_str(basis_d[i]));
 			stmt.step_and_reset();
 		}
 	}
@@ -165,20 +165,20 @@ void generate_ss(const Database& db, const std::string& table_name_basis, const 
 /* generate the homology of the E_r page */
 void generate_next_page(const Database& db, const std::string& table_prefix, const std::string& table_H_prefix, int r)
 {
-	array3d gb = db.load_gb(table_prefix + "_relations");
-	std::map<Deg, array2d> basis = db.load_basis(table_prefix + "_basis");
+	Poly1d gb = db.load_gb(table_prefix + "_relations");
+	std::map<Deg, Mon1d> basis = db.load_basis(table_prefix + "_basis");
 	std::map<Deg, BasisComplex> basis_ss = db.load_basis_ss(table_prefix + "_ss", r);
 
 	std::vector<Deg> gen_degs_H;
 	array2d reprs_H;
-	array3d gb_H;
+	Poly1d gb_H;
 
-	array3d leadings;
-	std::map<Deg, array2d> basis_H;
+	Mon2d leadings;
+	std::map<Deg, Mon1d> basis_H;
 	basis[Deg{ 0, 0, 0 }].push_back({});
 	std::map<Deg, array2d> mon_reprs_H;
 	basis[Deg{ 0, 0, 0 }].push_back({});
-	std::map<Deg, array2d> basis_H_new;
+	std::map<Deg, Mon1d> basis_H_new;
 	std::map<Deg, array2d> mon_reprs_H_new;
 
 	int t_max = basis_ss.crbegin()->first.t;
@@ -192,8 +192,9 @@ void generate_next_page(const Database& db, const std::string& table_prefix, con
 			if (pNew != basis_H_new.end()) {
 				/* Compute gb */
 				array indices = range(int(pNew->second.size()));
-				std::sort(indices.begin(), indices.end(), [&pNew](int a, int b) {return cmp_mons(pNew->second[a], pNew->second[b]); });
-				array2d mons_new, reprs_new;
+				std::sort(indices.begin(), indices.end(), [&pNew](int a, int b) {return pNew->second[a] < pNew->second[b]; });
+				Mon1d mons_new;
+				array2d reprs_new;
 				for (size_t j = 0; j < indices.size(); j++) {
 					mons_new.push_back(std::move(pNew->second[indices[j]]));
 					reprs_new.push_back(std::move(mon_reprs_H_new[deg][indices[j]]));
@@ -203,8 +204,8 @@ void generate_next_page(const Database& db, const std::string& table_prefix, con
 				set_linear_map(reprs_new, image, kernel, g);
 				array lead_kernel;
 				for (array& p_indices : kernel) {
-					gb_H.push_back(indices_to_poly(p_indices, mons_new));
-					int index = gb_H.back().front().front();
+					gb_H.push_back(indices_to_Poly(p_indices, mons_new));
+					int index = gb_H.back().front().front().gen;
 					if (size_t(index) >= leadings.size())
 						leadings.resize(size_t(index) + 1);
 					leadings[index].push_back(gb_H.back().front());
@@ -218,7 +219,7 @@ void generate_next_page(const Database& db, const std::string& table_prefix, con
 				for (auto& x : quotient) {
 					gen_degs_H.push_back(deg);
 					reprs_H.push_back(x);
-					basis_H[deg].push_back({ int(gen_degs_H.size()) - 1, 1 });
+					basis_H[deg].push_back({ {int(gen_degs_H.size()) - 1, 1} });
 					mon_reprs_H[deg].push_back(std::move(x));
 				}
 
@@ -234,7 +235,7 @@ void generate_next_page(const Database& db, const std::string& table_prefix, con
 				for (array& x : simplify_space(p_ss->second.kernel)) {
 					gen_degs_H.push_back(deg);
 					reprs_H.push_back(x);
-					basis_H[deg].push_back({ int(gen_degs_H.size()) - 1, 1 });
+					basis_H[deg].push_back({ {int(gen_degs_H.size()) - 1, 1} });
 					mon_reprs_H[deg].push_back(std::move(x));
 				}
 			}
@@ -244,7 +245,7 @@ void generate_next_page(const Database& db, const std::string& table_prefix, con
 				/* Add to gb_H */
 				for (auto& mon : basis_H_new_d) {
 					gb_H.push_back({ {std::move(mon)} });
-					int index = gb_H.back().front().front();
+					int index = gb_H.back().front().front().gen;
 					if (size_t(index) >= leadings.size())
 						leadings.resize(size_t(index) + 1);
 					leadings[index].push_back(gb_H.back().front());
@@ -267,15 +268,15 @@ void generate_next_page(const Database& db, const std::string& table_prefix, con
 						for (size_t j = 0; j < p->second.size(); ++j) {
 							const auto& mon1 = p->second[j];
 							const auto& repr1 = mon_reprs_H[deg1][j];
-							if (mon1.empty() || gen_id <= mon1[0]) {
-								array mon(mul(mon1, { gen_id, 1 }));
+							if (mon1.empty() || gen_id <= mon1[0].gen) {
+								Mon mon(mul(mon1, { {gen_id, 1} }));
 								if (gen_id >= (int)leadings.size() || std::none_of(leadings[gen_id].begin(), leadings[gen_id].end(),
-									[mon](array _m) { return divides(_m, mon); })) {
+									[mon](Mon _m) { return divides(_m, mon); })) {
 									/* Compute the represeting cycle of the base monomial */
-									auto poly1 = indices_to_poly(repr1, basis[deg1]);
-									auto gen_repr = indices_to_poly(reprs_H[gen_id], basis[g_deg]);
-									array2d repr = reduce(mul(poly1, gen_repr), gb);
-									array repr_indices = residue(basis_ss[deg].boundary, poly_to_indices(repr, basis[deg]));
+									auto poly1 = indices_to_Poly(repr1, basis[deg1]);
+									auto gen_repr = indices_to_Poly(reprs_H[gen_id], basis[g_deg]);
+									Poly repr = reduce(mul(poly1, gen_repr), gb);
+									array repr_indices = residue(basis_ss[deg].boundary, Poly_to_indices(repr, basis[deg]));
 									basis_H_new[deg].push_back(std::move(mon));
 									mon_reprs_H_new[deg].push_back(std::move(repr_indices));
 								}
@@ -288,9 +289,9 @@ void generate_next_page(const Database& db, const std::string& table_prefix, con
 	}
 
 	/* Save generators */
-	array3d reprs_poly_H;
+	Poly1d reprs_poly_H;
 	for (size_t i = 0; i < (int)reprs_H.size(); ++i)
-		reprs_poly_H.push_back(indices_to_poly(reprs_H[i], basis[gen_degs_H[i]]));
+		reprs_poly_H.push_back(indices_to_Poly(reprs_H[i], basis[gen_degs_H[i]]));
 	db.save_generators(table_H_prefix + "_generators", gen_degs_H, reprs_poly_H);
 
 	/* Save gb */

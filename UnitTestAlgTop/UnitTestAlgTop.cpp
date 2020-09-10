@@ -1,9 +1,17 @@
 #include "CppUnitTest.h"
 #include "../algtop/database.h"
-#include "../algtop/my_utilities.cpp"
+#include "../algtop/myparser.h"
+#include "../algtop/utilities.cpp"
 #include "../algtop/algmod2.cpp"
+#include "../algtop/myparser.cpp"
 
 using namespace Microsoft::VisualStudio::CppUnitTestFramework;
+
+std::string ToString(array2d a) {
+	std::stringstream ss;
+	ss << a;
+	return ss.str();
+}
 
 namespace UnitTestAlgTop
 {
@@ -13,20 +21,20 @@ namespace UnitTestAlgTop
 
 		TEST_METHOD(test_pow)
 		{
-			array2d poly = { {1, 1}, {0, 1} };
-			array3d gb = { {{0, 1, 1, 2}, {-1, 3}} };
-			array2d power = pow(poly, 3, gb);
-			array2d anwer = { {1, 3}, {0, 2, 1, 1}, {0, 3}, {-1, 3} };
-			Assert::AreEqual(array2d_to_str(anwer), array2d_to_str(power));
+			Poly poly = { {{1, 1}}, {{0, 1}} };
+			Poly1d gb = { {{{0, 1}, {1, 2}}, {{-1, 3}}} };
+			Poly power = pow(poly, 3, gb);
+			Poly anwer = { {{1, 3}}, {{0, 2}, {1, 1}}, {{0, 3}}, {{-1, 3}} };
+			Assert::AreEqual(Poly_to_str(anwer), Poly_to_str(power));
 		};
 
 		TEST_METHOD(test_evaluate)
 		{
-			array2d p = { {1, 3}, {0, 3}, {0, 1, 2, 1} };
-			array3d images = { {{1, 1}, {0, 1}}, {}, {{3, 1}} };
-			array2d fp = evaluate(p, [&images](int gen_id) {return images[gen_id]; }, array3d{});
-			array2d anwer = { {1, 1, 3, 1}, {1, 3}, {0, 1, 3, 1}, {0, 1, 1, 2}, {0, 2, 1, 1}, {0, 3} };
-			Assert::AreEqual(array2d_to_str(anwer), array2d_to_str(fp));
+			Poly p = { {{1, 3}}, {{0, 3}}, {{0, 1}, {2, 1}} };
+			Poly1d images = { {{{1, 1}}, {{0, 1}}}, {}, {{{3, 1}}} };
+			Poly fp = evaluate(p, [&images](int gen_id) {return images[gen_id]; }, {});
+			Poly anwer = { {{1, 1}, {3, 1}}, {{1, 3}}, {{0, 1}, {3, 1}}, {{0, 1}, {1, 2}}, {{0, 2}, {1, 1}}, {{0, 3}} };
+			Assert::AreEqual(Poly_to_str(anwer), Poly_to_str(fp));
 		};
 	};
 
@@ -51,12 +59,12 @@ namespace UnitTestAlgTop
 			array2d fx = { {1, 3, 4}, {2, 4, 5}, {1, 2, 3, 5} };
 			array2d image, kernel, g;
 			set_linear_map(x, fx, image, kernel, g);
-			Assert::AreEqual(array2d_to_str(array2d({ {1, 3, 4}, {2, 4, 5} })), array2d_to_str(image));
-			Assert::AreEqual(array2d_to_str(array2d({ {1, 2, 3} })), array2d_to_str(kernel));
-			
+			Assert::AreEqual(ToString(array2d({ {1, 3, 4}, {2, 4, 5} })), ToString(image));
+			Assert::AreEqual(ToString(array2d({ {1, 2, 3} })), ToString(kernel));
+
 			image.clear(); kernel.clear(); g.clear();
 			set_linear_map(fx, image, kernel, g);
-			Assert::AreEqual(array2d_to_str(array2d({ {0, 1, 2} })), array2d_to_str(kernel));
+			Assert::AreEqual(ToString(array2d({ {0, 1, 2} })), ToString(kernel));
 		};
 		TEST_METHOD(test_get_image)
 		{
@@ -72,7 +80,7 @@ namespace UnitTestAlgTop
 				get_image(spaceV, f, v);
 			}
 			catch (const char* e) {
-				Assert::AreEqual("6a4fe8a1-608e-466c-ab5e-5fae459ce1b9", e);
+				Assert::AreEqual("6a4fe8a1", e);
 				bException = true;
 			}
 			Assert::AreEqual(true, bException);
@@ -85,7 +93,7 @@ namespace UnitTestAlgTop
 			array2d spaceW = { {2, 3}, {4} };
 			array2d quotient = quotient_space(spaceV, spaceW);
 			array2d answer = { {1}, {3} };
-			Assert::AreEqual(array2d_to_str(answer), array2d_to_str(quotient));
+			Assert::AreEqual(ToString(answer), ToString(quotient));
 #ifdef _DEBUG
 			spaceW = { {2, 3}, {5} };
 			bool bException = false;
@@ -93,7 +101,7 @@ namespace UnitTestAlgTop
 				quotient = quotient_space(spaceV, spaceW);
 			}
 			catch (const char* e) {
-				Assert::AreEqual("cec7f701-0911-482a-a63f-1caaa646591b", e);
+				Assert::AreEqual("cec7f701", e);
 				bException = true;
 			}
 			Assert::AreEqual(true, bException);
@@ -104,7 +112,7 @@ namespace UnitTestAlgTop
 		{
 			array2d spaceV = { {1, 2, 3, 4}, {2, 3, 4}, {3} };
 			array2d answer = { {1}, {2, 4}, {3} };
-			Assert::AreEqual(array2d_to_str(answer), array2d_to_str(simplify_space(spaceV)));
+			Assert::AreEqual(ToString(answer), ToString(simplify_space(spaceV)));
 		}
 	};
 
@@ -116,18 +124,18 @@ namespace UnitTestAlgTop
 		TEST_METHOD(test_groebner_B7)
 		{
 			array gen_degs;
-			int n_max = 8;
+			int n_max = 7;
 			for (int d = 1; d <= n_max; d++) {
 				for (int i = 0; i <= n_max - d; i++) {
 					int j = i + d;
 					gen_degs.push_back((1 << j) - (1 << i));
 				}
 			}
-			array3d rels;
+			Poly1d rels;
 			for (int d = 2; d <= n_max; d++) {
 				for (int i = 0; i <= n_max - d; i++) {
 					int j = i + d;
-					array2d rel;
+					Poly rel;
 					for (int k = i + 1; k < j; k++) {
 						int a = (1 << k) - (1 << i);
 						int b = (1 << j) - (1 << k);
@@ -135,29 +143,26 @@ namespace UnitTestAlgTop
 						auto p2 = std::find(gen_degs.begin(), gen_degs.end(), b);
 						int index1 = int(p1 - gen_degs.begin());
 						int index2 = int(p2 - gen_degs.begin());
-						rel = add(rel, index1 < index2 ? array2d{ { index1, 1, index2, 1 } } : array2d{ { index2, 1, index1, 1 } });
+						rel = add(rel, index1 < index2 ? Poly{ {{index1, 1}, {index2, 1}} } : Poly{ {{index2, 1}, {index1, 1}} });
 					}
 					rels.push_back(std::move(rel));
 				}
 			}
 
-			array3d gb;
+			Poly1d gb;
 			add_rels(gb, rels, gen_degs, -1);
-			size_t gb_size = 0;
-			for (auto& p = gb.cbegin(); p != gb.cend(); ++p)
-				gb_size += p->size();
-			//size_t gb_size = gb.size();
-			size_t answer = 163;
+			size_t gb_size = gb.size();
+			size_t answer = 65;
 			Assert::AreEqual(answer, gb_size);
 		}
 
 		TEST_METHOD(test_groebner)
 		{
 			array gen_degs = { 1, 1, 1, 1 };
-			array3d rels = { {{2, 3}, {1, 3}, {0, 1, 1, 1, 2, 1}, {0, 3}} };
-			array3d rels1 = { {{2, 1}, {1, 1}, {0, 1}} };
+			Poly1d rels = { {{{2, 3}}, {{1, 3}}, {{0, 1}, {1, 1}, {2, 1}}, {{0, 3}}} };
+			Poly1d rels1 = { {{{2, 1}}, {{1, 1}}, {{0, 1}}} };
 
-			array3d gb;
+			Poly1d gb;
 			add_rels(gb, rels, gen_degs, -1);
 			add_rels(gb, rels1, gen_degs, -1);
 			Assert::AreEqual(1, int(gb.size()));

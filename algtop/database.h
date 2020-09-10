@@ -35,19 +35,19 @@ public:
 	void end_transaction() const { execute_cmd("END TRANSACTION"); }
 public:
 	std::vector<Deg> load_gen_degs(const std::string& table_name) const;
-	array3d load_gen_diffs(const std::string& table_name) const;
-	array3d load_gen_reprs(const std::string& table_name) const;
-	array3d load_leading_terms(const std::string& table_name) const;
-	array3d load_gb(const std::string& table_name) const;
-	std::map<Deg, array2d> load_basis(const std::string& table_name) const;
+	Poly1d load_gen_diffs(const std::string& table_name) const;
+	Poly1d load_gen_reprs(const std::string& table_name) const;
+	Mon2d load_leading_terms(const std::string& table_name) const;
+	Poly1d load_gb(const std::string& table_name) const;
+	std::map<Deg, Mon1d> load_basis(const std::string& table_name) const;
 	std::map<Deg, array2d> load_mon_diffs_ind(const std::string& table_name) const;
-	std::map<Deg, array3d> load_mon_diffs(const std::string& table_name, const std::map<Deg, array2d>& basis, int r) const;
+	std::map<Deg, Poly1d> load_mon_diffs(const std::string& table_name, const std::map<Deg, Mon1d>& basis, int r) const;
 	std::map<Deg, BasisComplex> load_basis_ss(const std::string& table_name_ss, int r) const;
 public:
-	void save_generators(const std::string& table_name, const std::vector<Deg>& gen_degs, const array3d& gen_reprs) const;
-	void save_gb(const std::string& table_name, const array3d& gb, const std::vector<Deg>& gen_degs) const;
-	void save_basis(const std::string& table_name, const std::map<Deg, array2d>& basis) const;
-	void save_basis(const std::string& table_name, const std::map<Deg, array2d>& basis, const std::map<Deg, array2d>& mon_reprs) const;
+	void save_generators(const std::string& table_name, const std::vector<Deg>& gen_degs, const Poly1d& gen_reprs) const;
+	void save_gb(const std::string& table_name, const Poly1d& gb, const std::vector<Deg>& gen_degs) const;
+	void save_basis(const std::string& table_name, const std::map<Deg, Mon1d>& basis) const;
+	void save_basis(const std::string& table_name, const std::map<Deg, Mon1d>& basis, const std::map<Deg, array2d>& mon_reprs) const;
 	void save_basis_ss(const std::string& table_name, const std::map<Deg, BasisSS>& basis_ss) const;
 private:
 	sqlite3* m_conn;
@@ -75,26 +75,29 @@ private:
 
 std::string array_to_str(array::const_iterator pbegin, array::const_iterator pend);
 array str_to_array(const char* str_mon);
-std::string array2d_to_str(array2d::const_iterator pbegin, array2d::const_iterator pend);
-array2d str_to_array2d(const char* str_poly);
+std::string Mon_to_str(MonInd pbegin, MonInd pend);
+Mon str_to_Mon(const char* str_mon);
+std::string Poly_to_str(Poly::const_iterator pbegin, Poly::const_iterator pend);
+Poly str_to_Poly(const char* str_poly);
 
 inline std::string array_to_str(const array& a) { return array_to_str(a.begin(), a.end()); };
-inline std::string array2d_to_str(const array2d& a) { return array2d_to_str(a.begin(), a.end()); };
+inline std::string Mon_to_str(const Mon& mon) { return Mon_to_str(mon.begin(), mon.end()); };
+inline std::string Poly_to_str(const Poly& poly) { return Poly_to_str(poly.begin(), poly.end()); };
 
-inline int get_index(const array2d& basis, const array& mon)
+inline int get_index(const Poly& basis, const Mon& mon)
 {
-	auto index = std::lower_bound(basis.begin(), basis.end(), mon, cmp_mons);
+	auto index = std::lower_bound(basis.begin(), basis.end(), mon);
 #ifdef _DEBUG
 	if (index == basis.end()) {
 		std::cout << "index not found\n";
-		throw "178905cf-781e-4b4b-b981-2e11a3e98ed3";
+		throw "178905cf";
 	}
 #endif
 	return int(index - basis.begin());
 }
 
-array poly_to_indices(const array2d& poly, const array2d& basis);
-array2d indices_to_poly(const array& indices, const array2d& basis);
+array Poly_to_indices(const Poly& poly, const Poly& basis);
+Poly indices_to_Poly(const array& indices, const Poly& basis);
 
 
 #endif /* DATABSE_H */
