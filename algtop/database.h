@@ -96,10 +96,5 @@ inline int get_index(const array2d& basis, const array& mon)
 array poly_to_indices(const array2d& poly, const array2d& basis);
 array2d indices_to_poly(const array& indices, const array2d& basis);
 
-inline const char* sqlite3_column_str(sqlite3_stmt* stmt, int iCol) { return reinterpret_cast<const char*>(sqlite3_column_text(stmt, iCol)); }//
-inline int sqlite3_bind_str(sqlite3_stmt* stmt, int iCol, const std::string& str) { return sqlite3_bind_text(stmt, iCol, str.c_str(), -1, SQLITE_TRANSIENT); }//
-inline int sqlite3_prepare_v100(sqlite3* db, const char* zSql, sqlite3_stmt** ppStmt) { return sqlite3_prepare_v2(db, zSql, int(strlen(zSql)) + 1, ppStmt, NULL); }//
-inline int sqlite3_prepare_v100(sqlite3* db, std::string sql, sqlite3_stmt** ppStmt) { return sqlite3_prepare_v2(db, sql.c_str(), int(sql.size()) + 1, ppStmt, NULL); }//
-
 
 #endif /* DATABSE_H */

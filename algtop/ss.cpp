@@ -1,6 +1,7 @@
 #include "main.h"
 
-void generate_basis(const Database& db, const std::string& table_prefix, int t_max, bool drop_existing=false)
+/* generate the basis of the algebra from the Groebner basis */
+void generate_basis(const Database& db, const std::string& table_prefix, int t_max, bool drop_existing /*= false*/)
 {
 	/* load gen_degs, leadings, basis */
 	if (drop_existing)
@@ -46,16 +47,7 @@ void generate_basis(const Database& db, const std::string& table_prefix, int t_m
 	}
 }
 
-int main_generate_basis(int argc, char** argv)
-{
-	Database db;
-	db.init(R"(C:\Users\lwnpk\Documents\MyProgramData\Math_AlgTop\database\tmp.db)");
-	std::string table_prefix = "E4b6";
-	int t_max = 74;
-	generate_basis(db, table_prefix, t_max, true);
-	return 0;
-}
-
+/* generate the differetials on the monomials */
 void generate_mon_diffs(const Database& db, const std::string& table_prefix, int r)
 {
 	/* load gen_degs, gen_diffs, gb and basis */
@@ -104,15 +96,7 @@ void generate_mon_diffs(const Database& db, const std::string& table_prefix, int
 	db.end_transaction();
 }
 
-int main_generate_diff(int argc, char** argv)
-{
-	Database db;
-	db.init(R"(C:\Users\lwnpk\Documents\MyProgramData\Math_AlgTop\database\tmp.db)");
-	std::string table_prefix = "E2";
-	generate_mon_diffs(db, table_prefix, 2);
-	return 0;
-}
-
+/* generate the table of the spectral sequence */
 void generate_ss(const Database& db, const std::string& table_name_basis, const std::string& table_ss, int r)
 {
 
@@ -178,17 +162,7 @@ void generate_ss(const Database& db, const std::string& table_name_basis, const 
 	db.save_basis_ss(table_ss, basis_ss);
 }
 
-int main_generate_ss(int argc, char** argv)
-{
-	Database db;
-	db.init(R"(C:\Users\lwnpk\Documents\MyProgramData\Math_AlgTop\database\tmp.db)");
-	const char* table_basis = "E2_basis", * table_ss = "E2_ss";
-	int t_max = 74;
-	generate_ss(db, table_basis, table_ss, 2);
-	return 0;
-}
-
-/* Generate the homology of the E_r page */
+/* generate the homology of the E_r page */
 void generate_next_page(const Database& db, const std::string& table_prefix, const std::string& table_H_prefix, int r)
 {
 	array3d gb = db.load_gb(table_prefix + "_relations");
@@ -324,13 +298,4 @@ void generate_next_page(const Database& db, const std::string& table_prefix, con
 
 	/* Save basis */
 	db.save_basis(table_H_prefix + "_basis", basis_H, mon_reprs_H);
-}
-
-int main_generate_next_page(int argc, char** argv)
-{
-	Database db;
-	db.init(R"(C:\Users\lwnpk\Documents\MyProgramData\Math_AlgTop\database\tmp.db)");
-	std::string table_prefix = "E2", table_H_prefix = "E4";
-	generate_next_page(db, table_prefix, table_H_prefix, 2);
-	return 0;
 }
