@@ -24,6 +24,7 @@ void load_gb(sqlite3* conn, const std::string& table_name, array3d& gb);
 /*--------- generate_ss.cpp ---------*/
 
 int main_generate_ss(int argc, char** argv);
+void load_mon_diffs_ind(sqlite3* conn, const std::string& table_name, std::map<Deg, array2d>& diffs);
 
 /* generate_next_page.cpp */
 

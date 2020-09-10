@@ -1,52 +1,5 @@
 #include "main.h"
 
-/*********** FUNCTIONS **********/
-
-void execute_cmd(sqlite3* conn, const std::string& cmd)
-{
-	sqlite3_stmt* stmt;
-	sqlite3_prepare_v100(conn, cmd, &stmt);
-	sqlite3_step(stmt);
-	sqlite3_finalize(stmt);
-}
-
-void load_gen_degs(sqlite3* conn, const std::string& table_name, std::vector<Deg>& gen_degs)
-{
-	sqlite3_stmt* stmt;
-	std::string cmd = std::string("SELECT s, t, v FROM ") + table_name + " ORDER BY gen_id;";
-	sqlite3_prepare_v100(conn, cmd, &stmt);
-	while (sqlite3_step(stmt) == SQLITE_ROW) {
-		gen_degs.emplace_back(sqlite3_column_int(stmt, 0), sqlite3_column_int(stmt, 1), sqlite3_column_int(stmt, 2));
-	}
-	sqlite3_finalize(stmt);
-}
-
-void load_leading_terms(sqlite3* conn, const std::string& table_name, array3d& leadings)
-{
-	sqlite3_stmt* stmt;
-	std::string cmd = std::string("SELECT leading_term FROM ") + table_name + ";";
-	sqlite3_prepare_v100(conn, cmd, &stmt);
-	while (sqlite3_step(stmt) == SQLITE_ROW) {
-		array mon(str_to_array(sqlite3_column_str(stmt, 0)));
-		if (size_t(mon[0]) >= leadings.size())
-			leadings.resize(size_t(mon[0]) + 1);
-		leadings[mon[0]].push_back(mon);
-	}
-	sqlite3_finalize(stmt);
-}
-
-void load_basis(sqlite3* conn, const std::string& table_name, std::map<Deg, array2d>& basis)
-{
-	sqlite3_stmt* stmt;
-	std::string cmd = "SELECT mon, s, t, v FROM " + table_name + " ORDER BY mon_id;";
-	sqlite3_prepare_v100(conn, cmd, &stmt);
-	while (sqlite3_step(stmt) == SQLITE_ROW) {
-		Deg d = { sqlite3_column_int(stmt, 1), sqlite3_column_int(stmt, 2), sqlite3_column_int(stmt, 3) };
-		basis[d].push_back(str_to_array(sqlite3_column_str(stmt, 0)));
-	}
-	sqlite3_finalize(stmt);
-}
-
 void generate_basis(const Database& db, const std::string& table_prefix, int t_max, bool drop_existing=false)
 {
 	/* load gen_degs, leadings, basis */
@@ -97,18 +50,8 @@ int main_generate_basis(int argc, char** argv)
 {
 	Database db;
 	db.init(R"(C:\Users\lwnpk\Documents\MyProgramData\Math_AlgTop\database\tmp.db)");
-
-	std::string table_prefix;
-	int t_max;
-	if (argc == 1) {
-		table_prefix = "E4b6";
-		t_max = 74;
-	}
-	else {
-		table_prefix = argv[1];
-		t_max = atoi(argv[2]);
-	}
-
+	std::string table_prefix = "E4b6";
+	int t_max = 74;
 	generate_basis(db, table_prefix, t_max, true);
 	return 0;
 }

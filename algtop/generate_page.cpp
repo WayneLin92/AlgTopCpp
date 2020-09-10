@@ -1,49 +1,11 @@
 #include "main.h"
 
-/********** STRUCTS AND CLASSES **********/
-
-struct BasisSS1
-{
-	array2d boundary;
-	array2d kernel;
-};
-
-/********** FUNCTIONS **********/
-
-void load_basis_ss(sqlite3* conn, const std::string& table_name_ss, std::map<Deg, BasisSS1>& basis_ss, int r)
-{
-	sqlite3_stmt* stmt;
-	std::string cmd = "SELECT base, level, s, t, v FROM " + table_name_ss + " ;";
-	sqlite3_prepare_v100(conn, cmd, &stmt);
-
-	while (sqlite3_step(stmt) == SQLITE_ROW) {
-		Deg deg = { sqlite3_column_int(stmt, 2), sqlite3_column_int(stmt, 3), sqlite3_column_int(stmt, 4) };
-		int level = sqlite3_column_int(stmt, 1);
-		if (level <= r)
-			basis_ss[deg].boundary.push_back(str_to_array(sqlite3_column_str(stmt, 0)));
-		else if (level <= T_MAX - r)
-			basis_ss[deg].kernel.push_back(str_to_array(sqlite3_column_str(stmt, 0)));
-	}
-	sqlite3_finalize(stmt);
-}
-
 /* Generate the homology of the E_r page */
-void generate_next_page(sqlite3* conn, const std::string& table_prefix, const std::string& table_H_prefix, int r)
+void generate_next_page(const Database& db, const std::string& table_prefix, const std::string& table_H_prefix, int r)
 {
-	/* Load gb */
-	array3d gb;
-	load_gb(conn, table_prefix + "_relations", gb);
-	std::cout << "gb loaded! Size=" << gb.size() << '\n';
-
-	/* Load basis */
-	std::map<Deg, array2d> basis;
-	load_basis(conn, table_prefix + "_basis", basis);
-	std::cout << "basis loaded! Size=" << basis.size() << '\n';
-
-	/* Load basis_ss */
-	std::map<Deg, BasisSS1> basis_ss;
-	load_basis_ss(conn, table_prefix + "_ss", basis_ss, r);
-	std::cout << "basis_ss loaded! Size=" << basis_ss.size() << '\n';
+	array3d gb = db.load_gb(table_prefix + "_relations");
+	std::map<Deg, array2d> basis = db.load_basis(table_prefix + "_basis");
+	std::map<Deg, BasisComplex> basis_ss = db.load_basis_ss(table_prefix + "_ss", r);
 
 	std::vector<Deg> gen_degs_H;
 	array2d reprs_H;
@@ -164,90 +126,23 @@ void generate_next_page(sqlite3* conn, const std::string& table_prefix, const st
 	}
 
 	/* Save generators */
-	sqlite3_stmt* stmt_update_generators;
-	std::string cmd_update_generators = std::string("INSERT INTO ") + table_H_prefix + "_generators (gen_id, repr, s, t, v) VALUES (?1, ?2, ?3, ?4, ?5);";
-	sqlite3_prepare_v100(conn, cmd_update_generators, &stmt_update_generators);
-
-	execute_cmd(conn, "BEGIN TRANSACTION");
-	for (int i = 0; i < (int)gen_degs_H.size(); ++i) {
-		sqlite3_bind_int(stmt_update_generators, 1, i);
-		sqlite3_bind_str(stmt_update_generators, 2, array2d_to_str(indices_to_poly(reprs_H[i], basis[gen_degs_H[i]])));
-		sqlite3_bind_int(stmt_update_generators, 3, gen_degs_H[i].s);
-		sqlite3_bind_int(stmt_update_generators, 4, gen_degs_H[i].t);
-		sqlite3_bind_int(stmt_update_generators, 5, gen_degs_H[i].v);
-		sqlite3_step(stmt_update_generators);
-		sqlite3_reset(stmt_update_generators);
-	}
-	execute_cmd(conn, "END TRANSACTION");
-	std::cout << gen_degs_H.size() << " Generators are inserted!\n";
-
-	sqlite3_finalize(stmt_update_generators);
+	array3d reprs_poly_H;
+	for (size_t i = 0; i < (int)reprs_H.size(); ++i)
+		reprs_poly_H.push_back(indices_to_poly(reprs_H[i], basis[gen_degs_H[i]]));
+	db.save_generators(table_H_prefix + "_generators", gen_degs_H, reprs_poly_H);
 
 	/* Save gb */
-	sqlite3_stmt* stmt_update_relations;
-	std::string cmd_update_relations = std::string("INSERT INTO ") + table_H_prefix + "_relations (leading_term, basis, s, t, v) VALUES (?1, ?2, ?3, ?4, ?5);"; // Insert s, t, v
-	sqlite3_prepare_v100(conn, cmd_update_relations, &stmt_update_relations);
-
-	execute_cmd(conn, "BEGIN TRANSACTION");
-	for (int i = 0; i < int(gb_H.size()); ++i) {
-		Deg deg = get_deg(gb_H[i], gen_degs_H);
-		sqlite3_bind_str(stmt_update_relations, 1, array_to_str(gb_H[i].front()));
-		sqlite3_bind_str(stmt_update_relations, 2, array2d_to_str(gb_H[i].begin() + 1, gb_H[i].end()));
-		sqlite3_bind_int(stmt_update_relations, 3, deg.s);
-		sqlite3_bind_int(stmt_update_relations, 4, deg.t);
-		sqlite3_bind_int(stmt_update_relations, 5, deg.v);
-		sqlite3_step(stmt_update_relations);
-		sqlite3_reset(stmt_update_relations);
-	}
-	execute_cmd(conn, "END TRANSACTION");
-	std::cout << gb_H.size() << " relations are inserted!\n";
-
-	sqlite3_finalize(stmt_update_relations);
+	db.save_gb(table_H_prefix + "_relations", gb_H, gen_degs_H);
 
 	/* Save basis */
-	sqlite3_stmt* stmt_update_basis;
-	std::string cmd_update_basis = std::string("INSERT INTO ") + table_H_prefix + "_basis (mon_id, mon, repr, s, t, v) VALUES (?1, ?2, ?3, ?4, ?5, ?6);"; // Insert s, t, v
-	sqlite3_prepare_v100(conn, cmd_update_basis, &stmt_update_basis);
-
-	execute_cmd(conn, "BEGIN TRANSACTION");
-	int mon_id = 0;
-	for (auto p = basis_H.begin(); p != basis_H.end(); ++p) {
-		for (size_t i = 0; i < p->second.size(); ++i) {
-			const Deg& deg = p->first;
-			sqlite3_bind_int(stmt_update_basis, 1, mon_id);
-			sqlite3_bind_str(stmt_update_basis, 2, array_to_str(p->second[i]));
-			sqlite3_bind_str(stmt_update_basis, 3, array_to_str(mon_reprs_H[deg][i]));
-			sqlite3_bind_int(stmt_update_basis, 4, deg.s);
-			sqlite3_bind_int(stmt_update_basis, 5, deg.t);
-			sqlite3_bind_int(stmt_update_basis, 6, deg.v);
-			sqlite3_step(stmt_update_basis);
-			sqlite3_reset(stmt_update_basis);
-			mon_id++;
-		}
-	}
-	execute_cmd(conn, "END TRANSACTION");
-	std::cout << basis_H.size() << " basis are inserted!\n";
-
-	sqlite3_finalize(stmt_update_basis);
+	db.save_basis(table_H_prefix + "_basis", basis_H, mon_reprs_H);
 }
 
 int main_generate_next_page(int argc, char** argv)
 {
-	sqlite3* conn;
-	sqlite3_open(R"(C:\Users\lwnpk\Documents\MyProgramData\Math_AlgTop\database\tmp.db)", &conn);
-
-	std::string table_prefix, table_H_prefix;
-	if (argc == 1) {
-		table_prefix = "E2";
-		table_H_prefix = "E4";
-	}
-	else {
-		table_prefix = argv[1];
-		table_H_prefix = argv[2];
-	}
-
-	generate_next_page(conn, table_prefix, table_H_prefix, 2);
-
-	sqlite3_close(conn);
+	Database db;
+	db.init(R"(C:\Users\lwnpk\Documents\MyProgramData\Math_AlgTop\database\tmp.db)");
+	std::string table_prefix = "E2", table_H_prefix = "E4";
+	generate_next_page(db, table_prefix, table_H_prefix, 2);
 	return 0;
 }

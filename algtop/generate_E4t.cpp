@@ -13,38 +13,25 @@ struct DgaBasis1
 
 /********** FUNCTIONS **********/
 
-void load_reprs(sqlite3* conn, const std::string& table_name, array3d& reprs)
+void load_dga_basis(const Database& db, const std::string& table_name, std::map<Deg, DgaBasis1>& basis, int r)
 {
-	sqlite3_stmt* stmt;
-	std::string cmd = std::string("SELECT repr FROM ") + table_name + ";";
-	sqlite3_prepare_v100(conn, cmd, &stmt);
-	while (sqlite3_step(stmt) == SQLITE_ROW) {
-		reprs.push_back(str_to_array2d(sqlite3_column_str(stmt, 0)));
-	}
-	sqlite3_finalize(stmt);
-}
-
-void load_dga_basis(sqlite3* conn, const std::string& table_name, std::map<Deg, DgaBasis1>& basis, int r)
-{
-	sqlite3_stmt* stmt;
-	std::string cmd = std::string("SELECT mon, diff, s, t, v FROM ") + table_name + " ORDER BY mon_id;";
-	sqlite3_prepare_v100(conn, cmd, &stmt);
+	Statement stmt;
+	stmt.init(db, "SELECT mon, diff, s, t, v FROM " + table_name + " ORDER BY mon_id;");
 	int prev_t = 0;
-	while (sqlite3_step(stmt) == SQLITE_ROW) {
-		Deg d = { sqlite3_column_int(stmt, 2), sqlite3_column_int(stmt, 3), sqlite3_column_int(stmt, 4) };
+	while (stmt.step() == SQLITE_ROW) {
+		Deg d = { stmt.column_int(2), stmt.column_int(3), stmt.column_int(4) };
 		if (d.t > prev_t) {
 			std::cout << "load_dag_basis, t=" << d.t << "          \r";
 			prev_t = d.t;
 		}
-		basis[d].basis.push_back(str_to_array(sqlite3_column_str(stmt, 0)));
-		basis[d].diffs.push_back({ str_to_array(sqlite3_column_str(stmt, 1)) });
+		basis[d].basis.push_back(str_to_array(stmt.column_str(0)));
+		basis[d].diffs.push_back({ str_to_array(stmt.column_str(1)) });
 	}
 	for (auto& [d, basis_d] : basis) {
 		for (size_t i = 0; i < basis_d.basis.size(); ++i) {
 			basis_d.diffs[i] = indices_to_poly(basis_d.diffs[i][0], basis[d + Deg{ 1, 0, -r }].basis);
 		}
 	}
-	sqlite3_finalize(stmt);
 }
 
 /* m1 is a sparse vector while [p1, p2) is a dense vector starting with index `index` */
@@ -273,46 +260,28 @@ std::vector<rel_heap_t> find_relations(Deg d, array2d& basis_d, const std::map<D
 	return result;
 }
 
-void generate_E4bk(sqlite3* conn, const std::string& table_prefix, const std::string& table1_prefix, const array2d& a, int bk_gen_id, int t_max)
+void generate_E4bk(const Database& db, const std::string& table_prefix, const std::string& table1_prefix, const array2d& a, int bk_gen_id, int t_max)
 {
-	/* load generators */
-
-	std::vector<Deg> gen_degs;
-	load_gen_degs(conn, table_prefix + "_generators", gen_degs);
-	std::cout << "gen_degs.size()=" << gen_degs.size() << '\n';
-
-	array3d reprs;
-	load_reprs(conn, table_prefix + "_generators", reprs);
-	std::cout << "reprs.size()=" << reprs.size() << '\n';
-
-	std::vector<Deg> gen_degs_E2t;
-	load_gen_degs(conn, "E2t_generators", gen_degs_E2t);
-	while (gen_degs_E2t.size() > size_t(bk_gen_id) + 1) gen_degs_E2t.pop_back();
-	std::cout << "gen_degs_E2t.size()=" << gen_degs_E2t.size() << '\n';
-
-	array3d diffs_E2t;
-	load_gen_diffs(conn, "E2t_generators", diffs_E2t);
-	std::cout << "diffs_E2t.size()=" << diffs_E2t.size() << '\n';
-
+	std::vector<Deg> gen_degs = db.load_gen_degs(table_prefix + "_generators");
 	array gen_degs_t;
 	for (auto p = gen_degs.begin(); p < gen_degs.end(); ++p)
 		gen_degs_t.push_back(p->t);
 
-	/* load Groebner basis */
+	array3d reprs = db.load_gen_reprs(table_prefix + "_generators");
 
-	array3d gb;
-	load_gb(conn, table_prefix + "_relations", gb);
-	std::cout << "gb.size()=" << gb.size() << '\n';
+	std::vector<Deg> gen_degs_E2t = db.load_gen_degs("E2t_generators");
+	while (gen_degs_E2t.size() > size_t(bk_gen_id) + 1)
+		gen_degs_E2t.pop_back();
 
-	array3d gb_E2t;
-	load_gb(conn, "E2_relations", gb_E2t);
-	std::cout << "gb_E2t.size()=" << gb_E2t.size() << '\n';
+	array3d diffs_E2t = db.load_gen_diffs("E2t_generators");
 
+	array3d gb = db.load_gb(table_prefix + "_relations");
 	array3d leadings;
 	leadings.resize(gen_degs.size());
 	for (const array2d& g : gb)
 		leadings[g[0][0]].push_back(g[0]);
 
+	array3d gb_E2t = db.load_gb("E2_relations");
 	array3d leadings_E2t;
 	leadings_E2t.resize(gen_degs_E2t.size());
 	for (const array2d& g : gb_E2t)
@@ -321,7 +290,7 @@ void generate_E4bk(sqlite3* conn, const std::string& table_prefix, const std::st
 	/* load E2_basis */
 
 	std::map<Deg, DgaBasis1> basis_E2;
-	load_dga_basis(conn, "E2_basis", basis_E2, 2);
+	load_dga_basis(db, "E2_basis", basis_E2, 2);
 	std::cout << "basis_E2 loaded! Size=" << basis_E2.size() << '\n';
 
 	/* generate basis of polynomials of b_1,...,b_k */
@@ -421,79 +390,44 @@ void generate_E4bk(sqlite3* conn, const std::string& table_prefix, const std::st
 	}
 
 	/* Save generators */
-	sqlite3_stmt* stmt_update_generators;
-	std::string cmd_update_generators = std::string("INSERT INTO ") + table1_prefix + "_generators (gen_id, repr, s, t, v) VALUES (?1, ?2, ?3, ?4, ?5);";
-	sqlite3_prepare_v100(conn, cmd_update_generators, &stmt_update_generators);
-
-	execute_cmd(conn, "BEGIN TRANSACTION");
-	for (size_t i = 0; i < gen_degs.size(); ++i) {
-		sqlite3_bind_int(stmt_update_generators, 1, int(i));
-		sqlite3_bind_str(stmt_update_generators, 2, array2d_to_str(reprs[i]));
-		sqlite3_bind_int(stmt_update_generators, 3, gen_degs[i].s);
-		sqlite3_bind_int(stmt_update_generators, 4, gen_degs[i].t);
-		sqlite3_bind_int(stmt_update_generators, 5, gen_degs[i].v);
-		sqlite3_step(stmt_update_generators);
-		sqlite3_reset(stmt_update_generators);
-	}
-	execute_cmd(conn, "END TRANSACTION");
-	std::cout << gen_degs.size() << " Generators are inserted!\n";
-
-	sqlite3_finalize(stmt_update_generators);
+	db.save_generators(table1_prefix + "_generators", gen_degs, reprs);
 
 	/* Save relations */
-	sqlite3_stmt* stmt_update_relations;
-	std::string cmd_update_relations = std::string("INSERT INTO ") + table1_prefix + "_relations (leading_term, basis, s, t, v) VALUES (?1, ?2, ?3, ?4, ?5);"; // Insert s, t, v
-	sqlite3_prepare_v100(conn, cmd_update_relations, &stmt_update_relations);
-
-	execute_cmd(conn, "BEGIN TRANSACTION");
-	for (size_t i = 0; i < gb.size(); ++i) {
-		Deg d = get_deg(gb[i], gen_degs);
-		sqlite3_bind_str(stmt_update_relations, 1, array_to_str(gb[i][0]));
-		sqlite3_bind_str(stmt_update_relations, 2, array2d_to_str(gb[i].begin() + 1, gb[i].end()));
-		sqlite3_bind_int(stmt_update_relations, 3, d.s);
-		sqlite3_bind_int(stmt_update_relations, 4, d.t);
-		sqlite3_bind_int(stmt_update_relations, 5, d.v);
-		sqlite3_step(stmt_update_relations);
-		sqlite3_reset(stmt_update_relations);
-	}
-	execute_cmd(conn, "END TRANSACTION");
-	std::cout << gb.size() << " relations are inserted!\n";
-
-	sqlite3_finalize(stmt_update_relations);
+	db.save_gb(table1_prefix + "_relations", gb, gen_degs);
 }
 
 int main_test1(int argc, char** argv)
 {
-	sqlite3* conn;
-	sqlite3_open(R"(C:\Users\lwnpk\Documents\MyProgramData\Math_AlgTop\database\tmp.db)", &conn);
+	Database db;
+	db.init(R"(C:\Users\lwnpk\Documents\MyProgramData\Math_AlgTop\database\tmp.db)");
 
-	execute_cmd(conn, "DELETE FROM E4b1_generators;");
-	execute_cmd(conn, "DELETE FROM E4b1_relations;");
-	execute_cmd(conn, "DELETE FROM E4b2_generators;");
-	execute_cmd(conn, "DELETE FROM E4b2_relations;");
-	execute_cmd(conn, "DELETE FROM E4b3_generators;");
-	execute_cmd(conn, "DELETE FROM E4b3_relations;");
-	execute_cmd(conn, "DELETE FROM E4b4_generators;");
-	execute_cmd(conn, "DELETE FROM E4b4_relations;");
-	execute_cmd(conn, "DELETE FROM E4b5_generators;");
-	execute_cmd(conn, "DELETE FROM E4b5_relations;");
-	execute_cmd(conn, "DELETE FROM E4b6_generators;");
-	execute_cmd(conn, "DELETE FROM E4b6_relations;");
+	db.execute_cmd("DELETE FROM E4b1_generators;");
+	db.execute_cmd("DELETE FROM E4b1_relations;");
+	db.execute_cmd("DELETE FROM E4b2_generators;");
+	db.execute_cmd("DELETE FROM E4b2_relations;");
+	db.execute_cmd("DELETE FROM E4b3_generators;");
+	db.execute_cmd("DELETE FROM E4b3_relations;");
+	db.execute_cmd("DELETE FROM E4b4_generators;");
+	db.execute_cmd("DELETE FROM E4b4_relations;");
+	db.execute_cmd("DELETE FROM E4b5_generators;");
+	db.execute_cmd("DELETE FROM E4b5_relations;");
+	db.execute_cmd("DELETE FROM E4b6_generators;");
+	db.execute_cmd("DELETE FROM E4b6_relations;");
 
 	auto start = std::chrono::system_clock::now();
 	int t_max = 74;
 	std::cout << "E4b1\n";
-	generate_E4bk(conn, "E4", "E4b1", { {0, 1} }, 58, t_max);
+	generate_E4bk(db, "E4", "E4b1", { {0, 1} }, 58, t_max);
 	std::cout << "E4b2\n";
-	generate_E4bk(conn, "E4b1", "E4b2", { {54, 1} }, 59, t_max);
+	generate_E4bk(db, "E4b1", "E4b2", { {54, 1} }, 59, t_max);
 	std::cout << "E4b3\n";
-	generate_E4bk(conn, "E4b2", "E4b3", { {75, 1} }, 60, t_max);
+	generate_E4bk(db, "E4b2", "E4b3", { {75, 1} }, 60, t_max);
 	std::cout << "E4b4\n";
-	generate_E4bk(conn, "E4b3", "E4b4", { {113, 1} }, 61, t_max);
+	generate_E4bk(db, "E4b3", "E4b4", { {113, 1} }, 61, t_max);
 	std::cout << "E4b5\n";
-	generate_E4bk(conn, "E4b4", "E4b5", { {172, 1} }, 62, t_max);
+	generate_E4bk(db, "E4b4", "E4b5", { {172, 1} }, 62, t_max);
 	std::cout << "E4b6\n";
-	generate_E4bk(conn, "E4b5", "E4b6", { {253, 1} }, 63, t_max);
+	generate_E4bk(db, "E4b5", "E4b6", { {253, 1} }, 63, t_max);
 
 
 
@@ -501,7 +435,6 @@ int main_test1(int argc, char** argv)
 	std::chrono::duration<double> elapsed = end - start;
 	std::cout << "Elapsed time: " << elapsed.count() << "s\n";
 
-	sqlite3_close(conn);
 	return 0;
 }
 
@@ -509,8 +442,8 @@ int main_generate_E4t(int argc, char** argv)
 {
 	return main_test1(argc, argv);
 
-	sqlite3* conn;
-	sqlite3_open(R"(C:\Users\lwnpk\Documents\MyProgramData\Math_AlgTop\database\ss.db)", &conn);
+	Database db;
+	db.init(R"(C:\Users\lwnpk\Documents\MyProgramData\Math_AlgTop\database\ss.db)");
 
 	auto start = std::chrono::system_clock::now();
 
@@ -524,7 +457,7 @@ int main_generate_E4t(int argc, char** argv)
 	//std::cout << "E4b4\n";
 	//generate_E4bk(conn, "E4b3", "E4b4", { {1064, 1} }, 61, t_max);
 	std::cout << "E4b5\n";
-	generate_E4bk(conn, "E4b4", "E4b5", { {1849, 1} }, 62, t_max);
+	generate_E4bk(db, "E4b4", "E4b5", { {1849, 1} }, 62, t_max);
 	/*std::cout << "E4b6\n";
 	generate_E4bk(conn, "E4b5", "E4b6", { {252, 1} }, 63, t_max);*/
 	//std::cout << "E4b7\n";
@@ -534,6 +467,5 @@ int main_generate_E4t(int argc, char** argv)
 	std::chrono::duration<double> elapsed = end - start;
 	std::cout << "Elapsed time: " << elapsed.count() << "s\n";
 
-	sqlite3_close(conn);
 	return 0;
 }
