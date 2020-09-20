@@ -9,8 +9,8 @@ constexpr auto T_MAX = 10000;
 
 struct BasisComplex
 {
-	array2d boundary;
-	array2d kernel;
+	array2d boundaries;
+	array2d cycles;
 };
 
 struct BasisSS
@@ -48,6 +48,7 @@ public:
 	void save_gb(const std::string& table_name, const Poly1d& gb, const std::vector<Deg>& gen_degs) const;
 	void save_basis(const std::string& table_name, const std::map<Deg, Mon1d>& basis) const;
 	void save_basis(const std::string& table_name, const std::map<Deg, Mon1d>& basis, const std::map<Deg, array2d>& mon_reprs) const;
+	void save_basis(const std::string& table_name, const std::map<Deg, Mon1d>& basis, const std::map<Deg, Poly1d>& mon_reprs) const;
 	void save_basis_ss(const std::string& table_name, const std::map<Deg, BasisSS>& basis_ss) const;
 private:
 	sqlite3* m_conn;

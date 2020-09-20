@@ -361,7 +361,6 @@ array2d quotient_space(const array2d& spaceV, const array2d& spaceW)
 	for (size_t i = 0; i < spaceV.size() && quotient.size() < dimQuo; i++) {
 #endif
 		auto v1 = residue(quotient, residue(spaceW, spaceV[i]));
-		std::cout << "quotient=" << quotient << " spaceV[i]=" << spaceV[i] << " v1=" << v1 << '\n';
 		if (!v1.empty())
 			quotient.push_back(std::move(v1));
 	}

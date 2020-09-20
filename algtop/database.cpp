@@ -121,9 +121,9 @@ std::map<Deg, BasisComplex> Database::load_basis_ss(const std::string& table_nam
 		Deg deg = { stmt.column_int(0), stmt.column_int(1), stmt.column_int(2) };
 		int level = stmt.column_int(3);
 		if (level <= r)
-			basis_ss[deg].boundary.push_back(str_to_array(stmt.column_str(4)));
+			basis_ss[deg].boundaries.push_back(str_to_array(stmt.column_str(4)));
 		else if (level <= T_MAX - r)
-			basis_ss[deg].kernel.push_back(str_to_array(stmt.column_str(4)));
+			basis_ss[deg].cycles.push_back(str_to_array(stmt.column_str(4)));
 	}
 	std::cout << "basis_ss loaded from " << table_name << ", size=" << basis_ss.size() << '\n';
 	return basis_ss;
@@ -195,6 +195,26 @@ void Database::save_basis(const std::string& table_name, const std::map<Deg, Mon
 		for (size_t i = 0; i < basis_d.size(); ++i){
 			stmt.bind_str(1, Mon_to_str(basis_d[i]));
 			stmt.bind_str(2, array_to_str(mon_reprs.at(deg)[i]));
+			stmt.bind_int(3, deg.s);
+			stmt.bind_int(4, deg.t);
+			stmt.bind_int(5, deg.v);
+			stmt.step_and_reset();
+		}
+	}
+	end_transaction();
+	std::cout << "basis is inserted, number of degrees=" << basis.size() << '\n';
+}
+
+void Database::save_basis(const std::string& table_name, const std::map<Deg, Mon1d>& basis, const std::map<Deg, Poly1d>& mon_reprs) const
+{
+	Statement stmt;
+	stmt.init(*this, "INSERT INTO " + table_name + " (mon, repr, s, t, v) VALUES (?1, ?2, ?3, ?4, ?5);");
+
+	begin_transaction();
+	for (auto& [deg, basis_d] : basis) {
+		for (size_t i = 0; i < basis_d.size(); ++i) {
+			stmt.bind_str(1, Mon_to_str(basis_d[i]));
+			stmt.bind_str(2, Poly_to_str(mon_reprs.at(deg)[i]));
 			stmt.bind_int(3, deg.s);
 			stmt.bind_int(4, deg.t);
 			stmt.bind_int(5, deg.v);

@@ -142,8 +142,8 @@ void generate_ss(const Database& db, const std::string& table_name_basis, const 
 
 		/* fill with boundaries */
 		Deg deg_diff = deg + Deg{ 1, 0, -r };
-		for (auto& boundary : image) {
-			basis_ss[deg_diff].basis_ind.push_back(std::move(boundary));
+		for (auto& boundaries : image) {
+			basis_ss[deg_diff].basis_ind.push_back(std::move(boundaries));
 			basis_ss[deg_diff].diffs_ind.push_back({});
 			basis_ss[deg_diff].levels.push_back(r);
 		}
@@ -175,9 +175,9 @@ void generate_next_page(const Database& db, const std::string& table_prefix, con
 
 	Mon2d leadings;
 	std::map<Deg, Mon1d> basis_H;
-	basis[Deg{ 0, 0, 0 }].push_back({});
+	basis_H[Deg{ 0, 0, 0 }].push_back({});
 	std::map<Deg, array2d> mon_reprs_H;
-	basis[Deg{ 0, 0, 0 }].push_back({});
+	mon_reprs_H[Deg{ 0, 0, 0 }].push_back({});
 	std::map<Deg, Mon1d> basis_H_new;
 	std::map<Deg, array2d> mon_reprs_H_new;
 
@@ -214,7 +214,7 @@ void generate_next_page(const Database& db, const std::string& table_prefix, con
 				std::sort(lead_kernel.begin(), lead_kernel.end());
 
 				/* Find new generators and add to basis_H */
-				quotient = quotient_space(p_ss->second.kernel, image);
+				quotient = quotient_space(p_ss->second.cycles, image);
 				simplify_space(quotient);
 				for (auto& x : quotient) {
 					gen_degs_H.push_back(deg);
@@ -232,7 +232,7 @@ void generate_next_page(const Database& db, const std::string& table_prefix, con
 			}
 			else {
 				/* Find new generators and add to basis_H */
-				for (array& x : simplify_space(p_ss->second.kernel)) {
+				for (array& x : simplify_space(p_ss->second.cycles)) {
 					gen_degs_H.push_back(deg);
 					reprs_H.push_back(x);
 					basis_H[deg].push_back({ {int(gen_degs_H.size()) - 1, 1} });
@@ -276,7 +276,7 @@ void generate_next_page(const Database& db, const std::string& table_prefix, con
 									auto poly1 = indices_to_Poly(repr1, basis[deg1]);
 									auto gen_repr = indices_to_Poly(reprs_H[gen_id], basis[g_deg]);
 									Poly repr = reduce(mul(poly1, gen_repr), gb);
-									array repr_indices = residue(basis_ss[deg].boundary, Poly_to_indices(repr, basis[deg]));
+									array repr_indices = residue(basis_ss[deg].boundaries, Poly_to_indices(repr, basis[deg]));
 									basis_H_new[deg].push_back(std::move(mon));
 									mon_reprs_H_new[deg].push_back(std::move(repr_indices));
 								}

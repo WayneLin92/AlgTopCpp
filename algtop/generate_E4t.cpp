@@ -143,6 +143,31 @@ std::map<Deg, DgaBasis1> get_basis_bi(const std::vector<Deg>& gen_degs, const Po
 	return result;
 }
 
+void save_basis_bi(Database& db)
+{
+	int t_max = 200;
+	std::vector<Deg> gen_degs_E2t = db.load_gen_degs("E2t_generators");
+	Poly1d diffs_E2t = db.load_gen_diffs("E2t_generators");
+	std::map<Deg, DgaBasis1> basis_bi = get_basis_bi(gen_degs_E2t, diffs_E2t, t_max);
+
+	Statement stmt;
+	stmt.init(db, "INSERT INTO E2t_bi_basis (s, t, v, mon, diff) VALUES (?1, ?2, ?3, ?4, ?5);");
+
+	db.begin_transaction();
+	for (auto& [deg, basis_d] : basis_bi) {
+		for (size_t i = 0; i < basis_d.basis.size(); ++i) {
+			stmt.bind_int(1, deg.s);
+			stmt.bind_int(2, deg.t);
+			stmt.bind_int(3, deg.v);
+			stmt.bind_str(4, Mon_to_str(basis_d.basis[i]));
+			stmt.bind_str(5, Poly_to_str(basis_bi[deg].diffs[i]));
+			stmt.step_and_reset();
+		}
+	}
+	db.end_transaction();
+	std::cout << "basis_bi is inserted, number of degrees=" << basis_bi.size() << '\n';
+}
+
 /* build the basis for t<=t_max */
 void get_basis(const Mon2d& leadings, const std::vector<Deg>& gen_degs, std::map<Deg, Mon1d>& basis, int t_max)
 {
@@ -261,23 +286,23 @@ std::vector<rel_heap_t> find_relations(Deg d, Mon1d& basis_d, const std::map<Deg
 void generate_E4bk(const Database& db, const std::string& table_prefix, const std::string& table1_prefix, const Poly& a, int bk_gen_id, int t_max)
 {
 	std::vector<Deg> gen_degs = db.load_gen_degs(table_prefix + "_generators");
-	array gen_degs_t;
+	array gen_degs_t; 
 	for (auto p = gen_degs.begin(); p < gen_degs.end(); ++p)
 		gen_degs_t.push_back(p->t);
 
 	Poly1d reprs = db.load_gen_reprs(table_prefix + "_generators");
-
-	std::vector<Deg> gen_degs_E2t = db.load_gen_degs("E2t_generators");
-	while (gen_degs_E2t.size() > size_t(bk_gen_id) + 1)
-		gen_degs_E2t.pop_back();
-
-	Poly1d diffs_E2t = db.load_gen_diffs("E2t_generators");
 
 	Poly1d gb = db.load_gb(table_prefix + "_relations");
 	Mon2d leadings;
 	leadings.resize(gen_degs.size());
 	for (const Poly& g : gb)
 		leadings[g[0][0].gen].push_back(g[0]);
+
+	std::vector<Deg> gen_degs_E2t = db.load_gen_degs("E2t_generators");
+	while (gen_degs_E2t.size() > size_t(bk_gen_id) + 1)
+		gen_degs_E2t.pop_back();
+
+	Poly1d diffs_E2t = db.load_gen_diffs("E2t_generators");
 
 	Poly1d gb_E2t = db.load_gb("E2_relations");
 	Mon2d leadings_E2t;
@@ -398,6 +423,8 @@ int main_test1(int argc, char** argv)
 {
 	Database db;
 	db.init(R"(C:\Users\lwnpk\Documents\MyProgramData\Math_AlgTop\database\tmp.db)");
+
+	save_basis_bi(db); return 0;
 
 	db.execute_cmd("DELETE FROM E4b1_generators;");
 	db.execute_cmd("DELETE FROM E4b1_relations;");
