@@ -399,7 +399,9 @@ Poly reduce(Poly poly, const Poly1d& gb)
 	return result;
 }
 
-/* Comsume relations from heap that is at most in degree `deg` while adding new relations to heap that is at most in degree `deg_max`. */
+/* Comsume relations from `heap` that is at most in degree `deg` while adding new relations to `heap` that is at most in degree `deg_max`. 
+** deg=-1 or deg_max=-1 means infinity.
+*/
 template <typename Fn>
 void add_rels(Poly1d& gb, std::vector<rel_heap_t>& heap, Fn _get_deg, int deg, int deg_max)
 {
@@ -512,6 +514,7 @@ void add_rels_freemodule(Poly1d& gb, std::vector<rel_heap_t>& heap, Fn get_deg, 
 	}
 }
 
+/* Compute the generating set of `vectors` inplace */
 Poly2d& indecomposables(const Poly1d& gb, Poly2d& vectors, const array& gen_degs, const array& basis_degs)
 {
 	if (vectors.empty())
@@ -525,6 +528,7 @@ Poly2d& indecomposables(const Poly1d& gb, Poly2d& vectors, const array& gen_degs
 		return result;
 	};
 
+	/* Convert each vector v into a relation \\sum vi x_{i-N} */
 	Poly1d rels;
 	array degs;
 	for (const Poly1d& v : vectors) {
@@ -539,6 +543,7 @@ Poly2d& indecomposables(const Poly1d& gb, Poly2d& vectors, const array& gen_degs
 	array indices = range((int)vectors.size());
 	std::sort(indices.begin(), indices.end(), [&degs](int i, int j) {return degs[i] < degs[j]; });
 
+	/* Add relations ordered by degree to gb1 */
 	std::vector<rel_heap_t> heap;
 	int deg_max = get_deg(rels[indices.back()][0]);
 	for (int i : indices) {
@@ -552,11 +557,13 @@ Poly2d& indecomposables(const Poly1d& gb, Poly2d& vectors, const array& gen_degs
 		else
 			vectors[i].clear();
 	}
-
+	
+	/* Keep only the indecomposables in `vectors` */
 	vectors.erase(std::remove_if(vectors.begin(), vectors.end(), [](const Poly1d& v) {return v.empty(); }), vectors.end());
 	return vectors;
 }
 
+/* Compute the generating set of linear relations among `polys` */
 Poly2d ann_seq(const Poly1d& gb, const Poly1d& polys, const array& gen_degs, int deg_max)
 {
 	Poly2d result;
@@ -565,6 +572,8 @@ Poly2d ann_seq(const Poly1d& gb, const Poly1d& polys, const array& gen_degs, int
 	Poly1d rels;
 	array gen_degs1;
 	int N = (int)polys.size();
+
+	/* Add relations Xi=polys[i] to gb to obtain gb1 */
 	for (int i = 0; i < N; ++i) {
 		Poly p = polys[i];
 		gen_degs1.push_back(get_deg(p, gen_degs));
@@ -578,6 +587,8 @@ Poly2d ann_seq(const Poly1d& gb, const Poly1d& polys, const array& gen_degs, int
 			result_ += (p->gen >= 0 ? gen_degs[p->gen] : gen_degs1[p->gen + size_t(N)]) * p->exp;
 		return result_;
 		}, deg_max);
+
+	/* Extract linear relations from gb1 */
 	for (const Poly& g : gb1) {
 		if (g[0][0].gen < 0) {
 			Poly1d result_i;
@@ -591,6 +602,8 @@ Poly2d ann_seq(const Poly1d& gb, const Poly1d& polys, const array& gen_degs, int
 			result.push_back(std::move(result_i));
 		}
 	}
+
+	/* Add commutators to linear relations */
 	for (int i = 0; i < N; ++i) {
 		for (int j = i + 1; j < N; j++) {
 			if (gen_degs1[i] + gen_degs1[j] <= deg_max) {
@@ -602,6 +615,7 @@ Poly2d ann_seq(const Poly1d& gb, const Poly1d& polys, const array& gen_degs, int
 			}
 		}
 	}
+
 	indecomposables(gb, result, gen_degs, gen_degs1);
 	return result;
 }
