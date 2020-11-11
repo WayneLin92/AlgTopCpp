@@ -28,7 +28,7 @@ public:
 	void init(const char* filename) { if (sqlite3_open(filename, &m_conn) != SQLITE_OK) throw "8de81e80"; }
 public:
 	void execute_cmd(const std::string& sql) const;
-	int get_num(const std::string& sql) const;
+	int get_int(const std::string& sql) const;
 	void sqlite3_prepare_v100(const char* zSql, sqlite3_stmt** ppStmt) const { if (sqlite3_prepare_v2(m_conn, zSql, int(strlen(zSql)) + 1, ppStmt, NULL) != SQLITE_OK) throw "bce2dcfe"; }
 	void sqlite3_prepare_v100(const std::string& sql, sqlite3_stmt** ppStmt) const { if (sqlite3_prepare_v2(m_conn, sql.c_str(), int(sql.size()) + 1, ppStmt, NULL) != SQLITE_OK) throw "da6ab7f6"; }
 public:
