@@ -27,7 +27,8 @@ public:
 	~Database() { sqlite3_close(m_conn); }
 	void init(const char* filename) { if (sqlite3_open(filename, &m_conn) != SQLITE_OK) throw "8de81e80"; }
 public:
-	void execute_cmd(const std::string& cmd) const;
+	void execute_cmd(const std::string& sql) const;
+	int get_num(const std::string& sql) const;
 	void sqlite3_prepare_v100(const char* zSql, sqlite3_stmt** ppStmt) const { if (sqlite3_prepare_v2(m_conn, zSql, int(strlen(zSql)) + 1, ppStmt, NULL) != SQLITE_OK) throw "bce2dcfe"; }
 	void sqlite3_prepare_v100(const std::string& sql, sqlite3_stmt** ppStmt) const { if (sqlite3_prepare_v2(m_conn, sql.c_str(), int(sql.size()) + 1, ppStmt, NULL) != SQLITE_OK) throw "da6ab7f6"; }
 public:
@@ -39,6 +40,7 @@ public:
 	Poly1d load_gen_reprs(const std::string& table_name) const;
 	Mon2d load_leading_terms(const std::string& table_name) const;
 	Poly1d load_gb(const std::string& table_name) const;
+	std::vector<rel_heap_t> load_heap(const std::string& table_name) const;
 	std::map<Deg, Mon1d> load_basis(const std::string& table_name) const;
 	std::map<Deg, array2d> load_mon_diffs_ind(const std::string& table_name) const;
 	std::map<Deg, Poly1d> load_mon_diffs(const std::string& table_name, const std::map<Deg, Mon1d>& basis, int r) const;
@@ -59,7 +61,7 @@ class Statement
 public:
 	Statement() : m_stmt(nullptr) {}
 	~Statement() { sqlite3_finalize(m_stmt); }
-	void init(const Database& db, const std::string& cmd) { db.sqlite3_prepare_v100(cmd, &m_stmt); }
+	void init(const Database& db, const std::string& sql) { db.sqlite3_prepare_v100(sql, &m_stmt); }
 public:
 	void bind_str(int iCol, const std::string& str) const { if (sqlite3_bind_text(m_stmt, iCol, str.c_str(), -1, SQLITE_TRANSIENT) != SQLITE_OK) throw "29cc3b21"; }
 	void bind_int(int iCol, int i) const { if (sqlite3_bind_int(m_stmt, iCol, i) != SQLITE_OK) throw "a61e05b2"; }

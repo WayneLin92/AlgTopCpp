@@ -1,12 +1,20 @@
 #include "database.h"
 
 
-void Database::execute_cmd(const std::string& cmd) const
+void Database::execute_cmd(const std::string& sql) const
 {
 	sqlite3_stmt* stmt;
-	sqlite3_prepare_v100(cmd, &stmt);
+	sqlite3_prepare_v100(sql, &stmt);
 	sqlite3_step(stmt);
 	sqlite3_finalize(stmt);
+}
+
+int Database::get_num(const std::string& sql) const
+{
+	Statement stmt;
+	stmt.init(*this, sql);
+	while (stmt.step() == SQLITE_ROW)
+		return stmt.column_int(0);
 }
 
 std::vector<Deg> Database::load_gen_degs(const std::string& table_name) const
@@ -70,6 +78,11 @@ Poly1d Database::load_gb(const std::string& table_name) const
 	}
 	std::cout << "gb loaded from " << table_name << ", size=" << gb.size() << '\n';
 	return gb;
+}
+
+std::vector<rel_heap_t> Database::load_heap(const std::string& table_name) const
+{
+
 }
 
 std::map<Deg, Mon1d> Database::load_basis(const std::string& table_name) const
