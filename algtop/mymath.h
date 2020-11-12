@@ -4,6 +4,7 @@
 // TODO: monomial std::vector<MonPow> version
 
 #include "myparser.h"
+#include <queue>
 #include <algorithm>
 #include <numeric>
 
@@ -67,10 +68,13 @@ struct Deg
 	};
 };
 
-struct rel_heap_t {
+struct PolyWithT {
 	Poly poly;
 	int deg;
+	bool operator<(const PolyWithT& rhs) const { return deg > rhs.deg; }
 };
+
+using RelHeap = std::priority_queue<PolyWithT>;
 
 /********** FUNCTIONS **********/
 // Move to a header for python in the future
@@ -85,7 +89,7 @@ inline void dump_array4d(const array4d& a, std::ostream& sout) { dump_vector(a, 
 
 void dump_MonPow(const MonPow& p, std::ostream& sout);
 inline void dump_Mon(const Mon& mon, std::ostream& sout) { dump_vector(mon, sout, "", "", "", dump_MonPow); }
-inline void dump_Poly(const Poly& poly, std::ostream& sout) { dump_vector(poly, sout, "", "+", "", dump_Mon); }
+inline void dump_Poly(const Poly& poly, std::ostream& sout) { if (poly.empty()) sout << '0'; else dump_vector(poly, sout, "", "+", "", dump_Mon); }
 inline void dump_Poly1d(const Poly1d& polys, std::ostream& sout) { dump_vector(polys, sout, "(", ", ", ")", dump_Poly); }
 inline void dump_Poly2d(const Poly2d& polys, std::ostream& sout) { dump_vector(polys, sout, "[", ", ", "]", dump_Poly1d); }
 
@@ -189,12 +193,16 @@ array2d quotient_space(const array2d& spaceV, const array2d& spaceW);
 **
 ** The default monomial ordering is revlex
 */
-
+/* Move from and remove top() of heap */
+inline PolyWithT MoveFromTop(RelHeap& heap) {
+	PolyWithT result = std::move(const_cast<PolyWithT&>(heap.top()));
+	heap.pop();
+	return result;
+}
 /* Reduce `poly` by groebner basis `rels` */
 Poly reduce(Poly poly, const Poly1d& gb);
-inline bool cmp_heap_rels(const rel_heap_t& s1, const rel_heap_t& s2) { return s1.deg > s2.deg; }
 /* Comsume relations from heap that is at most in degree `deg` while adding new relations to heap that is at most in degree `deg_max`. */
-void add_rels(Poly1d& gb, std::vector<rel_heap_t>& heap, const array& gen_degs, int t, int deg_max);
+void add_rels_from_heap(Poly1d& gb, RelHeap& heap, const array& gen_degs, int t, int deg_max);
 /* Add new relations `rels` to groebner basis `gb` */
 void add_rels(Poly1d& gb, const Poly1d& rels, const array& gen_degs, int deg_max);
 /* return a_{ij} such that a_{i1}p_1+...+a_{in}p_n=0 */
