@@ -76,6 +76,29 @@ struct PolyWithT {
 
 using RelHeap = std::priority_queue<PolyWithT>;
 
+/* A functor which computes the degree of a monomial */
+struct FnGetDeg {
+	const array& gen_degs;
+	int operator()(const Mon& mon) const {
+		int result = 0;
+		for (MonInd p = mon.begin(); p != mon.end(); ++p)
+			result += gen_degs[p->gen] * p->exp;
+		return result;
+	}
+};
+
+/* A functor which computes the degree of a monomial with negative indices */
+struct FnGetDegV2 {
+	const array& gen_degs;
+	const array& neg_gen_degs;
+	int operator()(const Mon& mon) const { 
+		int result = 0;
+		for (MonInd p = mon.begin(); p != mon.end(); ++p)
+			result += (p->gen >= 0 ? gen_degs[p->gen] : neg_gen_degs[size_t(-p->gen) - 1]) * p->exp;
+		return result;
+	}
+};
+
 /********** FUNCTIONS **********/
 // Move to a header for python in the future
 

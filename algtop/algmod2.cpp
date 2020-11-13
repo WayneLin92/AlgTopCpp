@@ -455,27 +455,17 @@ void add_rels_from_heap(Poly1d& gb, RelHeap& heap, const array& gen_degs, int t,
 
 void add_rels_from_heap(Poly1d& gb, RelHeap& heap, const array& gen_degs, const array& neg_gen_degs, int t, int deg_max)
 {
-	add_rels_from_heap(gb, heap, [&gen_degs, &neg_gen_degs](const Mon& mon) {
-		int result_ = 0;
-		for (MonInd p = mon.begin(); p != mon.end(); ++p)
-			result_ += (p->gen >= 0 ? gen_degs[p->gen] : neg_gen_degs[size_t(-p->gen) - 1]) * p->exp;
-		return result_;
-		}, t, deg_max);
+	add_rels_from_heap(gb, heap, FnGetDegV2{ gen_degs, neg_gen_degs }, t, deg_max);
 }
 
 void add_rels(Poly1d& gb, const Poly1d& rels, const array& gen_degs, int deg_max)
 {
-	add_rels(gb, rels, [&gen_degs](const Mon& m) {return get_deg(m, gen_degs); }, deg_max);
+	add_rels(gb, rels, FnGetDeg{ gen_degs }, deg_max);
 }
 
 void add_rels(Poly1d& gb, const Poly1d& rels, const array& gen_degs, const array& neg_gen_degs, int deg_max)
 {
-	add_rels(gb, rels, [&gen_degs, &neg_gen_degs](const Mon& mon) {
-		int result_ = 0;
-		for (MonInd p = mon.begin(); p != mon.end(); ++p)
-			result_ += (p->gen >= 0 ? gen_degs[p->gen] : neg_gen_degs[size_t(-p->gen) - 1]) * p->exp;
-		return result_;
-		}, deg_max);
+	add_rels(gb, rels, FnGetDegV2{gen_degs, neg_gen_degs}, deg_max);
 }
 
 template <typename Fn>
@@ -519,12 +509,7 @@ Poly2d& indecomposables(const Poly1d& gb, Poly2d& vectors, const array& gen_degs
 		return vectors;
 	Poly1d gb1 = gb;
 	int N = (int)basis_degs.size();
-	auto get_deg_ = [&gen_degs, &basis_degs](const Mon& mon) {
-		int result = 0;
-		for (MonInd p = mon.begin(); p != mon.end(); ++p)
-			result += (p->gen >= 0 ? gen_degs[p->gen] : basis_degs[size_t(-p->gen) - 1]) * p->exp;
-		return result;
-	};
+	auto get_deg_ = FnGetDegV2{ gen_degs, basis_degs };
 
 	/* Convert each vector v into a relation \\sum vi x_{-i-1} */
 	Poly1d rels;
