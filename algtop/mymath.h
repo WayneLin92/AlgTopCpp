@@ -151,6 +151,13 @@ Mon lcm(const Mon& m1, const Mon& m2);
 Poly get_diff(const Mon& mon, const Poly1d& diffs);
 Poly get_diff(const Poly& poly, const Poly1d& diffs);
 
+inline Poly operator+(const Poly& lhs, const Poly& rhs) { return add(lhs, rhs); }
+inline Poly& operator+=(Poly& lhs, const Poly& rhs) { lhs = add(lhs, rhs); return lhs; }
+inline Poly operator*(const Poly& lhs, const Poly& rhs) { return mul(lhs, rhs); }
+inline Poly operator*(const Poly& lhs, const Mon& rhs) { return mul(lhs, rhs); }
+inline Poly operator*(const Mon& lhs, const Poly& rhs) { return mul(lhs, rhs); }
+inline Mon operator/(const Mon& lhs, const Mon& rhs) { return div(lhs, rhs); }
+
 /* Linear Algebra Mod 2
 **
 ** Vector spaces are sparse triangular matrices
@@ -203,8 +210,11 @@ inline PolyWithT MoveFromTop(RelHeap& heap) {
 Poly reduce(Poly poly, const Poly1d& gb);
 /* Comsume relations from heap that is at most in degree `deg` while adding new relations to heap that is at most in degree `deg_max`. */
 void add_rels_from_heap(Poly1d& gb, RelHeap& heap, const array& gen_degs, int t, int deg_max);
+void add_rels_from_heap(Poly1d& gb, RelHeap& heap, const array& gen_degs, const array& 
+	, int t, int deg_max);
 /* Add new relations `rels` to groebner basis `gb` */
 void add_rels(Poly1d& gb, const Poly1d& rels, const array& gen_degs, int deg_max);
+void add_rels(Poly1d& gb, const Poly1d& rels, const array& gen_degs, const array& neg_gen_degs, int deg_max);
 /* return a_{ij} such that a_{i1}p_1+...+a_{in}p_n=0 */
 Poly2d ann_seq(const Poly1d& gb, const Poly1d& polys, const array& gen_degs, int deg_max);
 
@@ -219,6 +229,12 @@ Poly evaluate(const Poly& poly, Fn map, const Poly1d& gb)
 		result = add(result, fm);
 	}
 	return result;
+}
+
+template <typename Container1d>
+inline void RemoveEmptyElements(Container1d& gb)
+{
+	gb.erase(std::remove_if(gb.begin(), gb.end(), [](const Container1d::value_type& g) {return g.empty(); }), gb.end());
 }
 
 #endif /* MYMATH_H */

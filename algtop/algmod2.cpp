@@ -79,7 +79,7 @@ Poly mul(const Poly& poly, const Mon& mon) {
 Poly mul(const Poly& poly1, const Poly& poly2) {
 	Poly result;
 	for (const Mon& mon2 : poly2)
-		result = add(result, mul(poly1, mon2));
+		result += mul(poly1, mon2);
 	return result;
 }
 
@@ -238,7 +238,7 @@ Poly get_diff(const Mon& mon, const Poly1d& diffs)
 	Poly result;
 	for (MonInd k = mon.begin(); k != mon.end(); ++k) {
 		if (k->exp % 2)
-			result = add(result, mul(diffs[k->gen], div(mon, { { k->gen, 1 } })));
+			result += mul(diffs[k->gen], div(mon, { { k->gen, 1 } }));
 	}
 	return result;
 }
@@ -249,7 +249,7 @@ Poly get_diff(const Poly& poly, const Poly1d& diffs)
 	for (const Mon& mon : poly) {
 		for (MonInd k = mon.begin(); k != mon.end(); ++k) {
 			if (k->exp % 2)
-				result = add(result, mul(diffs[k->gen], div(mon, { { k->gen, 1 } })));
+				result += result, mul(diffs[k->gen], div(mon, { { k->gen, 1 } }));
 		}
 	}
 	return result;
@@ -409,14 +409,13 @@ void add_rels_from_heap(Poly1d& gb, RelHeap& heap, Fn _get_deg, int deg, int deg
 {
 	while (!heap.empty() && (deg == -1 ? (deg_max == -1 || heap.top().deg <= deg_max) : heap.top().deg <= deg)) {
 		PolyWithT heap_ele = MoveFromTop(heap);
-
 		Poly rel = reduce(heap_ele.poly, gb);
 		if (!rel.empty()) {
 			for (Poly& g : gb) {
 				if (gcd_nonzero(rel[0], g[0])) {
 					if (divides(rel[0], g[0])) {
 						Mon q = div(g[0], rel[0]);
-						Poly new_rel = add(mul(rel, q), g);
+						Poly new_rel = rel * q + g;
 						if (!new_rel.empty())
 							heap.push(PolyWithT{ std::move(new_rel), _get_deg(g[0]) });
 						g.clear();
@@ -427,13 +426,13 @@ void add_rels_from_heap(Poly1d& gb, RelHeap& heap, Fn _get_deg, int deg, int deg
 						if (deg_max == -1 || deg_new_rel <= deg_max) {
 							Mon q_r = div(mlcm, rel[0]);
 							Mon q_g = div(mlcm, g[0]);
-							Poly new_rel = add(mul(rel, q_r), mul(g, q_g));
+							Poly new_rel = rel * q_r + g * q_g;
 							heap.push(PolyWithT{ std::move(new_rel), deg_new_rel });
 						}
 					}
 				}
 			}
-			gb.erase(std::remove_if(gb.begin(), gb.end(), [](const Poly& g) {return g.empty(); }), gb.end());
+			RemoveEmptyElements(gb);
 			gb.push_back(std::move(rel));
 		}
 	}
@@ -490,7 +489,7 @@ void add_rels_freemodule(Poly1d& gb, RelHeap& heap, Fn get_deg, int deg, int deg
 				if ((rel[0][0].gen >= 0 || g[0][0].gen >= 0 || rel[0][0].gen == g[0][0].gen) && gcd_nonzero(rel[0], g[0])) {
 					if (divides(rel[0], g[0])) {
 						Mon q = div(g[0], rel[0]);
-						Poly new_rel = add(mul(rel, q), g);
+						Poly new_rel = rel * q + g;
 						if (!new_rel.empty())
 							heap.push(PolyWithT{ std::move(new_rel), get_deg(g[0]) });
 						g.clear();
@@ -501,13 +500,13 @@ void add_rels_freemodule(Poly1d& gb, RelHeap& heap, Fn get_deg, int deg, int deg
 						if (deg_max == -1 || deg_new_rel <= deg_max) {
 							Mon q_r = div(mlcm, rel[0]);
 							Mon q_g = div(mlcm, g[0]);
-							Poly new_rel = add(mul(rel, q_r), mul(g, q_g));
+							Poly new_rel = rel * q_r + g * q_g;
 							heap.push(PolyWithT{ std::move(new_rel), deg_new_rel });
 						}
 					}
 				}
 			}
-			gb.erase(std::remove_if(gb.begin(), gb.end(), [](const Poly& g) {return g.empty(); }), gb.end());
+			RemoveEmptyElements(gb);
 			gb.push_back(std::move(rel));
 		}
 	}
@@ -534,7 +533,7 @@ Poly2d& indecomposables(const Poly1d& gb, Poly2d& vectors, const array& gen_degs
 		Poly rel;
 		for (int i = 0; i < N; ++i) {
 			if (!v[i].empty())
-				rel = add(rel, mul(v[i], { {-i - 1, 1} }));
+				rel += v[i] * Mon{ {-i - 1, 1} };
 		}
 		degs.push_back(get_deg_(rel[0]));
 		rels.push_back(std::move(rel));
@@ -556,7 +555,7 @@ Poly2d& indecomposables(const Poly1d& gb, Poly2d& vectors, const array& gen_degs
 	}
 	
 	/* Keep only the indecomposables in `vectors` */
-	vectors.erase(std::remove_if(vectors.begin(), vectors.end(), [](const Poly1d& v) {return v.empty(); }), vectors.end());
+	RemoveEmptyElements(vectors);
 	return vectors;
 }
 
@@ -589,7 +588,7 @@ Poly2d ann_seq(const Poly1d& gb, const Poly1d& polys, const array& gen_degs, int
 				MonInd p = m.begin();
 				for (; p != m.end() && p->gen < 0; ++p);
 				Mon m1(m.begin(), p), m2(p, m.end());
-				ann[size_t(-m1[0].gen) - 1] = add(ann[size_t(-m1[0].gen) - 1], reduce(mul(evaluate({ div(m1, { {m1[0].gen, 1} }) }, [&polys](int i) {return polys[size_t(-i) - 1]; }, gb), m2), gb));
+				ann[size_t(-m1[0].gen) - 1] += reduce(mul(evaluate({ div(m1, { {m1[0].gen, 1} }) }, [&polys](int i) {return polys[size_t(-i) - 1]; }, gb), m2), gb);
 			}
 			result.push_back(std::move(ann));
 		}
