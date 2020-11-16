@@ -407,7 +407,7 @@ Poly reduce(Poly poly, const Poly1d& gb)
 template <typename Fn>
 void add_rels_from_heap(Poly1d& gb, RelHeap& heap, Fn _get_deg, int deg, int deg_max)
 {
-	while (!heap.empty() && (deg == -1 ? (deg_max == -1 || heap.top().deg <= deg_max) : heap.top().deg <= deg)) {
+	while (!heap.empty() && (deg == -1 ? (deg_max == -1 || heap.top().t <= deg_max) : heap.top().t <= deg)) {
 		PolyWithT heap_ele = MoveFromTop(heap);
 		Poly rel = reduce(heap_ele.poly, gb);
 		if (!rel.empty()) {
@@ -441,7 +441,7 @@ void add_rels(Poly1d& gb, const Poly1d& rels, Fn _get_deg, int deg_max)
 	RelHeap heap;
 	for (const Poly& rel : rels)
 		if (!rel.empty())
-			heap.push(PolyWithT{ rel, _get_deg(rel[0]) });
+			heap.push(PolyWithT{ rel, _get_deg(rel[0]) });  // rel is copied by value
 	add_rels_from_heap(gb, heap, _get_deg, -1, deg_max);
 }
 
@@ -450,9 +450,9 @@ void add_rels_from_heap(Poly1d& gb, RelHeap& heap, const array& gen_degs, int t,
 	add_rels_from_heap(gb, heap, [&gen_degs](const Mon& m) {return get_deg(m, gen_degs); }, t, deg_max);
 }
 
-void add_rels_from_heap(Poly1d& gb, RelHeap& heap, const array& gen_degs, const array& neg_gen_degs, int t, int deg_max)
+void add_rels_from_heap(Poly1d& gb, RelHeap& heap, const array& gen_degs, const array& gen_degs1, int t, int deg_max)
 {
-	add_rels_from_heap(gb, heap, FnGetDegV2{ gen_degs, neg_gen_degs }, t, deg_max);
+	add_rels_from_heap(gb, heap, FnGetDegV2{ gen_degs, gen_degs1 }, t, deg_max);
 }
 
 void add_rels(Poly1d& gb, const Poly1d& rels, const array& gen_degs, int deg_max)
@@ -460,15 +460,15 @@ void add_rels(Poly1d& gb, const Poly1d& rels, const array& gen_degs, int deg_max
 	add_rels(gb, rels, FnGetDeg{ gen_degs }, deg_max);
 }
 
-void add_rels(Poly1d& gb, const Poly1d& rels, const array& gen_degs, const array& neg_gen_degs, int deg_max)
+void add_rels(Poly1d& gb, const Poly1d& rels, const array& gen_degs, const array& gen_degs1, int deg_max)
 {
-	add_rels(gb, rels, FnGetDegV2{gen_degs, neg_gen_degs}, deg_max);
+	add_rels(gb, rels, FnGetDegV2{gen_degs, gen_degs1}, deg_max);
 }
 
 template <typename Fn>
 void add_rels_freemodule(Poly1d& gb, RelHeap& heap, Fn get_deg, int deg, int deg_max)
 {
-	while (!heap.empty() && (deg == -1 ? (deg_max == -1 || heap.top().deg <= deg_max) : heap.top().deg <= deg)) {
+	while (!heap.empty() && (deg == -1 ? (deg_max == -1 || heap.top().t <= deg_max) : heap.top().t <= deg)) {
 		PolyWithT heap_ele = MoveFromTop(heap);
 		Poly rel = reduce(heap_ele.poly, gb);
 		if (!rel.empty()) {
@@ -527,11 +527,10 @@ Poly2d& indecomposables(const Poly1d& gb, Poly2d& vectors, const array& gen_degs
 	RelHeap heap;
 	int deg_max = get_deg_(rels[indices.back()][0]);
 	for (int i : indices) {
-		int deg = get_deg_(rels[i][0]);
-		add_rels_freemodule(gb1, heap, get_deg_, deg, deg_max);
+		add_rels_freemodule(gb1, heap, get_deg_, degs[i], deg_max);
 		Poly rel = reduce(rels[i], gb1);
 		if (!rel.empty())
-			heap.push(PolyWithT{ std::move(rel), deg });
+			heap.push(PolyWithT{ std::move(rel), degs[i] });
 		else
 			vectors[i].clear();
 	}
@@ -548,18 +547,18 @@ Poly2d ann_seq(const Poly1d& gb, const Poly1d& polys, const array& gen_degs, int
 	if (polys.empty())
 		return result;
 	Poly1d rels;
-	array neg_gen_degs;
+	array gen_degs1;
 	int N = (int)polys.size();
 
 	/* Add relations Xi=polys[i] to gb to obtain gb1 */
 	for (int i = 0; i < N; ++i) {
 		Poly p = polys[i];
-		neg_gen_degs.push_back(get_deg(p, gen_degs));
+		gen_degs1.push_back(get_deg(p, gen_degs));
 		p.push_back({ {-i - 1, 1} });
 		rels.push_back(std::move(p));
 	}
 	Poly1d gb1 = gb;
-	add_rels(gb1, rels, gen_degs, neg_gen_degs, deg_max);
+	add_rels(gb1, rels, gen_degs, gen_degs1, deg_max);
 
 	/* Extract linear relations from gb1 */
 	for (const Poly& g : gb1) {
@@ -579,7 +578,7 @@ Poly2d ann_seq(const Poly1d& gb, const Poly1d& polys, const array& gen_degs, int
 	/* Add commutators to linear relations */
 	for (int i = 0; i < N; ++i) {
 		for (int j = i + 1; j < N; j++) {
-			if (neg_gen_degs[i] + neg_gen_degs[j] <= deg_max) {
+			if (gen_degs1[i] + gen_degs1[j] <= deg_max) {
 				Poly1d result_i;
 				result_i.resize(N);
 				result_i[i] = polys[j];
@@ -589,18 +588,18 @@ Poly2d ann_seq(const Poly1d& gb, const Poly1d& polys, const array& gen_degs, int
 		}
 	}
 
-	indecomposables(gb, result, gen_degs, neg_gen_degs);
+	indecomposables(gb, result, gen_degs, gen_degs1);
 	return result;
 }
 
-RelHeap GenerateHeap(const Poly1d& gb, const array& gen_degs, const array& neg_gen_degs, int t, int t_max)
+RelHeap GenerateHeap(const Poly1d& gb, const array& gen_degs, const array& gen_degs1, int t, int t_max)
 {
 	RelHeap heap;
 	for (auto pg1 = gb.begin(); pg1 != gb.end(); ++pg1) {
 		for (auto pg2 = pg1 + 1; pg2 != gb.end(); ++pg2) {
 			if (gcd_nonzero(pg1->front(), pg2->front())) {
 				Mon mlcm = lcm(pg1->front(), pg2->front());
-				int deg_new_rel = get_deg(mlcm, gen_degs, neg_gen_degs);
+				int deg_new_rel = get_deg(mlcm, gen_degs, gen_degs1);
 				if (t <= deg_new_rel && deg_new_rel <= t_max) {
 					Poly new_rel = (*pg1) * div(mlcm, pg1->front()) + (*pg2) * div(mlcm, pg2->front());
 					heap.push(PolyWithT{ std::move(new_rel), deg_new_rel });

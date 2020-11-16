@@ -66,11 +66,12 @@ struct Deg
 
 struct PolyWithT {
 	Poly poly;
-	int deg;
-	bool operator<(const PolyWithT& rhs) const { return deg > rhs.deg; }
+	int t;
+	bool operator<(const PolyWithT& rhs) const { return t < rhs.t; }
+	bool operator>(const PolyWithT& rhs) const { return t > rhs.t; }
 };
 
-using RelHeap = std::priority_queue<PolyWithT>;
+using RelHeap = std::priority_queue<PolyWithT, std::vector<PolyWithT>, std::greater<PolyWithT>>;
 
 /********** FUNCTIONS **********/
 // Move to a header for python in the future
@@ -137,10 +138,10 @@ int log(const Mon& m1, const Mon& m2);
 inline int get_deg(const Mon& mon) { int result = 0; for (MonInd p = mon.begin(); p != mon.end(); ++p) result += p->exp; return result; };
 inline int get_deg(const Poly& poly) { return poly.size() ? get_deg(poly[0]) : -1; };
 inline int get_deg(const Mon& mon, const array& gen_degs) { int result = 0; for (MonInd p = mon.begin(); p != mon.end(); ++p) result += gen_degs[p->gen] * p->exp; return result; };
-inline int get_deg(const Mon& mon, const array& gen_degs, const array& neg_gen_degs) {
+inline int get_deg(const Mon& mon, const array& gen_degs, const array& gen_degs1) {
 	int result = 0;
 	for (MonInd p = mon.begin(); p != mon.end(); ++p)
-		result += (p->gen >= 0 ? gen_degs[p->gen] : neg_gen_degs[size_t(-p->gen) - 1]) * p->exp;
+		result += (p->gen >= 0 ? gen_degs[p->gen] : gen_degs1[size_t(-p->gen) - 1]) * p->exp;
 	return result;
 }
 inline Deg get_deg(const Mon& mon, const std::vector<Deg>& gen_degs) { Deg result({ 0, 0, 0 }); for (MonInd p = mon.begin(); p != mon.end(); ++p) result += gen_degs[p->gen] * p->exp; return result; };
@@ -169,8 +170,8 @@ struct FnGetDeg {
 /* A functor which computes the degree of a monomial with negative indices */
 struct FnGetDegV2 {
 	const array& gen_degs;
-	const array& neg_gen_degs;
-	int operator()(const Mon& mon) const { return get_deg(mon, gen_degs, neg_gen_degs); }
+	const array& gen_degs1;
+	int operator()(const Mon& mon) const { return get_deg(mon, gen_degs, gen_degs1); }
 };
 
 /* Linear Algebra Mod 2
@@ -230,11 +231,11 @@ void add_rels_from_heap(Poly1d& gb, RelHeap& heap, const array& gen_degs, const 
 	, int t, int deg_max);
 /* Add new relations `rels` to groebner basis `gb` */
 void add_rels(Poly1d& gb, const Poly1d& rels, const array& gen_degs, int deg_max);
-void add_rels(Poly1d& gb, const Poly1d& rels, const array& gen_degs, const array& neg_gen_degs, int deg_max);
+void add_rels(Poly1d& gb, const Poly1d& rels, const array& gen_degs, const array& gen_degs1, int deg_max);
 /* return a_{ij} such that a_{i1}p_1+...+a_{in}p_n=0 */
 Poly2d ann_seq(const Poly1d& gb, const Poly1d& polys, const array& gen_degs, int deg_max);
 /* Assume gb is truncated in degree < t. Prepare the heap in degrees [t, t_max] */
-RelHeap GenerateHeap(const Poly1d& gb, const array& gen_degs, const array& neg_gen_degs, int t, int t_max);
+RelHeap GenerateHeap(const Poly1d& gb, const array& gen_degs, const array& gen_degs1, int t, int t_max);
 
 template <typename Fn>
 Poly evaluate(const Poly& poly, Fn map, const Poly1d& gb)
