@@ -2,7 +2,6 @@
 #include "../algtop/database.h"
 #include "../algtop/myparser.h"
 #include "../algtop/utilities.cpp"
-#include "../algtop/algmod2.cpp"
 #include "../algtop/myparser.cpp"
 
 using namespace Microsoft::VisualStudio::CppUnitTestFramework;
@@ -166,6 +165,20 @@ namespace UnitTestAlgTop
 			add_rels(gb, rels, gen_degs, -1);
 			add_rels(gb, rels1, gen_degs, -1);
 			Assert::AreEqual(1, int(gb.size()));
+		}
+
+		TEST_METHOD(test_ann_seq)
+		{
+			array gen_degs = { 1, 1, 1, 1 }; /* x, y, z, w */
+			Poly rel0 = { {{0, 4}} }; /* x^4 */
+			Poly rel1 = { {{0, 2}, {1, 4}} }; /* x^2y^4 */
+			Poly rel2 = { {{0, 1}, {2, 2}}, {{0, 2}, {1, 1}} }; /* x^2y + xz^2 */
+			Poly rel3 = { {{3, 4}}, {{2, 4}} }; /* z^2 + w^4 */
+			Poly1d gb;
+			add_rels(gb, { rel0, rel1, rel2, rel3 }, gen_degs, -1);
+
+			Poly2d ann = ann_seq(gb, { Poly{ {{0, 1}} } }, gen_degs, -1);
+			Assert::AreEqual(3, int(ann.size()));
 		}
 	};
 }

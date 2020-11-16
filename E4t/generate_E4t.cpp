@@ -1,5 +1,4 @@
 #include "main.h"
-#include <chrono>
 #include <fstream>
 #include <future>
 
@@ -106,68 +105,6 @@ Mon1d get_basis(const Mon2d& leadings, const std::vector<Deg>& gen_degs, Deg deg
 	return result;
 }
 
-/* return a basis for polynomails of bi for t<=t_max */
-std::map<Deg, DgaBasis1> get_basis_bi(const std::vector<Deg>& gen_degs, const Poly1d& gen_diffs, int t_max)
-{
-	std::map<Deg, DgaBasis1> result;
-	result[Deg{ 0, 0, 0 }].basis.push_back({});
-	result[Deg{ 0, 0, 0 }].diffs.push_back({});
-
-	for (int t = 1; t <= t_max; ++t) {
-		std::map<Deg, DgaBasis1> basis_new;
-		std::cout << "Computing basis_bi, t=" << t << "          \r";
-		for (int gen_id = (int)gen_degs.size() - 1; gen_id >= 58; --gen_id) { /* 58 is the gen_id of b1 */
-			int t1 = t - gen_degs[gen_id].t;
-			if (t1 >= 0) {
-				auto p1 = result.lower_bound(Deg{ 0, t1, 0 });
-				auto p2 = result.lower_bound(Deg{ 0, t1 + 1, 0 });
-				for (auto p = p1; p != p2; ++p) {
-					auto p_m = p->second.basis.begin();
-					auto p_diff = p->second.diffs.begin();
-					for (; p_m != p->second.basis.end(); ++p_m, ++p_diff) {
-						if (p_m->empty() || gen_id <= p_m->front().gen) {
-							Mon mon(mul(*p_m, { {gen_id, 1} }));
-
-							int s = p->first.s + gen_degs[gen_id].s;
-							int v = p->first.v + gen_degs[gen_id].v;
-							basis_new[Deg{ s, t, v }].basis.push_back(std::move(mon));
-							Poly diff = add(mul(gen_diffs[gen_id], *p_m), mul({ {gen_id, 1} }, *p_diff));
-							basis_new[Deg{ s, t, v }].diffs.push_back(std::move(diff));
-						}
-					}
-				}
-			}
-		}
-		result.merge(basis_new);
-	}
-	return result;
-}
-
-void save_basis_bi(Database& db)
-{
-	int t_max = 200;
-	std::vector<Deg> gen_degs_E2t = db.load_gen_degs("E2t_generators");
-	Poly1d diffs_E2t = db.load_gen_diffs("E2t_generators");
-	std::map<Deg, DgaBasis1> basis_bi = get_basis_bi(gen_degs_E2t, diffs_E2t, t_max);
-
-	Statement stmt;
-	stmt.init(db, "INSERT INTO E2t_bi_basis (s, t, v, mon, diff) VALUES (?1, ?2, ?3, ?4, ?5);");
-
-	db.begin_transaction();
-	for (auto& [deg, basis_d] : basis_bi) {
-		for (size_t i = 0; i < basis_d.basis.size(); ++i) {
-			stmt.bind_int(1, deg.s);
-			stmt.bind_int(2, deg.t);
-			stmt.bind_int(3, deg.v);
-			stmt.bind_str(4, Mon_to_str(basis_d.basis[i]));
-			stmt.bind_str(5, Poly_to_str(basis_bi[deg].diffs[i]));
-			stmt.step_and_reset();
-		}
-	}
-	db.end_transaction();
-	std::cout << "basis_bi is inserted, number of degrees=" << basis_bi.size() << '\n';
-}
-
 /* build the basis for t<=t_max */
 void get_basis(const Mon2d& leadings, const std::vector<Deg>& gen_degs, std::map<Deg, Mon1d>& basis, int t_max)
 {
@@ -265,7 +202,7 @@ std::vector<rel_heap_t> find_relations(Deg d, Mon1d& basis_d, const std::map<Deg
 	set_linear_map(map_diff, image_diff, kernel_diff, g_diff);
 
 	array2d map_repr;
-	for (const Mon& mon : basis_d) {
+	for (const Mon& mon : basis_d) {on
 		array repr = residue(image_diff, Poly_to_indices(evaluate({ mon }, [&reprs](int i) {return reprs[i]; }, gb_E2t), basis_d_E2t));
 		map_repr.push_back(std::move(repr));
 	}
@@ -278,8 +215,7 @@ std::vector<rel_heap_t> find_relations(Deg d, Mon1d& basis_d, const std::map<Deg
 
 	for (const array& rel_indices : kernel_repr)
 		basis_d[rel_indices[0]].clear();
-	basis_d.erase(std::remove_if(basis_d.begin(), basis_d.end(), [](const Mon& m) {return m.empty(); }), basis_d.end());
-
+	RemoveEmptyElements(basis_d);
 	return result;
 }
 
@@ -353,7 +289,7 @@ void generate_E4bk(const Database& db, const std::string& table_prefix, const st
 		reprs.push_back(add(mul(evaluate(b[i], [&reprs](int i) {return reprs[i]; }, gb_E2t), { {bk_gen_id, 1} }), ab_inv[i]));
 	}
 
-	/* compute the relations */
+	/* compute the relations */ 
 
 	add_rels(gb, { a }, gen_degs_t, t_max); /* Add relations dx=0 */
 	leadings.clear();
@@ -405,7 +341,7 @@ void generate_E4bk(const Database& db, const std::string& table_prefix, const st
 				std::push_heap(heap.begin(), heap.end(), cmp_heap_rels);
 			}
 		
-		add_rels(gb, heap, gen_degs_t, std::min(t + 1, t_max), t_max);
+		add_rels_from_heap(gb, heap, gen_degs_t, std::min(t + 1, t_max), t_max);
 		leadings.clear();
 		leadings.resize(gen_degs.size());
 		for (const Poly& g : gb)
@@ -439,7 +375,8 @@ int main_test1(int argc, char** argv)
 	db.execute_cmd("DELETE FROM E4b6_generators;");
 	db.execute_cmd("DELETE FROM E4b6_relations;");
 
-	auto start = std::chrono::system_clock::now();
+	Timer timer;
+
 	int t_max = 74;
 	std::cout << "E4b1\n";
 	generate_E4bk(db, "E4", "E4b1", { {{0, 1}} }, 58, t_max);
@@ -453,12 +390,6 @@ int main_test1(int argc, char** argv)
 	generate_E4bk(db, "E4b4", "E4b5", { {{172, 1}} }, 62, t_max);
 	std::cout << "E4b6\n";
 	generate_E4bk(db, "E4b5", "E4b6", { {{253, 1}} }, 63, t_max);
-
-
-
-	auto end = std::chrono::system_clock::now();
-	std::chrono::duration<double> elapsed = end - start;
-	std::cout << "Elapsed time: " << elapsed.count() << "s\n";
 
 	return 0;
 }

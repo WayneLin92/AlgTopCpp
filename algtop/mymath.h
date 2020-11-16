@@ -1,12 +1,8 @@
 #ifndef MYMATH_H
 #define MYMATH_H
-// TODO: greobner basis array4d version
-// TODO: monomial std::vector<MonPow> version
 
 #include "myparser.h"
 #include <queue>
-#include <algorithm>
-#include <numeric>
 
 /********** STRUCTS AND CLASSES **********/
 using array = std::vector<int>;
@@ -76,29 +72,6 @@ struct PolyWithT {
 
 using RelHeap = std::priority_queue<PolyWithT>;
 
-/* A functor which computes the degree of a monomial */
-struct FnGetDeg {
-	const array& gen_degs;
-	int operator()(const Mon& mon) const {
-		int result = 0;
-		for (MonInd p = mon.begin(); p != mon.end(); ++p)
-			result += gen_degs[p->gen] * p->exp;
-		return result;
-	}
-};
-
-/* A functor which computes the degree of a monomial with negative indices */
-struct FnGetDegV2 {
-	const array& gen_degs;
-	const array& neg_gen_degs;
-	int operator()(const Mon& mon) const { 
-		int result = 0;
-		for (MonInd p = mon.begin(); p != mon.end(); ++p)
-			result += (p->gen >= 0 ? gen_degs[p->gen] : neg_gen_degs[size_t(-p->gen) - 1]) * p->exp;
-		return result;
-	}
-};
-
 /********** FUNCTIONS **********/
 // Move to a header for python in the future
 
@@ -164,6 +137,12 @@ int log(const Mon& m1, const Mon& m2);
 inline int get_deg(const Mon& mon) { int result = 0; for (MonInd p = mon.begin(); p != mon.end(); ++p) result += p->exp; return result; };
 inline int get_deg(const Poly& poly) { return poly.size() ? get_deg(poly[0]) : -1; };
 inline int get_deg(const Mon& mon, const array& gen_degs) { int result = 0; for (MonInd p = mon.begin(); p != mon.end(); ++p) result += gen_degs[p->gen] * p->exp; return result; };
+inline int get_deg(const Mon& mon, const array& gen_degs, const array& neg_gen_degs) {
+	int result = 0;
+	for (MonInd p = mon.begin(); p != mon.end(); ++p)
+		result += (p->gen >= 0 ? gen_degs[p->gen] : neg_gen_degs[size_t(-p->gen) - 1]) * p->exp;
+	return result;
+}
 inline Deg get_deg(const Mon& mon, const std::vector<Deg>& gen_degs) { Deg result({ 0, 0, 0 }); for (MonInd p = mon.begin(); p != mon.end(); ++p) result += gen_degs[p->gen] * p->exp; return result; };
 inline int get_deg_t(const Mon& mon, const std::vector<Deg>& gen_degs) { int result = 0; for (MonInd p = mon.begin(); p != mon.end(); ++p) result += gen_degs[p->gen].t * p->exp; return result; };
 inline int get_deg(const Poly& p, const array& gen_degs) { return p.size() ? get_deg(p[0], gen_degs) : -1; }
@@ -180,6 +159,19 @@ inline Poly operator*(const Poly& lhs, const Poly& rhs) { return mul(lhs, rhs); 
 inline Poly operator*(const Poly& lhs, const Mon& rhs) { return mul(lhs, rhs); }
 inline Poly operator*(const Mon& lhs, const Poly& rhs) { return mul(lhs, rhs); }
 inline Mon operator/(const Mon& lhs, const Mon& rhs) { return div(lhs, rhs); }
+
+/* A functor which computes the degree of a monomial */
+struct FnGetDeg {
+	const array& gen_degs;
+	int operator()(const Mon& mon) const { return get_deg(mon, gen_degs); }
+};
+
+/* A functor which computes the degree of a monomial with negative indices */
+struct FnGetDegV2 {
+	const array& gen_degs;
+	const array& neg_gen_degs;
+	int operator()(const Mon& mon) const { return get_deg(mon, gen_degs, neg_gen_degs); }
+};
 
 /* Linear Algebra Mod 2
 **
@@ -228,7 +220,8 @@ inline PolyWithT MoveFromTop(RelHeap& heap) {
 	PolyWithT result = std::move(const_cast<PolyWithT&>(heap.top()));
 	heap.pop();
 	return result;
-}
+};
+/* Generate Heap from trunctated groebner basis in degree t to t_max */
 /* Reduce `poly` by groebner basis `rels` */
 Poly reduce(Poly poly, const Poly1d& gb);
 /* Comsume relations from heap that is at most in degree `deg` while adding new relations to heap that is at most in degree `deg_max`. */
@@ -240,6 +233,8 @@ void add_rels(Poly1d& gb, const Poly1d& rels, const array& gen_degs, int deg_max
 void add_rels(Poly1d& gb, const Poly1d& rels, const array& gen_degs, const array& neg_gen_degs, int deg_max);
 /* return a_{ij} such that a_{i1}p_1+...+a_{in}p_n=0 */
 Poly2d ann_seq(const Poly1d& gb, const Poly1d& polys, const array& gen_degs, int deg_max);
+/* Assume gb is truncated in degree < t. Prepare the heap in degrees [t, t_max] */
+RelHeap GenerateHeap(const Poly1d& gb, const array& gen_degs, const array& neg_gen_degs, int t, int t_max);
 
 template <typename Fn>
 Poly evaluate(const Poly& poly, Fn map, const Poly1d& gb)

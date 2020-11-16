@@ -414,8 +414,7 @@ void add_rels_from_heap(Poly1d& gb, RelHeap& heap, Fn _get_deg, int deg, int deg
 			for (Poly& g : gb) {
 				if (gcd_nonzero(rel[0], g[0])) {
 					if (divides(rel[0], g[0])) {
-						Mon q = div(g[0], rel[0]);
-						Poly new_rel = rel * q + g;
+						Poly new_rel = rel * div(g[0], rel[0]) + g;
 						if (!new_rel.empty())
 							heap.push(PolyWithT{ std::move(new_rel), _get_deg(g[0]) });
 						g.clear();
@@ -424,9 +423,7 @@ void add_rels_from_heap(Poly1d& gb, RelHeap& heap, Fn _get_deg, int deg, int deg
 						Mon mlcm = lcm(rel[0], g[0]);
 						int deg_new_rel = _get_deg(mlcm);
 						if (deg_max == -1 || deg_new_rel <= deg_max) {
-							Mon q_r = div(mlcm, rel[0]);
-							Mon q_g = div(mlcm, g[0]);
-							Poly new_rel = rel * q_r + g * q_g;
+							Poly new_rel = rel * div(mlcm, rel[0]) + g * div(mlcm, g[0]);
 							heap.push(PolyWithT{ std::move(new_rel), deg_new_rel });
 						}
 					}
@@ -509,7 +506,7 @@ Poly2d& indecomposables(const Poly1d& gb, Poly2d& vectors, const array& gen_degs
 		return vectors;
 	Poly1d gb1 = gb;
 	int N = (int)basis_degs.size();
-	auto get_deg_ = FnGetDegV2{ gen_degs, basis_degs };
+	FnGetDegV2 get_deg_{ gen_degs, basis_degs };
 
 	/* Convert each vector v into a relation \\sum vi x_{-i-1} */
 	Poly1d rels;
@@ -594,4 +591,22 @@ Poly2d ann_seq(const Poly1d& gb, const Poly1d& polys, const array& gen_degs, int
 
 	indecomposables(gb, result, gen_degs, neg_gen_degs);
 	return result;
+}
+
+RelHeap GenerateHeap(const Poly1d& gb, const array& gen_degs, const array& neg_gen_degs, int t, int t_max)
+{
+	RelHeap heap;
+	for (auto pg1 = gb.begin(); pg1 != gb.end(); ++pg1) {
+		for (auto pg2 = pg1 + 1; pg2 != gb.end(); ++pg2) {
+			if (gcd_nonzero(pg1->front(), pg2->front())) {
+				Mon mlcm = lcm(pg1->front(), pg2->front());
+				int deg_new_rel = get_deg(mlcm, gen_degs, neg_gen_degs);
+				if (t <= deg_new_rel && deg_new_rel <= t_max) {
+					Poly new_rel = (*pg1) * div(mlcm, pg1->front()) + (*pg2) * div(mlcm, pg2->front());
+					heap.push(PolyWithT{ std::move(new_rel), deg_new_rel });
+				}
+			}
+		}
+	}
+	return heap;
 }

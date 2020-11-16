@@ -4,7 +4,7 @@
 #include <iostream>
 #include "../algtop/mymath.h"
 
-int main()
+int tmp()
 {
 	array gen_degs = { 1, 1, 1, 1 }; /* x, y, z, w */
 	Poly rel0 = { {{0, 4}} }; /* x^4 */
@@ -15,10 +15,21 @@ int main()
 	Poly z = { {{2, 1}} };
 	Poly w = { {{3, 1}} };
 	Poly1d gb;
+	
 	add_rels(gb, { rel0, rel1, rel2, rel3 }, gen_degs, -1);
 
-	Poly2d ann = ann_seq(gb, { x, z, w }, gen_degs, -1);
-	std::cout << ann;
+	Mon mon = { {0, 1}, {1, 2} };
+	std::cout << FnGetDeg{ gen_degs }(mon) << '\n';
+	return 0;
+}
+
+int main()
+{
+	array a = { 0, 1, 2, 3 };
+	for (auto p1 = a.begin(); p1 != a.end(); ++p1)
+		for (auto p2 = p1 + 1; p2 != a.end(); ++p2)
+			std::cout << *p1 << ' ' << *p2 << '\n';
+	return 0;
 }
 
 // Run program: Ctrl + F5 or Debug > Start Without Debugging menu

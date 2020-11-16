@@ -10,11 +10,13 @@ void dump_MonPow(const MonPow& p, std::ostream& sout)
 		sout << p.gen;
 	else
 		sout << '{' << p.gen << '}';
-	sout << '^';
-	if (0 <= p.exp && p.exp < 10)
-		sout << p.exp;
-	else
-		sout << '{' << p.exp << '}';
+	if (p.exp > 1) {
+		sout << '^';
+		if (0 <= p.exp && p.exp < 10)
+			sout << p.exp;
+		else
+			sout << '{' << p.exp << '}';
+	}
 };
 
 std::string array_to_str(array::const_iterator pbegin, array::const_iterator pend)

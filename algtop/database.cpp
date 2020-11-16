@@ -18,6 +18,17 @@ int Database::get_int(const std::string& sql) const
 	throw "effbf28c";
 }
 
+array Database::get_ints(const std::string& table_name, const std::string& column_name, const std::string& conditions) const
+{
+	array result;
+	Statement stmt;
+	stmt.init(*this, "SELECT " + column_name + " FROM " + table_name + ' ' + conditions + ';');
+	while (stmt.step() == SQLITE_ROW)
+		result.emplace_back(stmt.column_int(0));
+	std::cout << column_name << " loaded from " << table_name << ", size=" << result.size() << '\n';
+	return result;
+}
+
 std::vector<Deg> Database::load_gen_degs(const std::string& table_name) const
 {
 	std::vector<Deg> gen_degs;
@@ -79,20 +90,6 @@ Poly1d Database::load_gb(const std::string& table_name) const
 	}
 	std::cout << "gb loaded from " << table_name << ", size=" << gb.size() << '\n';
 	return gb;
-}
-
-std::vector<rel_heap_t> Database::load_heap(const std::string& table_name) const
-{
-	std::vector<rel_heap_t> heap;
-	Statement stmt;
-	stmt.init(*this, "SELECT poly, t FROM " + table_name + ";");
-	while (stmt.step() == SQLITE_ROW) {
-		Poly poly(str_to_Poly(stmt.column_str(0)));
-		int t = stmt.column_int(1);
-		heap.push_back({ poly, t });
-	}
-	std::cout << "heap loaded from " << table_name << ", size=" << heap.size() << '\n';
-	return heap;
 }
 
 std::map<Deg, Mon1d> Database::load_basis(const std::string& table_name) const

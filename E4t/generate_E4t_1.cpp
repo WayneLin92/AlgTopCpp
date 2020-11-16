@@ -81,7 +81,7 @@ void get_basis_E2t_1(const std::map<Deg, DgaBasis1>& basis_E2, const std::map<De
 	}
 }
 
-void generate_E4bk(const Database& db, int t_max)
+void generate_E4t(const Database& db, int t_max)
 {
 	const std::string table_prefix = "E2t";
 	const std::string table_H_prefix = "E4t";
@@ -234,6 +234,7 @@ void generate_E4bk(const Database& db, int t_max)
 				int t1 = t + 1 - gen_degs_H[gen_id].t;
 				if (t1 >= 0) {
 					auto p1 = basis_H.lower_bound(Deg{ 0, t1, 0 });
+
 					auto p2 = basis_H.lower_bound(Deg{ 0, t1 + 1, 0 });
 					for (auto p = p1; p != p2; ++p) {
 						const Deg& deg1 = p->first;
@@ -259,8 +260,8 @@ void generate_E4bk(const Database& db, int t_max)
 		}
 	}
 
-	/* Save generators */
 
+	/* Save generators */
 	db.save_generators(table_H_prefix + "_generators", gen_degs_H, reprs_H);
 
 	/* Save gb */
@@ -281,7 +282,7 @@ int main_generate_E4t_1(int argc, char** argv)
 	auto start = std::chrono::system_clock::now();
 
 	int t_max = 74;
-	generate_E4bk(db, t_max);
+	generate_E4t(db, t_max);
 
 	auto end = std::chrono::system_clock::now();
 	std::chrono::duration<double> elapsed = end - start;
