@@ -475,8 +475,7 @@ void add_rels_freemodule(Poly1d& gb, RelHeap& heap, Fn get_deg, int deg, int deg
 			for (Poly& g : gb) {
 				if ((rel[0][0].gen >= 0 || g[0][0].gen >= 0 || rel[0][0].gen == g[0][0].gen) && gcd_nonzero(rel[0], g[0])) {
 					if (divides(rel[0], g[0])) {
-						Mon q = div(g[0], rel[0]);
-						Poly new_rel = rel * q + g;
+						Poly new_rel = rel * div(g[0], rel[0]) + g;
 						if (!new_rel.empty())
 							heap.push(PolyWithT{ std::move(new_rel), get_deg(g[0]) });
 						g.clear();
@@ -485,9 +484,7 @@ void add_rels_freemodule(Poly1d& gb, RelHeap& heap, Fn get_deg, int deg, int deg
 						Mon mlcm = lcm(rel[0], g[0]);
 						int deg_new_rel = get_deg(mlcm);
 						if (deg_max == -1 || deg_new_rel <= deg_max) {
-							Mon q_r = div(mlcm, rel[0]);
-							Mon q_g = div(mlcm, g[0]);
-							Poly new_rel = rel * q_r + g * q_g;
+							Poly new_rel = rel * div(mlcm, rel[0]) + g * div(mlcm, g[0]);
 							heap.push(PolyWithT{ std::move(new_rel), deg_new_rel });
 						}
 					}
@@ -505,7 +502,6 @@ Poly2d& indecomposables(const Poly1d& gb, Poly2d& vectors, const array& gen_degs
 	if (vectors.empty())
 		return vectors;
 	Poly1d gb1 = gb;
-	int N = (int)basis_degs.size();
 	FnGetDegV2 get_deg_{ gen_degs, basis_degs };
 
 	/* Convert each vector v into a relation \\sum vi x_{-i-1} */
@@ -513,10 +509,9 @@ Poly2d& indecomposables(const Poly1d& gb, Poly2d& vectors, const array& gen_degs
 	array degs;
 	for (const Poly1d& v : vectors) {
 		Poly rel;
-		for (int i = 0; i < N; ++i) {
+		for (int i = 0; i < basis_degs.size(); ++i)
 			if (!v[i].empty())
 				rel += v[i] * Mon{ {-i - 1, 1} };
-		}
 		degs.push_back(get_deg_(rel[0]));
 		rels.push_back(std::move(rel));
 	}
@@ -525,7 +520,7 @@ Poly2d& indecomposables(const Poly1d& gb, Poly2d& vectors, const array& gen_degs
 
 	/* Add relations ordered by degree to gb1 */
 	RelHeap heap;
-	int deg_max = get_deg_(rels[indices.back()][0]);
+	int deg_max = degs[indices.back()];
 	for (int i : indices) {
 		add_rels_freemodule(gb1, heap, get_deg_, degs[i], deg_max);
 		Poly rel = reduce(rels[i], gb1);
@@ -577,7 +572,7 @@ Poly2d ann_seq(const Poly1d& gb, const Poly1d& polys, const array& gen_degs, int
 
 	/* Add commutators to linear relations */
 	for (int i = 0; i < N; ++i) {
-		for (int j = i + 1; j < N; j++) {
+		for (int j = i + 1; j < N; ++j) {
 			if (gen_degs1[i] + gen_degs1[j] <= deg_max) {
 				Poly1d result_i;
 				result_i.resize(N);

@@ -118,7 +118,7 @@ void get_basis(const Mon2d& leadings, const std::vector<Deg>& gen_degs, std::map
 
 	for (int t = t_min; t <= t_max; ++t) {
 		std::map<Deg, Mon1d> basis_new;
-		for (int gen_id = (int)gen_degs.size() - 1; gen_id >= 0; --gen_id) { /* 58 is the gen_id of b1 */
+		for (int gen_id = (int)gen_degs.size() - 1; gen_id >= 0; --gen_id) {
 			int t1 = t - gen_degs[gen_id].t;
 			if (t1 >= 0) {
 				auto p1 = basis.lower_bound(Deg{ 0, t1, 0 });

@@ -234,7 +234,6 @@ void generate_E4t(const Database& db, int t_max)
 				int t1 = t + 1 - gen_degs_H[gen_id].t;
 				if (t1 >= 0) {
 					auto p1 = basis_H.lower_bound(Deg{ 0, t1, 0 });
-
 					auto p2 = basis_H.lower_bound(Deg{ 0, t1 + 1, 0 });
 					for (auto p = p1; p != p2; ++p) {
 						const Deg& deg1 = p->first;
@@ -246,7 +245,7 @@ void generate_E4t(const Database& db, int t_max)
 							if (mon1.empty() || gen_id <= mon1[0].gen) {
 								Mon mon(mul(mon1, { {gen_id, 1} }));
 								if (gen_id >= (int)leadings.size() || std::none_of(leadings[gen_id].begin(), leadings[gen_id].end(),
-									[mon](Mon _m) { return divides(_m, mon); })) {
+									[&mon](Mon _m) { return divides(_m, mon); })) {
 									/* Compute the represeting cycle of the base monomial */
 									Poly repr = reduce(mul(repr1, reprs_H[gen_id]), gb);
 									basis_H_new[deg].push_back(std::move(mon));

@@ -46,8 +46,11 @@ public:
 	std::map<Deg, Poly1d> load_mon_diffs(const std::string& table_name, const std::map<Deg, Mon1d>& basis, int r) const;
 	std::map<Deg, BasisComplex> load_basis_ss(const std::string& table_name_ss, int r) const;
 public:
-	void save_generators(const std::string& table_name, const std::vector<Deg>& gen_degs, const Poly1d& gen_reprs) const;
-	void save_gb(const std::string& table_name, const Poly1d& gb, const std::vector<Deg>& gen_degs) const;
+	void save_generators(const std::string& table_name, const std::vector<Deg>& gen_degs, const Poly1d& gen_reprs, size_t i_start) const;
+	void save_gb(const std::string& table_name, const Poly1d& gb, const std::vector<Deg>& gen_degs, size_t i_start) const;
+
+	void save_generators(const std::string& table_name, const std::vector<Deg>& gen_degs, const Poly1d& gen_reprs) const { save_generators(table_name, gen_degs, gen_reprs, 0); }
+	void save_gb(const std::string& table_name, const Poly1d& gb, const std::vector<Deg>& gen_degs) const { save_gb(table_name, gb, gen_degs, 0); }
 	void save_basis(const std::string& table_name, const std::map<Deg, Mon1d>& basis) const;
 	void save_basis(const std::string& table_name, const std::map<Deg, Mon1d>& basis, const std::map<Deg, array2d>& mon_reprs) const;
 	void save_basis(const std::string& table_name, const std::map<Deg, Mon1d>& basis, const std::map<Deg, Poly1d>& mon_reprs) const;
