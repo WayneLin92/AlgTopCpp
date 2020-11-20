@@ -424,7 +424,8 @@ void add_rels_from_heap(Poly1d& gb, RelHeap& heap, Fn _get_deg, int deg, int deg
 						int deg_new_rel = _get_deg(mlcm);
 						if (deg_max == -1 || deg_new_rel <= deg_max) {
 							Poly new_rel = rel * div(mlcm, rel[0]) + g * div(mlcm, g[0]);
-							heap.push(PolyWithT{ std::move(new_rel), deg_new_rel });
+							if (!new_rel.empty())
+								heap.push(PolyWithT{ std::move(new_rel), deg_new_rel });
 						}
 					}
 				}
@@ -485,7 +486,8 @@ void add_rels_freemodule(Poly1d& gb, RelHeap& heap, Fn get_deg, int deg, int deg
 						int deg_new_rel = get_deg(mlcm);
 						if (deg_max == -1 || deg_new_rel <= deg_max) {
 							Poly new_rel = rel * div(mlcm, rel[0]) + g * div(mlcm, g[0]);
-							heap.push(PolyWithT{ std::move(new_rel), deg_new_rel });
+							if (!new_rel.empty())
+								heap.push(PolyWithT{ std::move(new_rel), deg_new_rel });
 						}
 					}
 				}

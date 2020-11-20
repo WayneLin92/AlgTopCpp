@@ -11,12 +11,12 @@ using array3d = std::vector<array2d>;
 using array4d = std::vector<array3d>;
 using arrayInd = array::const_iterator;
 
-struct MonPow {
+struct GenPow {
 	int gen, exp;
-	MonPow(int g, int e) : gen(g), exp(e) {}
-	bool operator<(const MonPow& rhs) const { return gen > rhs.gen || (gen == rhs.gen && exp < rhs.exp); }
+	GenPow(int g, int e) : gen(g), exp(e) {}
+	bool operator<(const GenPow& rhs) const { return gen > rhs.gen || (gen == rhs.gen && exp < rhs.exp); }
 };
-using Mon = std::vector<MonPow>; // only monomials in the same degree are comparable
+using Mon = std::vector<GenPow>; // only monomials in the same degree are comparable
 using Poly = std::vector<Mon>;
 using Poly1d = std::vector<Poly>;
 using Poly2d = std::vector<Poly1d>;
@@ -84,7 +84,7 @@ inline void dump_array2d(const array2d& poly, std::ostream& sout) { dump_vector(
 inline void dump_array3d(const array3d& polys, std::ostream& sout) { dump_vector(polys, sout, "[", ", ", "]", dump_array2d); }
 inline void dump_array4d(const array4d& a, std::ostream& sout) { dump_vector(a, sout, "[", ", ", "]", dump_array3d); }
 
-void dump_MonPow(const MonPow& p, std::ostream& sout);
+void dump_MonPow(const GenPow& p, std::ostream& sout);
 inline void dump_Mon(const Mon& mon, std::ostream& sout) { dump_vector(mon, sout, "", "", "", dump_MonPow); }
 inline void dump_Poly(const Poly& poly, std::ostream& sout) { if (poly.empty()) sout << '0'; else dump_vector(poly, sout, "", "+", "", dump_Mon); }
 inline void dump_Poly1d(const Poly1d& polys, std::ostream& sout) { dump_vector(polys, sout, "(", ", ", ")", dump_Poly); }
@@ -99,7 +99,7 @@ inline std::ostream& operator<<(std::ostream& sout, const array2d& poly) { dump_
 inline std::ostream& operator<<(std::ostream& sout, const array3d& polys) { dump_array3d(polys, sout); return sout; }
 inline std::ostream& operator<<(std::ostream& sout, const array4d& a) { dump_array4d(a, sout); return sout; }
 inline std::ostream& operator<<(std::ostream& sout, const Deg& d) { sout << '(' << d.s << ',' << d.t << ',' << d.v << ')'; return sout; }
-inline std::ostream& operator<<(std::ostream& sout, const MonPow& p) { dump_MonPow(p, sout); return sout; }
+inline std::ostream& operator<<(std::ostream& sout, const GenPow& p) { dump_MonPow(p, sout); return sout; }
 inline std::ostream& operator<<(std::ostream& sout, const Mon& mon) { dump_Mon(mon, sout); return sout; }
 inline std::ostream& operator<<(std::ostream& sout, const Poly& poly) { dump_Poly(poly, sout); return sout; }
 inline std::ostream& operator<<(std::ostream& sout, const Poly1d& polys) { dump_Poly1d(polys, sout); return sout; }
@@ -136,7 +136,6 @@ bool divides(const Mon& m1, const Mon& m2);
 int log(const Mon& m1, const Mon& m2);
 
 inline int get_deg(const Mon& mon) { int result = 0; for (MonInd p = mon.begin(); p != mon.end(); ++p) result += p->exp; return result; };
-inline int get_deg(const Poly& poly) { return poly.size() ? get_deg(poly[0]) : -1; };
 inline int get_deg(const Mon& mon, const array& gen_degs) { int result = 0; for (MonInd p = mon.begin(); p != mon.end(); ++p) result += gen_degs[p->gen] * p->exp; return result; };
 inline int get_deg(const Mon& mon, const array& gen_degs, const array& gen_degs1) {
 	int result = 0;
@@ -146,8 +145,10 @@ inline int get_deg(const Mon& mon, const array& gen_degs, const array& gen_degs1
 }
 inline Deg get_deg(const Mon& mon, const std::vector<Deg>& gen_degs) { Deg result({ 0, 0, 0 }); for (MonInd p = mon.begin(); p != mon.end(); ++p) result += gen_degs[p->gen] * p->exp; return result; };
 inline int get_deg_t(const Mon& mon, const std::vector<Deg>& gen_degs) { int result = 0; for (MonInd p = mon.begin(); p != mon.end(); ++p) result += gen_degs[p->gen].t * p->exp; return result; };
-inline int get_deg(const Poly& p, const array& gen_degs) { return p.size() ? get_deg(p[0], gen_degs) : -1; }
-inline Deg get_deg(const Poly& p, const std::vector<Deg>& gen_degs) { return p.size() ? get_deg(p[0], gen_degs) : Deg({ -1, -1, -1 }); }
+inline int get_deg(const Poly& poly) { return poly.empty() ? -1 : get_deg(poly[0]); };
+inline int get_deg(const Poly& poly, const array& gen_degs) { return poly.empty() ? -10000 : get_deg(poly[0], gen_degs); }
+inline int get_deg(const Poly& poly, const array& gen_degs, const array& gen_degs1) { return poly.empty() ? -10000 : get_deg(poly[0], gen_degs, gen_degs1); }
+inline Deg get_deg(const Poly& poly, const std::vector<Deg>& gen_degs) { return poly.size() ? get_deg(poly[0], gen_degs) : Deg({ -10000, -10000, -10000 }); }
 Mon gcd(const Mon& m1, const Mon& m2);
 Mon lcm(const Mon& m1, const Mon& m2);
 
@@ -227,7 +228,7 @@ inline PolyWithT MoveFromTop(RelHeap& heap) {
 Poly reduce(Poly poly, const Poly1d& gb);
 /* Comsume relations from heap that is at most in degree `deg` while adding new relations to heap that is at most in degree `deg_max`. */
 void add_rels_from_heap(Poly1d& gb, RelHeap& heap, const array& gen_degs, int t, int deg_max);
-void add_rels_from_heap(Poly1d& gb, RelHeap& heap, const array& gen_degs, const array& 
+void add_rels_from_heap(Poly1d& gb, RelHeap& heap, const array& gen_degs, const array&
 	, int t, int deg_max);
 /* Add new relations `rels` to groebner basis `gb` */
 void add_rels(Poly1d& gb, const Poly1d& rels, const array& gen_degs, int deg_max);

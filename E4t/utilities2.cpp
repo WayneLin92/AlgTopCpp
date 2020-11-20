@@ -8,7 +8,7 @@ std::map<Deg, DgaBasis1> load_dga_basis(const Database& db, const std::string& t
 	int prev_t = 0;
 	std::map<Deg, array2d> mon_diffs;
 	while (stmt.step() == SQLITE_ROW) {
-		Deg d = { stmt.column_int(2), stmt.column_int(3), stmt.column_int(4) };
+		const Deg d = { stmt.column_int(2), stmt.column_int(3), stmt.column_int(4) };
 		if (d.t > prev_t) {
 			std::cout << "load_dag_basis, t=" << d.t << "          \r";
 			prev_t = d.t;
@@ -19,10 +19,11 @@ std::map<Deg, DgaBasis1> load_dga_basis(const Database& db, const std::string& t
 	}
 	for (auto& [d, basis_d] : basis) {
 		for (size_t i = 0; i < basis_d.basis.size(); ++i) {
-			basis_d.diffs[i] = indices_to_Poly(mon_diffs[d][i], basis[d + Deg{ 1, 0, -r }].basis);
+			Deg d1 = d + Deg{ 1, 0, -r };
+			basis_d.diffs[i] = basis.find(d1) != basis.end() ? indices_to_Poly(mon_diffs[d][i], basis.at(d1).basis) : Poly{};
 		}
 	}
-	std::cout << "dga_basis loaded from " << table_name << ", size=" << basis.size() << '\n';
+	std::cout << "dga_basis loaded from " << table_name << ", # of degs=" << basis.size() << '\n';
 	return basis;
 }
 
@@ -63,6 +64,18 @@ void save_y(const Database& db, const std::string& table_name, const Poly2d& y_t
 		stmt_update_relations.step_and_reset();
 	}
 	std::cout << y_t.size() << " y's are inserted!\n";
+}
+
+void save_map_gen_id(const Database& db, const std::string& table_name, const array& map_gen_id, int i_start)
+{
+	Statement stmt_update_relations;
+	stmt_update_relations.init(db, "INSERT INTO " + table_name + " (gen_id) VALUES (?1);");
+
+	for (size_t i = i_start; i < map_gen_id.size(); ++i) {
+		stmt_update_relations.bind_int(1, map_gen_id[i]);
+		stmt_update_relations.step_and_reset();
+	}
+	std::cout << map_gen_id.size() - i_start << " new gen_id's are inserted!\n";
 }
 
 void SaveGb(const Database& db, const std::string& table_name, const Poly1d& gb, const array& gen_degs, const array& gen_degs1, int t)
@@ -137,30 +150,30 @@ Poly d_inv(const Poly& poly, const std::vector<Deg>& gen_degs, const Poly1d& dif
 }
 
 Poly proj(const Poly& poly, const std::vector<Deg>& gen_degs, const Poly1d& gen_diffs, const Poly1d& gb, const std::map<Deg, DgaBasis1>& basis_A,
-	const std::map<Deg, DgaBasis1>& basis_X, const Poly1d& gen_reprs, std::map<Deg, Mon1d>& basis_H)
+	const std::map<Deg, DgaBasis1>& basis_X, const Poly1d& gen_reprs_H, std::map<Deg, Mon1d>& basis_H)
 {
 	if (poly.empty())
 		return {};
-	Deg deg_poly = get_deg(poly[0], gen_degs);
-	Deg deg_result = deg_poly - Deg{ 1, 0, -2 };
-	Mon1d basis_in_poly;
-	Mon1d basis_in_result;
-	get_basis_B(basis_A, basis_X, basis_in_poly, deg_poly);
-	get_basis_B(basis_A, basis_X, basis_in_result, deg_result);
-	std::sort(basis_in_poly.begin(), basis_in_poly.end());
-	std::sort(basis_in_result.begin(), basis_in_result.end());
+	Deg d = get_deg(poly[0], gen_degs);
+	Deg d1 = d - Deg{ 1, 0, -2 };
+	Mon1d basis_d;
+	Mon1d basis_d1;
+	get_basis_B(basis_A, basis_X, basis_d, d);
+	get_basis_B(basis_A, basis_X, basis_d1, d1);
+	std::sort(basis_d.begin(), basis_d.end());
+	std::sort(basis_d1.begin(), basis_d1.end());
 
 	array2d map_diff;
-	for (const Mon& mon : basis_in_result)
-		map_diff.push_back(Poly_to_indices(reduce(get_diff(mon, gen_diffs), gb), basis_in_poly));
+	for (const Mon& mon : basis_d1)
+		map_diff.push_back(Poly_to_indices(reduce(get_diff(mon, gen_diffs), gb), basis_d));
 	array2d image, kernel, g;
 	set_linear_map(map_diff, image, kernel, g);
 
 	array2d map_repr;
-	for (const Mon& mon : basis_H[deg_poly])
-		map_repr.push_back(residue(image, Poly_to_indices(get_repr({ mon }, gen_reprs, gb), basis_in_poly)));
+	for (const Mon& mon : basis_H[d])
+		map_repr.push_back(residue(image, Poly_to_indices(get_repr({ mon }, gen_reprs_H, gb), basis_d)));
 	array2d image1, kernel1, g1;
 	set_linear_map(map_repr, image1, kernel1, g1);
 
-	return indices_to_Poly(get_image(image1, g1, Poly_to_indices(poly, basis_in_poly)), basis_H[deg_poly]);
+	return indices_to_Poly(get_image(image1, g1, Poly_to_indices(poly, basis_d)), basis_H[d]);
 }

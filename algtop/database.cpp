@@ -13,8 +13,9 @@ int Database::get_int(const std::string& sql) const
 {
 	Statement stmt;
 	stmt.init(*this, sql);
-	while (stmt.step() == SQLITE_ROW)
-		return stmt.column_int(0);
+	if (stmt.step() == SQLITE_ROW)
+		if (stmt.column_type(0) == SQLITE_INTEGER)
+			return stmt.column_int(0);
 	throw "effbf28c";
 }
 
@@ -162,7 +163,7 @@ void Database::save_generators(const std::string& table_name, const std::vector<
 		stmt_update_generators.bind_int(5, gen_degs[i].v);
 		stmt_update_generators.step_and_reset();
 	}
-	std::cout << gen_degs.size() << " generators are inserted into " + table_name + "!\n";
+	std::cout << gen_degs.size() - i_start << " generators are inserted into " + table_name + "!\n";
 }
 
 void Database::save_gb(const std::string& table_name, const Poly1d& gb, const std::vector<Deg>& gen_degs, size_t i_start) const
@@ -179,7 +180,7 @@ void Database::save_gb(const std::string& table_name, const Poly1d& gb, const st
 		stmt_update_relations.bind_int(5, deg.v);
 		stmt_update_relations.step_and_reset();
 	}
-	std::cout << gb.size() << " relations are inserted into " + table_name + "!\n";
+	std::cout << gb.size() - i_start << " relations are inserted into " + table_name + "!\n";
 }
 
 void Database::save_basis(const std::string& table_name, const std::map<Deg, Mon1d>& basis) const
@@ -187,8 +188,10 @@ void Database::save_basis(const std::string& table_name, const std::map<Deg, Mon
 	Statement stmt;
 	stmt.init(*this, "INSERT INTO " + table_name + " (mon, s, t, v) VALUES (?1, ?2, ?3, ?4);");
 
+	int count = 0;
 	for (auto& [deg, basis_d] : basis) {
 		for (auto& m : basis_d) {
+			++count;
 			stmt.bind_str(1, Mon_to_str(m));
 			stmt.bind_int(2, deg.s);
 			stmt.bind_int(3, deg.t);
@@ -196,7 +199,7 @@ void Database::save_basis(const std::string& table_name, const std::map<Deg, Mon
 			stmt.step_and_reset();
 		}
 	}
-	std::cout << "basis is inserted, number of degrees=" << basis.size() << '\n';
+	std::cout << count << " bases are inserted into " + table_name + "!\n";
 }
 
 void Database::save_basis(const std::string& table_name, const std::map<Deg, Mon1d>& basis, const std::map<Deg, array2d>& mon_reprs) const
@@ -204,8 +207,10 @@ void Database::save_basis(const std::string& table_name, const std::map<Deg, Mon
 	Statement stmt;
 	stmt.init(*this, "INSERT INTO " + table_name + " (mon, repr, s, t, v) VALUES (?1, ?2, ?3, ?4);");
 
+	int count = 0;
 	for (auto& [deg, basis_d] : basis) {
 		for (size_t i = 0; i < basis_d.size(); ++i){
+			++count;
 			stmt.bind_str(1, Mon_to_str(basis_d[i]));
 			stmt.bind_str(2, array_to_str(mon_reprs.at(deg)[i]));
 			stmt.bind_int(3, deg.s);
@@ -214,7 +219,7 @@ void Database::save_basis(const std::string& table_name, const std::map<Deg, Mon
 			stmt.step_and_reset();
 		}
 	}
-	std::cout << "basis is inserted into " + table_name + ", number of degrees=" << basis.size() << '\n';
+	std::cout << count << " bases are inserted into " + table_name + "!\n";
 }
 
 void Database::save_basis(const std::string& table_name, const std::map<Deg, Mon1d>& basis, const std::map<Deg, Poly1d>& mon_reprs) const

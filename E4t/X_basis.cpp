@@ -72,7 +72,7 @@ int main_generate_X_basis(int argc, char** argv)
 	Database db;
 	db.init(R"(C:\Users\lwnpk\Documents\MyProgramData\Math_AlgTop\database\HB.db)");
 
-	for (int n = 1; n <= 7; n++) // Create Xi_basis
+	for (int n = 1; n <= 7; n++) /* Create Xi_basis */
 		save_basis_X(db, 58, n);
 	return 0;
 }

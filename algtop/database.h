@@ -23,15 +23,15 @@ struct BasisSS
 class Database
 {
 public:
-	Database() : m_conn(nullptr) {}
-	~Database() { sqlite3_close(m_conn); }
-	void init(const char* filename) { if (sqlite3_open(filename, &m_conn) != SQLITE_OK) throw "8de81e80"; }
+	Database() : conn_(nullptr) {}
+	~Database() { sqlite3_close(conn_); }
+	void init(const char* filename) { if (sqlite3_open(filename, &conn_) != SQLITE_OK) throw "8de81e80"; }
 public:
 	void execute_cmd(const std::string& sql) const;
 	int get_int(const std::string& sql) const;
 	array get_ints(const std::string& table_name, const std::string& column_name, const std::string& conditions="") const;
-	void sqlite3_prepare_v100(const char* zSql, sqlite3_stmt** ppStmt) const { if (sqlite3_prepare_v2(m_conn, zSql, int(strlen(zSql)) + 1, ppStmt, NULL) != SQLITE_OK) throw "bce2dcfe"; }
-	void sqlite3_prepare_v100(const std::string& sql, sqlite3_stmt** ppStmt) const { if (sqlite3_prepare_v2(m_conn, sql.c_str(), int(sql.size()) + 1, ppStmt, NULL) != SQLITE_OK) throw "da6ab7f6"; }
+	void sqlite3_prepare_v100(const char* zSql, sqlite3_stmt** ppStmt) const { if (sqlite3_prepare_v2(conn_, zSql, int(strlen(zSql)) + 1, ppStmt, NULL) != SQLITE_OK) throw "bce2dcfe"; }
+	void sqlite3_prepare_v100(const std::string& sql, sqlite3_stmt** ppStmt) const { if (sqlite3_prepare_v2(conn_, sql.c_str(), int(sql.size()) + 1, ppStmt, NULL) != SQLITE_OK) throw "da6ab7f6"; }
 public:
 	void begin_transaction() const { execute_cmd("BEGIN TRANSACTION"); }
 	void end_transaction() const { execute_cmd("END TRANSACTION"); }
@@ -56,25 +56,26 @@ public:
 	void save_basis(const std::string& table_name, const std::map<Deg, Mon1d>& basis, const std::map<Deg, Poly1d>& mon_reprs) const;
 	void save_basis_ss(const std::string& table_name, const std::map<Deg, BasisSS>& basis_ss) const;
 private:
-	sqlite3* m_conn;
+	sqlite3* conn_;
 };
 
 class Statement
 {
 public:
-	Statement() : m_stmt(nullptr) {}
-	~Statement() { sqlite3_finalize(m_stmt); }
-	void init(const Database& db, const std::string& sql) { db.sqlite3_prepare_v100(sql, &m_stmt); }
+	Statement() : stmt_(nullptr) {}
+	~Statement() { sqlite3_finalize(stmt_); }
+	void init(const Database& db, const std::string& sql) { db.sqlite3_prepare_v100(sql, &stmt_); }
 public:
-	void bind_str(int iCol, const std::string& str) const { if (sqlite3_bind_text(m_stmt, iCol, str.c_str(), -1, SQLITE_TRANSIENT) != SQLITE_OK) throw "29cc3b21"; }
-	void bind_int(int iCol, int i) const { if (sqlite3_bind_int(m_stmt, iCol, i) != SQLITE_OK) throw "a61e05b2"; }
-	const char* column_str(int iCol) const { return reinterpret_cast<const char*>(sqlite3_column_text(m_stmt, iCol)); }
-	int column_int(int iCol) const { return sqlite3_column_int(m_stmt, iCol); }
-	int step() const { return sqlite3_step(m_stmt); }
-	int reset() const { return sqlite3_reset(m_stmt); }
+	void bind_str(int iCol, const std::string& str) const { if (sqlite3_bind_text(stmt_, iCol, str.c_str(), -1, SQLITE_TRANSIENT) != SQLITE_OK) throw "29cc3b21"; }
+	void bind_int(int iCol, int i) const { if (sqlite3_bind_int(stmt_, iCol, i) != SQLITE_OK) throw "a61e05b2"; }
+	const char* column_str(int iCol) const { return reinterpret_cast<const char*>(sqlite3_column_text(stmt_, iCol)); }
+	int column_int(int iCol) const { return sqlite3_column_int(stmt_, iCol); }
+	int column_type(int iCol) const { return sqlite3_column_type(stmt_, iCol); }
+	int step() const { return sqlite3_step(stmt_); }
+	int reset() const { return sqlite3_reset(stmt_); }
 	void step_and_reset() const { step(); reset(); }
 private:
-	sqlite3_stmt* m_stmt;
+	sqlite3_stmt* stmt_;
 };
 
 /*--------- my_utilities.cpp ---------*/

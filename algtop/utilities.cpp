@@ -3,7 +3,7 @@
 
 /*********** FUNCTIONS **********/
 
-void dump_MonPow(const MonPow& p, std::ostream& sout)
+void dump_MonPow(const GenPow& p, std::ostream& sout)
 {
 	sout << "x_";
 	if (0 <= p.gen && p.gen < 10)

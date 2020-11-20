@@ -42,7 +42,9 @@ void generate_basis(const Database& db, const std::string& table_prefix, int t_m
 			}
 		}
 		/* Insert the new basis in degree t into the database */
+		db.begin_transaction();
 		db.save_basis(table_prefix + "_basis", basis_new);
+		db.end_transaction();
 		basis.merge(basis_new);
 	}
 }
@@ -159,7 +161,9 @@ void generate_ss(const Database& db, const std::string& table_name_basis, const 
 	}
 
 	/* insert into the database */
+	db.begin_transaction();
 	db.save_basis_ss(table_ss, basis_ss);
+	db.end_transaction();
 }
 
 /* generate the homology of the E_r page */
@@ -289,6 +293,8 @@ void generate_next_page(const Database& db, const std::string& table_prefix, con
 	}
 
 	/* Save generators */
+	db.begin_transaction();
+
 	Poly1d reprs_poly_H;
 	for (size_t i = 0; i < (int)reprs_H.size(); ++i)
 		reprs_poly_H.push_back(indices_to_Poly(reprs_H[i], basis[gen_degs_H[i]]));
@@ -299,4 +305,6 @@ void generate_next_page(const Database& db, const std::string& table_prefix, con
 
 	/* Save basis */
 	db.save_basis(table_H_prefix + "_basis", basis_H, mon_reprs_H);
+
+	db.end_transaction();
 }
