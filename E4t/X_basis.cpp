@@ -1,4 +1,4 @@
-#include "main.h"
+#include "main_E4t.h"
 
 /* return a basis for polynomails of xi for t<=t_max */
 std::map<Deg, DgaBasis1> get_basis_X(const std::vector<Deg>& gen_degs, const Poly1d& gen_diffs, int start_x, int num_x, int t_max)

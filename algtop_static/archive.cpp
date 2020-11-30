@@ -101,3 +101,12 @@ void get_basis(const Mon2d& leadings, const std::vector<Deg>& gen_degs, std::map
 		basis.merge(basis_new);
 	}
 }
+
+inline void hash_combine(std::size_t& seed, int v) { seed ^= std::hash<int>{}(v)+0x9e3779b9 + (seed << 6) + (seed >> 2); }
+inline size_t hash_range(const array& a)
+{
+	size_t seed = 0;
+	for (int i : a)
+		hash_combine(seed, i);
+	return seed;
+}

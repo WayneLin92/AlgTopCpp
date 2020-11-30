@@ -339,7 +339,7 @@ ASALocalRun/
 
 # BeatPulse healthcheck temp database
 healthchecksdb
-*.vcxproj
+# *.vcxproj
 *.filters
 
 # Custom

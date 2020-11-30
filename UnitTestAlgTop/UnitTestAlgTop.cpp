@@ -1,8 +1,13 @@
 #include "CppUnitTest.h"
-#include "../algtop/database.h"
-#include "../algtop/myparser.h"
-#include "../algtop/utilities.cpp"
-#include "../algtop/myparser.cpp"
+#include "algebras.h"
+#include "groebner.h"
+#include "linalg.h"
+#include "myio.h"
+#include "database.h"
+
+std::string array_to_str(const array& a);
+std::string Poly_to_str(const Poly& poly);
+
 
 using namespace Microsoft::VisualStudio::CppUnitTestFramework;
 

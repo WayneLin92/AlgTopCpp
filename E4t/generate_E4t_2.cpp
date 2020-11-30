@@ -1,4 +1,6 @@
-#include "main.h"
+#include "main_E4t.h"
+#include "linalg.h"
+#include "benchmark.h"
 
 Poly reindex(const Poly& poly, array map_gen_id)
 {
@@ -494,7 +496,7 @@ int main_generate_E4t(int argc, char** argv)
 	Database db;
 	db.init(R"(C:\Users\lwnpk\Documents\MyProgramData\Math_AlgTop\database\HB.db)");
 	Timer timer;
-	generate_HB(db, 74, 74, false);
+	generate_HB(db, 74, 74, true);
 
 	return 0;
 }

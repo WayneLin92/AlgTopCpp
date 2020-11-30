@@ -1,7 +1,5 @@
-#ifndef MAIN_H
-#define MAIN_H
+#pragma once
 
-#include "database.h"
 #include <chrono>
 
 class Timer {
@@ -25,12 +23,3 @@ private:
 	std::chrono::time_point<std::chrono::system_clock> saved_time;
 	bool bPrinted;
 };
-
-void generate_basis(const Database& db, const std::string& table_prefix, int t_max, bool drop_existing = false);
-void generate_mon_diffs(const Database& db, const std::string& table_prefix, int r);
-void generate_ss(const Database& db, const std::string& table_name_basis, const std::string& table_ss, int r);
-void generate_next_page(const Database& db, const std::string& table_prefix, const std::string& table_H_prefix, int r);
-int main_test(int argc, char** argv);
-
-
-#endif

@@ -1,4 +1,7 @@
-#include "main.h"
+#include "main_E4t.h"
+#include "sqlite3/sqlite3.h"
+#include "database.h"
+#include "linalg.h"
 
 std::map<Deg, DgaBasis1> load_dga_basis(const Database& db, const std::string& table_name, int r)
 {

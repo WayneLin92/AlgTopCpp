@@ -1,6 +1,7 @@
 #pragma once
-#include "../algtop/main.h"
-#include <fstream>
+#include "groebner.h"
+#include "database.h"
+#include <iostream>
 #include <future>
 
 

@@ -1,11 +1,16 @@
 #ifndef DATABSE_H
 #define DATABSE_H
 
-#include "mymath.h"
-#include "sqlite3/sqlite3.h"
+#include "algebras.h"
+#include <string>
+#include <vector>
 #include <map>
 
+/********** STRUCTS AND CLASSES **********/
+/* Declarations */
 constexpr auto T_MAX = 10000;
+struct sqlite3;
+struct sqlite3_stmt;
 
 struct BasisComplex
 {
@@ -20,18 +25,19 @@ struct BasisSS
 	array levels;
 };
 
+/* The wrapper for sqlite* */
 class Database
 {
 public:
 	Database() : conn_(nullptr) {}
-	~Database() { sqlite3_close(conn_); }
-	void init(const char* filename) { if (sqlite3_open(filename, &conn_) != SQLITE_OK) throw "8de81e80"; }
+	~Database();
+	void init(const char* filename);
 public:
 	void execute_cmd(const std::string& sql) const;
 	int get_int(const std::string& sql) const;
 	array get_ints(const std::string& table_name, const std::string& column_name, const std::string& conditions="") const;
-	void sqlite3_prepare_v100(const char* zSql, sqlite3_stmt** ppStmt) const { if (sqlite3_prepare_v2(conn_, zSql, int(strlen(zSql)) + 1, ppStmt, NULL) != SQLITE_OK) throw "bce2dcfe"; }
-	void sqlite3_prepare_v100(const std::string& sql, sqlite3_stmt** ppStmt) const { if (sqlite3_prepare_v2(conn_, sql.c_str(), int(sql.size()) + 1, ppStmt, NULL) != SQLITE_OK) throw "da6ab7f6"; }
+	void sqlite3_prepare_v100(const char* zSql, sqlite3_stmt** ppStmt) const;
+	void sqlite3_prepare_v100(const std::string& sql, sqlite3_stmt** ppStmt) const;
 public:
 	void begin_transaction() const { execute_cmd("BEGIN TRANSACTION"); }
 	void end_transaction() const { execute_cmd("END TRANSACTION"); }
@@ -59,52 +65,37 @@ private:
 	sqlite3* conn_;
 };
 
+/* The wrapper for sqlite3_stmt* */
 class Statement
 {
 public:
 	Statement() : stmt_(nullptr) {}
-	~Statement() { sqlite3_finalize(stmt_); }
-	void init(const Database& db, const std::string& sql) { db.sqlite3_prepare_v100(sql, &stmt_); }
+	~Statement();
+	void init(const Database& db, const std::string& sql);
 public:
-	void bind_str(int iCol, const std::string& str) const { if (sqlite3_bind_text(stmt_, iCol, str.c_str(), -1, SQLITE_TRANSIENT) != SQLITE_OK) throw "29cc3b21"; }
-	void bind_int(int iCol, int i) const { if (sqlite3_bind_int(stmt_, iCol, i) != SQLITE_OK) throw "a61e05b2"; }
-	const char* column_str(int iCol) const { return reinterpret_cast<const char*>(sqlite3_column_text(stmt_, iCol)); }
-	int column_int(int iCol) const { return sqlite3_column_int(stmt_, iCol); }
-	int column_type(int iCol) const { return sqlite3_column_type(stmt_, iCol); }
-	int step() const { return sqlite3_step(stmt_); }
-	int reset() const { return sqlite3_reset(stmt_); }
-	void step_and_reset() const { step(); reset(); }
+	void bind_str(int iCol, const std::string& str) const;
+	void bind_int(int iCol, int i) const;
+	const char* column_str(int iCol) const;
+	int column_int(int iCol) const;
+	int column_type(int iCol) const;
+	int step() const;
+	int reset() const;
+	void step_and_reset() const;
 private:
 	sqlite3_stmt* stmt_;
 };
 
-/*--------- my_utilities.cpp ---------*/
-
-std::string array_to_str(array::const_iterator pbegin, array::const_iterator pend);
 array str_to_array(const char* str_mon);
-std::string Mon_to_str(MonInd pbegin, MonInd pend);
 Mon str_to_Mon(const char* str_mon);
-std::string Poly_to_str(Poly::const_iterator pbegin, Poly::const_iterator pend);
 Poly str_to_Poly(const char* str_poly);
+std::string array_to_str(array::const_iterator pbegin, array::const_iterator pend);
+inline std::string array_to_str(const array& a) { return array_to_str(a.begin(), a.end()); }
+std::string Mon_to_str(MonInd pbegin, MonInd pend);
+inline std::string Mon_to_str(const Mon& mon) { return Mon_to_str(mon.begin(), mon.end()); }
+std::string Poly_to_str(Poly::const_iterator pbegin, Poly::const_iterator pend);
+inline std::string Poly_to_str(const Poly& poly) { return Poly_to_str(poly.begin(), poly.end()); }
 
-inline std::string array_to_str(const array& a) { return array_to_str(a.begin(), a.end()); };
-inline std::string Mon_to_str(const Mon& mon) { return Mon_to_str(mon.begin(), mon.end()); };
-inline std::string Poly_to_str(const Poly& poly) { return Poly_to_str(poly.begin(), poly.end()); };
-
-inline int get_index(const Poly& basis, const Mon& mon)
-{
-	auto index = std::lower_bound(basis.begin(), basis.end(), mon);
-#ifdef _DEBUG
-	if (index == basis.end()) {
-		std::cout << "index not found\n";
-		throw "178905cf";
-	}
-#endif
-	return int(index - basis.begin());
-}
-
-array Poly_to_indices(const Poly& poly, const Poly& basis);
-Poly indices_to_Poly(const array& indices, const Poly& basis);
-
+Poly indices_to_Poly(const array& indices, const Mon1d& basis);
+array Poly_to_indices(const Poly& poly, const Mon1d& basis);
 
 #endif /* DATABSE_H */

@@ -1,5 +1,19 @@
 #include "database.h"
+#include "sqlite3/sqlite3.h"
+#include "myio.h"
+#include <iostream>
+#include <sstream>
 
+Database::~Database()
+{
+	sqlite3_close(conn_);
+}
+
+void Database::init(const char* filename)
+{
+	if (sqlite3_open(filename, &conn_) != SQLITE_OK)
+		throw "8de81e80";
+}
 
 void Database::execute_cmd(const std::string& sql) const
 {
@@ -28,6 +42,18 @@ array Database::get_ints(const std::string& table_name, const std::string& colum
 		result.emplace_back(stmt.column_int(0));
 	std::cout << column_name << " loaded from " << table_name << ", size=" << result.size() << '\n';
 	return result;
+}
+
+void Database::sqlite3_prepare_v100(const char* zSql, sqlite3_stmt** ppStmt) const
+{
+	if (sqlite3_prepare_v2(conn_, zSql, int(strlen(zSql)) + 1, ppStmt, NULL) != SQLITE_OK)
+		throw "bce2dcfe";
+}
+
+void Database::sqlite3_prepare_v100(const std::string& sql, sqlite3_stmt** ppStmt) const
+{
+	if (sqlite3_prepare_v2(conn_, sql.c_str(), int(sql.size()) + 1, ppStmt, NULL) != SQLITE_OK)
+		throw "da6ab7f6";
 }
 
 std::vector<Deg> Database::load_gen_degs(const std::string& table_name) const
@@ -257,4 +283,169 @@ void Database::save_basis_ss(const std::string& table_name, const std::map<Deg, 
 		}
 	}
 	std::cout << "basis_ss is inserted into " + table_name + ", number of degrees=" << basis_ss.size() << '\n';
+}
+
+Statement::~Statement() { sqlite3_finalize(stmt_); }
+void Statement::init(const Database& db, const std::string& sql) { db.sqlite3_prepare_v100(sql, &stmt_); }
+
+
+void Statement::bind_str(int iCol, const std::string& str) const
+{
+	if (sqlite3_bind_text(stmt_, iCol, str.c_str(), -1, SQLITE_TRANSIENT) != SQLITE_OK)
+		throw "29cc3b21";
+}
+
+void Statement::bind_int(int iCol, int i) const
+{
+	if (sqlite3_bind_int(stmt_, iCol, i) != SQLITE_OK)
+		throw "a61e05b2";
+}
+
+const char* Statement::column_str(int iCol) const
+{
+	return reinterpret_cast<const char*>(sqlite3_column_text(stmt_, iCol));
+}
+
+int Statement::column_int(int iCol) const
+{
+	return sqlite3_column_int(stmt_, iCol);
+}
+
+int Statement::column_type(int iCol) const
+{
+	return sqlite3_column_type(stmt_, iCol);
+}
+
+int Statement::step() const
+{
+	return sqlite3_step(stmt_);
+}
+
+int Statement::reset() const
+{
+	return sqlite3_reset(stmt_);
+}
+
+void Statement::step_and_reset() const
+{
+	step(); reset();
+}
+
+inline int get_index(const Mon1d& basis, const Mon& mon)
+{
+	auto index = std::lower_bound(basis.begin(), basis.end(), mon);
+#ifdef _DEBUG
+	if (index == basis.end()) {
+		std::cout << "index not found\n";
+		throw "178905cf";
+	}
+#endif
+	return int(index - basis.begin());
+}
+
+array Poly_to_indices(const Poly& poly, const Mon1d& basis)
+{
+	array result;
+	for (const Mon& mon : poly)
+		result.push_back(get_index(basis, mon));
+	return result;
+}
+
+Poly indices_to_Poly(const array& indices, const Mon1d& basis)
+{
+	Poly result;
+	for (int i : indices)
+		result.push_back(basis[i]);
+	return result;
+}
+
+std::string array_to_str(array::const_iterator pbegin, array::const_iterator pend)
+{
+	std::stringstream ss;
+	for (auto p = pbegin; p < pend; p++) {
+		ss << *p;
+		if (p + 1 < pend)
+			ss << ",";
+	}
+	return ss.str();
+}
+
+array str_to_array(const char* str_mon)
+{
+	array result;
+	if (str_mon[0] == '\0')
+		return array();
+	std::stringstream ss(str_mon);
+	while (ss.good()) {
+		int i;
+		ss >> i;
+		result.push_back(i);
+		if (ss.peek() == ',')
+			ss.ignore();
+	}
+	return result;
+}
+
+std::string Mon_to_str(MonInd pbegin, MonInd pend)
+{
+	std::stringstream ss;
+	for (auto p = pbegin; p < pend; p++) {
+		ss << p->gen << ',' << p->exp;
+		if (p + 1 < pend)
+			ss << ",";
+	}
+	return ss.str();
+}
+
+Mon str_to_Mon(const char* str_mon)
+{
+	Mon result;
+	if (str_mon[0] == '\0')
+		return {};
+	std::stringstream ss(str_mon);
+	while (ss.good()) {
+		int gen, exp;
+		ss >> gen >> "," >> exp;
+		result.emplace_back(gen, exp);
+		if (ss.peek() == ',')
+			ss.ignore();
+	}
+	return result;
+}
+
+std::string Poly_to_str(Poly::const_iterator pbegin, Poly::const_iterator pend) /* Warning: assume the algebra is connected */
+{
+	std::stringstream ss;
+	for (auto pMon = pbegin; pMon < pend; ++pMon) {
+		for (auto p = pMon->begin(); p != pMon->end(); ++p) {
+			ss << p->gen << ',' << p->exp;
+			if (p + 1 != pMon->end())
+				ss << ",";
+		}
+		if (pMon + 1 != pend)
+			ss << ";";
+	}
+	return ss.str();
+}
+
+Poly str_to_Poly(const char* str_poly) /* Warning: assume the algebra is connected */
+{
+	Poly result;
+	if (str_poly[0] == '\0')
+		return {};
+	std::stringstream ss(str_poly);
+	while (ss.good()) {
+		int gen, exp;
+		ss >> gen >> "," >> exp;
+		if (result.empty())
+			result.emplace_back();
+		result.back().emplace_back(gen, exp);
+		if (ss.peek() == ',')
+			ss.ignore();
+		else if (ss.peek() == ';') {
+			ss.ignore();
+			result.emplace_back();
+		}
+	}
+	return result;
 }

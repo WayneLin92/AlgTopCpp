@@ -1,4 +1,7 @@
 #include "main.h"
+#include "groebner.h"
+#include "linalg.h"
+#include <iostream>
 
 /* generate the basis of the algebra from the Groebner basis */
 void generate_basis(const Database& db, const std::string& table_prefix, int t_max, bool drop_existing /*= false*/)

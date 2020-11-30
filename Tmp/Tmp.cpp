@@ -2,13 +2,22 @@
 //
 
 #include <iostream>
-//#include "../algtop/mymath.h"
+//#include "algebras.h"
 
-struct PolyWithT {
-	int deg;
-	bool operator<(const PolyWithT& rhs) const { return deg < rhs.deg; }
-	//bool operator>(const PolyWithT& rhs) const { return deg > rhs.deg; }
-};
+template <typename Container>
+void dump_vector(const Container& cont, std::ostream& sout,
+	const char* left, const char* sep, const char* right)
+{
+	sout << left;
+	for (auto i = cont.begin(); i != cont.end(); ++i) {
+		if (i != cont.begin())
+			sout << sep;
+		sout << *i;
+	}
+	sout << right;
+}
+
+//#include <vector>
 
 int tmp()
 {
@@ -26,14 +35,15 @@ int tmp()
 
 	//Mon mon = { {0, 1}, {1, 2} };
 	//std::cout << FnGetDeg{ gen_degs }(mon) << '\n';
+	//std::cout << rel2 * rel3 << '\n';
+	std::vector<int> a = { 1, 2, 3, 4 };
+	dump_vector(a, std::cout, "(", ", ", ")");
 	return 0;
 }
 
 int main()
 {
-	auto p1 = PolyWithT{ 1 };
-	auto p2 = PolyWithT{ 2 };
-	std::cout << (p1 < p2) << '\n';
+	return tmp();
 	return 0;
 }
 
