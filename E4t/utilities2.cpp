@@ -66,7 +66,9 @@ void save_y(const Database& db, const std::string& table_name, const Poly2d& y_t
 		stmt_update_relations.bind_int(2, t);
 		stmt_update_relations.step_and_reset();
 	}
+#ifdef DATABASE_SAVE_LOGGING
 	std::cout << y_t.size() << " y's are inserted!\n";
+#endif
 }
 
 void save_map_gen_id(const Database& db, const std::string& table_name, const array& map_gen_id, int i_start)
@@ -78,13 +80,15 @@ void save_map_gen_id(const Database& db, const std::string& table_name, const ar
 		stmt_update_relations.bind_int(1, map_gen_id[i]);
 		stmt_update_relations.step_and_reset();
 	}
+#ifdef DATABASE_SAVE_LOGGING
 	std::cout << map_gen_id.size() - i_start << " new gen_id's are inserted!\n";
+#endif
 }
 
 void SaveGb(const Database& db, const std::string& table_name, const Poly1d& gb, const array& gen_degs, const array& gen_degs1, int t)
 {
 	Statement stmt_update_relations;
-	stmt_update_relations.init(db, "INSERT INTO " + table_name + " (leading_term, basis) VALUES (?1, ?2);");
+	stmt_update_relations.init(db, "INSERT INTO " + table_name + " (leading_term, basis, t) VALUES (?1, ?2, ?3);"); ////
 
 	for (int i = (int)gb.size() - 1; i >= 0; --i) {
 		int t1 = get_deg(gb[i].front(), gen_degs, gen_degs1);
@@ -92,9 +96,12 @@ void SaveGb(const Database& db, const std::string& table_name, const Poly1d& gb,
 			break;
 		stmt_update_relations.bind_str(1, Mon_to_str(gb[i].front()));
 		stmt_update_relations.bind_str(2, Poly_to_str(gb[i].begin() + 1, gb[i].end()));
+		stmt_update_relations.bind_int(3, t1); ////
 		stmt_update_relations.step_and_reset();
 	}
+#ifdef DATABASE_SAVE_LOGGING
 	std::cout << gb.size() << " relations are inserted into " + table_name + "!\n";
+#endif
 }
 
 void get_basis_B(const std::map<Deg, DgaBasis1>& basis_A, const std::map<Deg, DgaBasis1>& basis_X, Mon1d& basis_B, const Deg& deg)

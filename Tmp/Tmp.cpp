@@ -17,7 +17,7 @@ void dump_vector(const Container& cont, std::ostream& sout,
 	sout << right;
 }
 
-//#include <vector>
+#include <vector>
 
 int tmp()
 {

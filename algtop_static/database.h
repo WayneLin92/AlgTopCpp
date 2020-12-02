@@ -1,6 +1,8 @@
 #ifndef DATABSE_H
 #define DATABSE_H
 
+//#define DATABASE_SAVE_LOGGING /* This is a switch to print what are saved to the database */
+
 #include "algebras.h"
 #include <string>
 #include <vector>
@@ -54,7 +56,6 @@ public:
 public:
 	void save_generators(const std::string& table_name, const std::vector<Deg>& gen_degs, const Poly1d& gen_reprs, size_t i_start) const;
 	void save_gb(const std::string& table_name, const Poly1d& gb, const std::vector<Deg>& gen_degs, size_t i_start) const;
-
 	void save_generators(const std::string& table_name, const std::vector<Deg>& gen_degs, const Poly1d& gen_reprs) const { save_generators(table_name, gen_degs, gen_reprs, 0); }
 	void save_gb(const std::string& table_name, const Poly1d& gb, const std::vector<Deg>& gen_degs) const { save_gb(table_name, gb, gen_degs, 0); }
 	void save_basis(const std::string& table_name, const std::map<Deg, Mon1d>& basis) const;

@@ -34,7 +34,7 @@ Poly reduce(Poly poly, const Poly1d& gb)
 	while (pbegin != pend) {
 		auto pGb = gb.begin();
 		for (; pGb != gb.end(); ++pGb)
-			if (divides((*pGb)[0], *pbegin))
+			if (divides(pGb->front(), *pbegin))
 				break;
 		if (pGb == gb.end())
 			result.push_back(std::move(*pbegin++));

@@ -1,6 +1,34 @@
 #include "main_E4t.h"
 #include "linalg.h"
 #include "benchmark.h"
+#include <future>
+
+array ReduceToIndices(Poly poly, const Poly1d& gb, const Mon1d& basis)
+{
+	array result;
+	auto pbegin = poly.begin(); auto pend = poly.end();
+	while (pbegin != pend) {
+		auto first = std::lower_bound(basis.begin(), basis.end(), *pbegin);
+		if (first != basis.end() && !(*pbegin < *first)) {
+			result.push_back(int(first - basis.begin()));
+			++pbegin;
+		}
+		else {
+			auto pGb = gb.begin();
+			for (; pGb != gb.end(); ++pGb)
+				if (divides(pGb->front(), *pbegin))
+					break;
+			Mon q = div(*pbegin, (*pGb)[0]);
+			Poly rel1 = mul(*pGb, q);
+			Poly poly1;
+			std::set_symmetric_difference(pbegin, pend, rel1.begin(), rel1.end(),
+				std::back_inserter(poly1));
+			poly = std::move(poly1);
+			pbegin = poly.begin(); pend = poly.end();
+		}
+	}
+	return result;
+}
 
 Poly reindex(const Poly& poly, array map_gen_id)
 {
@@ -181,7 +209,7 @@ std::vector<PolyWithT> FindRels(std::map<Deg, Mon1d>& basis_HB, const std::map<D
 
 		array2d map_diff;
 		for (Poly& diff : diffs_B_sm1)
-			map_diff.push_back(Poly_to_indices(reduce(diff, gb_A), basis_B_s));
+			map_diff.push_back(ReduceToIndices(diff, gb_A, basis_B_s)); // Profiler: 369
 		array2d image_diff, kernel_diff, g_diff;
 		set_linear_map(map_diff, image_diff, kernel_diff, g_diff);
 
@@ -208,12 +236,12 @@ void generate_HB(const Database& db, const int t_max, const int t_max_compute=-1
 	/*# Load data */
 	size_t index_x = (size_t)db.get_int("SELECT COUNT(*) FROM A_generators;") - 1; /* the gen_id of Xn is index_x + n */
 	size_t n = (size_t)db.get_int("SELECT COUNT(*) FROM B_generators;") - index_x - 1;
-	n = 6;//
+	n = 6;////
 	int t_min;
 	if (drop_existing)
 		t_min = 0;
 	else {
-		try { t_min = db.get_int("SELECT MAX(t) FROM HA1_basis;") + 1; }
+		try { t_min = db.get_int("SELECT MAX(t) FROM HA1_basis;") + 1; } ////
 		catch (const char*) { t_min = 0; }
 	}
 	std::vector<Deg> gen_degs_B = db.load_gen_degs("B_generators");
@@ -232,8 +260,7 @@ void generate_HB(const Database& db, const int t_max, const int t_max_compute=-1
 	std::vector<std::map<Deg, Mon1d>> basis_HA;
 	std::vector<Poly1d> y;
 	std::vector<array> t_y;
-	/* new gen_id of HA[i] in HA[i+1] */
-	std::vector<array> map_gen_id;
+	std::vector<array> map_gen_id; /* new gen_id of HA[i] in HA[i+1] */
 
 	std::vector<Poly1d> gb_HA_ann_c;
 	std::vector<Poly1d> gb_HA_ind_y;
@@ -376,7 +403,7 @@ void generate_HB(const Database& db, const int t_max, const int t_max_compute=-1
 			AddRelFromGb(gb_HA[i], gen_degs_t_HA[i], gb_HA[i + 1], heap_HA[i + 1], gen_degs_t_HA[i + 1], map_gen_id[i], t, t_max); /* Add relations of HA[i] to HA[i+1] */
 			if (t < t_x) {
 				AddRelFromGb(gb_HA[i], gen_degs_t_HA[i], gb_HA_ann_c[i], heap_HA_ann_c[i], t, t_max);
-				AddRelFromGb(gb_HA[i], gen_degs_t_HA[i], gb_HA_ann_y[i], heap_HA_ann_y[i], t, t_max);
+				AddRelFromGb(gb_HA[i], gen_degs_t_HA[i], gb_HA_ann_y[i], heap_HA_ann_y[i], t - t_x, t_max);
 				leadings_HA[i + 1].clear();
 				leadings_HA[i + 1].resize(gen_degs_HA[i + 1].size());
 				for (const Poly& g : gb_HA[i + 1])
@@ -384,9 +411,6 @@ void generate_HB(const Database& db, const int t_max, const int t_max_compute=-1
 				basis_t = ExtendBasis(gen_degs_HA[i + 1], leadings_HA[i + 1], basis_HA[i + 1], t);
 			}
 			else {
-				if (i == 2 && t == 17) {////
-					std::cout << "test\n";
-				}
 				y_new = ExtendAnn(gb_HA[i], gen_degs_t_HA[i], gb_HA_ann_c[i], heap_HA_ann_c[i], { c[i] }, { t_x }, t, t_max);
 				Indecomposables(gb_HA[i], gen_degs_t_HA[i], gb_HA_ind_y[i], heap_HA_ind_y[i], y_new, { t_x }, t, t_max);
 				for (auto& yi : y_new) {
@@ -416,9 +440,6 @@ void generate_HB(const Database& db, const int t_max, const int t_max_compute=-1
 					gen_reprs_HA[i + 1].push_back(Mon{ {int(index_x + i + 1), 1} } * get_repr(y_new[j][0], gen_reprs_HA[i], gb_A0) + cy_inv[j]);
 				}
 
-				if (i == 2 && t == 17) {////
-					std::cout << "test\n";
-				}
 				/* Add new relations to HA[i + 1] */
 				/* Degrees of relations */
 				std::map<int, array> rel_degs;
@@ -431,7 +452,7 @@ void generate_HB(const Database& db, const int t_max, const int t_max_compute=-1
 						break;
 					}
 				}
-				for (size_t j = 0; j < range_g.size(); ++j) /* Consider x2offset because [x^2] could be one of them */ //
+				for (size_t j = 0; j < range_g.size(); ++j)
 					for (size_t k = j; k < range_g.size(); ++k) {
 						Deg deg_gjgk = gen_degs_HA[i + 1][range_g[j]] + gen_degs_HA[i + 1][range_g[k]]; /* Deg of [xy_j][xy_k] */
 						if (deg_gjgk.t == t)
@@ -444,12 +465,9 @@ void generate_HB(const Database& db, const int t_max, const int t_max_compute=-1
 							rel_degs[deg_akgj.v + 2 * deg_akgj.s].push_back(deg_akgj.s);
 							break;
 						}
-				for (auto& [v1, v_s] : rel_degs) {
-					std::sort(v_s.begin(), v_s.end());
-					v_s.erase(std::unique(v_s.begin(), v_s.end()), v_s.end());
-				}
-				if (i == 2 && t == 17) {////
-					std::cout << "test\n";
+				for (auto& [v1, list_s] : rel_degs) {
+					std::sort(list_s.begin(), list_s.end());
+					list_s.erase(std::unique(list_s.begin(), list_s.end()), list_s.end());
 				}
 
 				/* Compute relations */
@@ -469,8 +487,7 @@ void generate_HB(const Database& db, const int t_max, const int t_max_compute=-1
 			/* Save data */
 			db.save_generators(table_H_prefix + "_generators", gen_degs_HA[i + 1], gen_reprs_HA[i + 1], gen_degs_HA_t_start);
 			db.save_gb(table_H_prefix + "_relations", gb_HA[i + 1], gen_degs_HA[i + 1], gb_HA_t_start);
-			db.save_basis(table_H_prefix + "_basis", basis_t);
-			basis_HA[i + 1].merge(basis_t);
+			db.save_basis(table_H_prefix + "_basis", basis_t); basis_HA[i + 1].merge(basis_t);
 			save_map_gen_id(db, table_prefix + "_map_gen_id", map_gen_id[i], map_gen_id_t_start);
 			SaveGb(db, table_prefix + "_ann_c_gb", gb_HA_ann_c[i], gen_degs_t_HA[i], { t_x }, t);
 			SaveGb(db, table_prefix + "_ind_y_gb", gb_HA_ind_y[i], gen_degs_t_HA[i], { t_x }, t);
@@ -496,7 +513,8 @@ int main_generate_E4t(int argc, char** argv)
 	Database db;
 	db.init(R"(C:\Users\lwnpk\Documents\MyProgramData\Math_AlgTop\database\HB.db)");
 	Timer timer;
-	generate_HB(db, 74, 74, true);
+	int t_max = 74;
+	generate_HB(db, t_max, 74, true);
 
 	return 0;
 }

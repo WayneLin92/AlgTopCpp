@@ -189,7 +189,9 @@ void Database::save_generators(const std::string& table_name, const std::vector<
 		stmt_update_generators.bind_int(5, gen_degs[i].v);
 		stmt_update_generators.step_and_reset();
 	}
+#ifdef DATABASE_SAVE_LOGGING
 	std::cout << gen_degs.size() - i_start << " generators are inserted into " + table_name + "!\n";
+#endif
 }
 
 void Database::save_gb(const std::string& table_name, const Poly1d& gb, const std::vector<Deg>& gen_degs, size_t i_start) const
@@ -206,7 +208,9 @@ void Database::save_gb(const std::string& table_name, const Poly1d& gb, const st
 		stmt_update_relations.bind_int(5, deg.v);
 		stmt_update_relations.step_and_reset();
 	}
+#ifdef DATABASE_SAVE_LOGGING
 	std::cout << gb.size() - i_start << " relations are inserted into " + table_name + "!\n";
+#endif
 }
 
 void Database::save_basis(const std::string& table_name, const std::map<Deg, Mon1d>& basis) const
@@ -225,7 +229,9 @@ void Database::save_basis(const std::string& table_name, const std::map<Deg, Mon
 			stmt.step_and_reset();
 		}
 	}
+#ifdef DATABASE_SAVE_LOGGING
 	std::cout << count << " bases are inserted into " + table_name + "!\n";
+#endif
 }
 
 void Database::save_basis(const std::string& table_name, const std::map<Deg, Mon1d>& basis, const std::map<Deg, array2d>& mon_reprs) const
@@ -245,7 +251,9 @@ void Database::save_basis(const std::string& table_name, const std::map<Deg, Mon
 			stmt.step_and_reset();
 		}
 	}
+#ifdef DATABASE_SAVE_LOGGING
 	std::cout << count << " bases are inserted into " + table_name + "!\n";
+#endif
 }
 
 void Database::save_basis(const std::string& table_name, const std::map<Deg, Mon1d>& basis, const std::map<Deg, Poly1d>& mon_reprs) const
@@ -263,7 +271,9 @@ void Database::save_basis(const std::string& table_name, const std::map<Deg, Mon
 			stmt.step_and_reset();
 		}
 	}
+#ifdef DATABASE_SAVE_LOGGING
 	std::cout << "basis is inserted into " + table_name + ", number of degrees=" << basis.size() << '\n';
+#endif
 }
 
 void Database::save_basis_ss(const std::string& table_name, const std::map<Deg, BasisSS>& basis_ss) const
@@ -282,7 +292,9 @@ void Database::save_basis_ss(const std::string& table_name, const std::map<Deg, 
 			stmt.step_and_reset();
 		}
 	}
+#ifdef DATABASE_SAVE_LOGGING
 	std::cout << "basis_ss is inserted into " + table_name + ", number of degrees=" << basis_ss.size() << '\n';
+#endif
 }
 
 Statement::~Statement() { sqlite3_finalize(stmt_); }
@@ -331,16 +343,17 @@ void Statement::step_and_reset() const
 	step(); reset();
 }
 
+/* Find the index of mon in basis, assuming that mon is in basis and basis is sorted. */
 inline int get_index(const Mon1d& basis, const Mon& mon)
 {
-	auto index = std::lower_bound(basis.begin(), basis.end(), mon);
+	auto first = std::lower_bound(basis.begin(), basis.end(), mon);
 #ifdef _DEBUG
-	if (index == basis.end()) {
+	if (first == basis.end() || mon < (*first)) {
 		std::cout << "index not found\n";
 		throw "178905cf";
 	}
 #endif
-	return int(index - basis.begin());
+	return int(first - basis.begin());
 }
 
 array Poly_to_indices(const Poly& poly, const Mon1d& basis)
