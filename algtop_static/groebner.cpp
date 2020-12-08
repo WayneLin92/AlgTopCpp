@@ -4,13 +4,6 @@
 
 /******** Groebner Basis ********/
 
-inline array range(int n) {
-	array result;
-	for (int i = 0; i < n; ++i)
-		result.push_back(i);
-	return result;
-};
-
 Poly pow(const Poly& poly, int n, const Poly1d& gb)
 {
 	Poly result = { {} };
@@ -39,7 +32,7 @@ Poly reduce(Poly poly, const Poly1d& gb)
 		if (pGb == gb.end())
 			result.push_back(std::move(*pbegin++));
 		else {
-			Mon q = div(*pbegin, (*pGb)[0]);
+			Mon q = div(*pbegin, pGb->front());
 			Poly rel1 = mul(*pGb, q);
 			Poly poly1;
 			std::set_symmetric_difference(pbegin, pend, rel1.begin(), rel1.end(),

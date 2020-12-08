@@ -6,6 +6,8 @@
 //#include <crtdbg.h>
 
 #include <iostream>
+int main_generate_X_basis(int argc, char** argv);
+int main_generate_Reindex(int argc, char** argv);
 int main_generate_E4t(int argc, char** argv);
 
 int main(int argc, char** argv)

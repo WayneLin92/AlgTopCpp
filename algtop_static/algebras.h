@@ -21,6 +21,7 @@ struct GenPow {
 	int gen, exp;
 	GenPow(int g, int e) : gen(g), exp(e) {}
 	bool operator<(const GenPow& rhs) const { return gen > rhs.gen || (gen == rhs.gen && exp < rhs.exp); }
+	bool operator==(const GenPow& rhs) const { return gen == rhs.gen && exp == rhs.exp; }
 };
 using Mon = std::vector<GenPow>;
 using Poly = std::vector<Mon>;
@@ -93,10 +94,13 @@ inline int get_deg(const Mon& mon, const array& gen_degs, const array& gen_degs1
 }
 inline Deg get_deg(const Mon& mon, const std::vector<Deg>& gen_degs) { Deg result({ 0, 0, 0 }); for (MonInd p = mon.begin(); p != mon.end(); ++p) result += gen_degs[p->gen] * p->exp; return result; };
 inline int get_deg_t(const Mon& mon, const std::vector<Deg>& gen_degs) { int result = 0; for (MonInd p = mon.begin(); p != mon.end(); ++p) result += gen_degs[p->gen].t * p->exp; return result; };
-inline int get_deg(const Poly& poly) { return poly.empty() ? -1 : get_deg(poly[0]); };
+
+inline int get_deg(const Poly& poly) { return poly.empty() ? -10000 : get_deg(poly[0]); };
 inline int get_deg(const Poly& poly, const array& gen_degs) { return poly.empty() ? -10000 : get_deg(poly[0], gen_degs); }
 inline int get_deg(const Poly& poly, const array& gen_degs, const array& gen_degs1) { return poly.empty() ? -10000 : get_deg(poly[0], gen_degs, gen_degs1); }
-inline Deg get_deg(const Poly& poly, const std::vector<Deg>& gen_degs) { return poly.size() ? get_deg(poly[0], gen_degs) : Deg({ -10000, -10000, -10000 }); }
+inline Deg get_deg(const Poly& poly, const std::vector<Deg>& gen_degs) { return poly.empty() ? Deg({ -10000, -10000, -10000 }) : get_deg(poly[0], gen_degs); }
+inline int get_deg_t(const Poly& poly, const std::vector<Deg>& gen_degs) { return poly.empty() ? -10000 : get_deg_t(poly[0], gen_degs); }
+
 Mon gcd(const Mon& m1, const Mon& m2);
 Mon lcm(const Mon& m1, const Mon& m2);
 

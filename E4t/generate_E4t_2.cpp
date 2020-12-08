@@ -1,7 +1,12 @@
+#define MULTITHREAD
+#define BENCHMARK
+
 #include "main_E4t.h"
 #include "linalg.h"
 #include "benchmark.h"
+#ifdef MULTITHREAD
 #include <future>
+#endif
 
 array ReduceToIndices(Poly poly, const Poly1d& gb, const Mon1d& basis)
 {
@@ -18,7 +23,7 @@ array ReduceToIndices(Poly poly, const Poly1d& gb, const Mon1d& basis)
 			for (; pGb != gb.end(); ++pGb)
 				if (divides(pGb->front(), *pbegin))
 					break;
-			Mon q = div(*pbegin, (*pGb)[0]);
+			Mon q = div(*pbegin, pGb->front());
 			Poly rel1 = mul(*pGb, q);
 			Poly poly1;
 			std::set_symmetric_difference(pbegin, pend, rel1.begin(), rel1.end(),
@@ -30,6 +35,7 @@ array ReduceToIndices(Poly poly, const Poly1d& gb, const Mon1d& basis)
 	return result;
 }
 
+/* assume that the sequence map_gen_id is increasing */
 Poly reindex(const Poly& poly, array map_gen_id)
 {
 	Poly result;
@@ -246,8 +252,8 @@ void generate_HB(const Database& db, const int t_max, const int t_max_compute=-1
 	}
 	std::vector<Deg> gen_degs_B = db.load_gen_degs("B_generators");
 	Poly1d gen_diffs_B = db.load_gen_diffs("B_generators");
-	Poly1d gb_A0 = db.load_gb("A_relations");
-	const std::map<Deg, DgaBasis1> basis_A0 = load_dga_basis(db, "A_basis", 2);
+	Poly1d gb_A0 = db.load_gb("A_relations", t_max);
+	const std::map<Deg, DgaBasis1> basis_A0 = load_dga_basis(db, "A_basis", 2, t_max);
 	std::vector<std::map<Deg, DgaBasis1>> basis_X;
 
 	/* Data that needs to be updated */
@@ -291,7 +297,7 @@ void generate_HB(const Database& db, const int t_max, const int t_max_compute=-1
 		try { db.execute_cmd("CREATE TABLE " + table_prefix + "_relations (leading_term TEXT, basis TEXT, s SMALLINT, t SMALLINT, v SMALLINT);"); }
 		catch (const char*) {}
 		if (i > 0 && drop_existing) db.execute_cmd("DELETE FROM " + table_prefix + "_relations;");
-		gb_HA.push_back(db.load_gb(table_prefix + "_relations"));
+		gb_HA.push_back(db.load_gb(table_prefix + "_relations", t_max));
 
 		/* Initialize leadings_HA */
 		leadings_HA.push_back({});
@@ -299,21 +305,15 @@ void generate_HB(const Database& db, const int t_max, const int t_max_compute=-1
 		/* Generate heap_HA */
 		heap_HA.push_back(i == 0 ? RelHeap{} : GenerateHeap(gb_HA.back(), gen_degs_t_HA.back(), {}, t_min, t_max));
 
-		if (i == 0) {
-			basis_X.push_back({});
-			basis_X.back()[Deg{ 0, 0, 0 }] = { {Mon{}}, {Poly{}} };
-			basis_HA.push_back({});
-		}
-		else {
-			/* Load basis_X */
-			basis_X.push_back(load_basis_X(db, "X" + std::to_string(i) + "_basis", t_max, 2));
+		/* Load basis_HA */
+		try { db.execute_cmd("CREATE TABLE " + table_prefix + "_basis  (mon_id INTEGER PRIMARY KEY, mon TEXT NOT NULL UNIQUE, diff TEXT, repr TEXT, s SMALLINT, t SMALLINT, v SMALLINT);"); }
+		catch (const char*) {}
+		if (drop_existing && i > 0) db.execute_cmd("DELETE FROM " + table_prefix + "_basis;");
+		basis_HA.push_back(db.load_basis(table_prefix + "_basis", t_max));
 
-			/* Load basis_HA */
-			try { db.execute_cmd("CREATE TABLE " + table_prefix + "_basis  (mon_id INTEGER PRIMARY KEY, mon TEXT NOT NULL UNIQUE, diff TEXT, repr TEXT, s SMALLINT, t SMALLINT, v SMALLINT);"); }
-			catch (const char*) {}
-			if (drop_existing) db.execute_cmd("DELETE FROM " + table_prefix + "_basis;");
-			basis_HA.push_back(db.load_basis(table_prefix + "_basis"));
-		}
+		/* Load basis_X */
+		basis_X.push_back(load_basis_X(db, "X" + std::to_string(i) + "_basis", t_max, 2));
+
 		if (i < n){
 			/* Load y and t_y */
 			try { db.execute_cmd("CREATE TABLE " + table_prefix + "_y  (y TEXT, t SMALLINT);"); }
@@ -332,25 +332,25 @@ void generate_HB(const Database& db, const int t_max, const int t_max_compute=-1
 			try { db.execute_cmd("CREATE TABLE " + table_prefix + "_ann_c_gb (leading_term TEXT, basis TEXT, s SMALLINT, t SMALLINT, v SMALLINT);"); }
 			catch (const char*) {}
 			if (drop_existing) db.execute_cmd("DELETE FROM " + table_prefix + "_ann_c_gb;");
-			gb_HA_ann_c.push_back(db.load_gb(table_prefix + "_ann_c_gb"));
+			gb_HA_ann_c.push_back(db.load_gb(table_prefix + "_ann_c_gb", t_max));
 
 			/* Load gb_HA_ann_y */
 			try { db.execute_cmd("CREATE TABLE " + table_prefix + "_ann_y_gb (leading_term TEXT, basis TEXT, s SMALLINT, t SMALLINT, v SMALLINT);"); }
 			catch (const char*) {}
 			if (drop_existing) db.execute_cmd("DELETE FROM " + table_prefix + "_ann_y_gb;");
-			gb_HA_ann_y.push_back(db.load_gb(table_prefix + "_ann_y_gb"));
+			gb_HA_ann_y.push_back(db.load_gb(table_prefix + "_ann_y_gb", t_max));
 
 			/* Load gb_HA_ind_y */
 			try { db.execute_cmd("CREATE TABLE " + table_prefix + "_ind_y_gb (leading_term TEXT, basis TEXT, s SMALLINT, t SMALLINT, v SMALLINT);"); }
 			catch (const char*) {}
 			if (drop_existing) db.execute_cmd("DELETE FROM " + table_prefix + "_ind_y_gb;");
-			gb_HA_ind_y.push_back(db.load_gb(table_prefix + "_ind_y_gb"));
+			gb_HA_ind_y.push_back(db.load_gb(table_prefix + "_ind_y_gb", t_max));
 
 			/* Load gb_HA_ind_a */
 			try { db.execute_cmd("CREATE TABLE " + table_prefix + "_ind_a_gb (leading_term TEXT, basis TEXT, s SMALLINT, t SMALLINT, v SMALLINT);"); }
 			catch (const char*) {}
 			if (drop_existing) db.execute_cmd("DELETE FROM " + table_prefix + "_ind_a_gb;");
-			gb_HA_ind_a.push_back(db.load_gb(table_prefix + "_ind_a_gb"));
+			gb_HA_ind_a.push_back(db.load_gb(table_prefix + "_ind_a_gb", t_max));
 
 			/* Generate heaps */
 			int t_x = gen_degs_B[index_x + i + 1].t; /* x = x_{i + 1} */
@@ -367,7 +367,7 @@ void generate_HB(const Database& db, const int t_max, const int t_max_compute=-1
 	for (size_t i = 0; i < (size_t)n; ++i) {
 		int t_x = gen_degs_B[index_x + i + 1].t; /* x = x_{i + 1} */
 		if (t_min > t_x)
-			c[i] = i == 0 ? Poly{ {{0, 1}} } : proj(gen_diffs_B[index_x + i + 1], gen_degs_B, gen_diffs_B, gb_A0, basis_A0, basis_X[i], gen_reprs_HA[i], basis_HA[i]);
+			c[i] = proj(gen_diffs_B[index_x + i + 1], gen_degs_B, gen_diffs_B, gb_A0, basis_A0, basis_X[i], gen_reprs_HA[i], basis_HA[i]);
 	}
 	int t_m = t_max_compute == -1 ? t_max : t_max_compute;
 	for (int t = t_min; t <= t_m; ++t) {
@@ -382,7 +382,7 @@ void generate_HB(const Database& db, const int t_max, const int t_max_compute=-1
 			Deg deg_x = gen_degs_B[index_x + i + 1];
 			int t_x = deg_x.t; /* x = x_{i + 1} */
 			if (t == t_x) {
-				c[i] = i == 0 ? Poly{ {{0, 1}} } : proj(gen_diffs_B[index_x + i + 1], gen_degs_B, gen_diffs_B, gb_A0, basis_A0, basis_X[i], gen_reprs_HA[i], basis_HA[i]);
+				c[i] = proj(gen_diffs_B[index_x + i + 1], gen_degs_B, gen_diffs_B, gb_A0, basis_A0, basis_X[i], gen_reprs_HA[i], basis_HA[i]);
 				heap_HA[i + 1].push(PolyWithT{ c[i], t_x }); /* Add relation dx=0 */
 			}
 
@@ -476,11 +476,25 @@ void generate_HB(const Database& db, const int t_max, const int t_max_compute=-1
 				for (const Poly& g : gb_HA[i + 1])
 					leadings_HA[i + 1][g[0][0].gen].push_back(g[0]);
 				basis_t = ExtendBasis(gen_degs_HA[i + 1], leadings_HA[i + 1], basis_HA[i + 1], t);
+#ifndef MULTITHREAD
 				for (auto& [v2s, v_s] : rel_degs) {
 					std::vector<PolyWithT> rels = FindRels(basis_t, basis_A0, basis_X[i + 1], gb_A0, gen_reprs_HA[i + 1], t, v2s, v_s);
 					for (PolyWithT& rel : rels)
-						heap_HA[i + 1].push(rel);
+						heap_HA[i + 1].push(std::move(rel));
 				}
+#else
+				std::vector<std::future<std::vector<PolyWithT>>> futures;
+				for (auto& [v2s, v_s] : rel_degs) {
+					futures.push_back(std::async(std::launch::async, FindRels, std::ref(basis_t), std::ref(basis_A0), std::ref(basis_X[i + 1]), std::ref(gb_A0), 
+						std::ref(gen_reprs_HA[i + 1]), t, v2s, std::ref(v_s)));
+				}
+				for (size_t j = 0; j < futures.size(); ++j) {
+					futures[j].wait();
+					std::cout << "t=" << t << " completed thread=" << j + 1 << '/' << futures.size() << "          \r";
+					for (auto& rel : futures[j].get())
+						heap_HA[i + 1].push(std::move(rel));
+				}
+#endif
 				add_rels_from_heap(gb_HA[i + 1], heap_HA[i + 1], gen_degs_t_HA[i + 1], t, t_max);
 			}
 
@@ -506,15 +520,27 @@ int main_test1(int argc, char** argv)
 	return 0;
 }
 
-int main_generate_E4t(int argc, char** argv)
+int main_benchmark_E4t100(int argc, char** argv)
 {
-	//return main_generate_X_basis(argc, argv);
-
 	Database db;
 	db.init(R"(C:\Users\lwnpk\Documents\MyProgramData\Math_AlgTop\database\HB.db)");
 	Timer timer;
-	int t_max = 74;
-	generate_HB(db, t_max, 74, true);
+	int t_max = 100;
+	generate_HB(db, t_max, -1, true);
 
 	return 0;
+}
+
+int main_generate_E4t(int argc, char** argv)
+{
+#ifdef BENCHMARK
+	return main_benchmark_E4t100(argc, argv);
+#else
+	Database db;
+	db.init(R"(C:\Users\lwnpk\Documents\MyProgramData\Math_AlgTop\database\E4t.db)");
+	Timer timer;
+	int t_max = 200;
+	generate_HB(db, t_max, -1, false);
+	return 0;
+#endif
 }

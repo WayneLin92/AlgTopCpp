@@ -20,7 +20,7 @@ inline Poly get_repr(const Poly& poly, const Poly1d& gen_reprs, const Poly1d& gb
 	return evaluate(poly, [&gen_reprs](int i) {return gen_reprs[i]; }, gb);
 }
 
-std::map<Deg, DgaBasis1> load_dga_basis(const Database& db, const std::string& table_name, int r);
+std::map<Deg, DgaBasis1> load_dga_basis(const Database& db, const std::string& table_name, int r, int t_max);
 std::map<Deg, DgaBasis1> load_basis_X(const Database& db, const std::string& table_name, int t_max, int r);
 void load_y(const Database& db, const std::string& table_name, Poly1d& y, array& t_y);
 void save_y(const Database& db, const std::string& table_name, const Poly2d& y_t, int t);
@@ -36,4 +36,5 @@ Poly proj(const Poly& poly, const std::vector<Deg>& gen_degs, const Poly1d& gen_
 template <typename Fn>
 void add_rels_freemodule(Poly1d& gb, RelHeap& heap, Fn get_deg, int deg, int deg_max);
 
-int main_generate_X_basis(int argc, char** argv);
+Poly reindex(const Poly& poly, array map_gen_id);
+

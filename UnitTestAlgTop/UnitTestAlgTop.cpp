@@ -62,7 +62,7 @@ namespace UnitTestAlgTop
 			array x = { 1, 2, 3 };
 			array2d fx = { {1, 3, 4}, {2, 4, 5}, {1, 2, 3, 5} };
 			array2d image, kernel, g;
-			set_linear_map(x, fx, image, kernel, g);
+			set_linear_map_v2(x, fx, image, kernel, g);
 			Assert::AreEqual(ToString(array2d({ {1, 3, 4}, {2, 4, 5} })), ToString(image));
 			Assert::AreEqual(ToString(array2d({ {1, 2, 3} })), ToString(kernel));
 

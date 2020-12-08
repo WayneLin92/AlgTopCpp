@@ -34,6 +34,13 @@ inline void RemoveEmptyElements(Container1d& gb)
 	gb.erase(std::remove_if(gb.begin(), gb.end(), [](const Container1d::value_type& g) {return g.empty(); }), gb.end());
 }
 
+inline array range(int n) {
+	array result;
+	for (int i = 0; i < n; ++i)
+		result.push_back(i);
+	return result;
+};
+
 Poly pow(const Poly& poly, int n, const Poly1d& gb);
 
 /* Reduce `poly` by groebner basis `rels` */
@@ -41,8 +48,7 @@ Poly reduce(Poly poly, const Poly1d& gb);
 
 /* Comsume relations from heap that is at most in degree `deg` while adding new relations to `heap` that is at most in degree `deg_max`. */
 void add_rels_from_heap(Poly1d& gb, RelHeap& heap, const array& gen_degs, int t, int deg_max);
-void add_rels_from_heap(Poly1d& gb, RelHeap& heap, const array& gen_degs, const array&
-	, int t, int deg_max);
+void add_rels_from_heap(Poly1d& gb, RelHeap& heap, const array& gen_degs, const array& gen_degs1, int t, int deg_max);
 
 /* Add new relations `rels` to groebner basis `gb` */
 void add_rels(Poly1d& gb, const Poly1d& rels, const array& gen_degs, int deg_max);

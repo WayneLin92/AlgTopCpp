@@ -334,12 +334,12 @@ void generate_E4bk(const Database& db, const std::string& table_prefix, const st
 		for (size_t j = 0; j < futures.size(); ++j) {
 			futures[j].wait();
 			std::cout << "t=" << t << " completed thread=" << j + 1 << '/' << futures.size() << "          \r";
-		}
-		for (auto& f : futures)
-			for (auto& rel : f.get()) {
+			for (auto& rel : futures[j].get()) {
 				heap.push_back(std::move(rel));
 				std::push_heap(heap.begin(), heap.end(), cmp_heap_rels);
 			}
+		}
+			
 		
 		add_rels_from_heap(gb, heap, gen_degs_t, std::min(t + 1, t_max), t_max);
 		leadings.clear();

@@ -2,6 +2,10 @@
 #include <algorithm>
 #include <iterator>
 
+#ifdef _DEBUG
+#include <iostream>
+#endif
+
 array add_vectors(const array& v1, const array& v2) {
 	array result;
 	std::set_symmetric_difference(v1.begin(), v1.end(), v2.begin(), v2.end(), std::back_inserter(result));
@@ -63,7 +67,7 @@ void set_linear_map(const array2d& fx, array2d& image, array2d& kernel, array2d&
 	}
 }
 
-void set_linear_map(const array& x, const array2d& fx, array2d& image, array2d& kernel, array2d& g)
+void set_linear_map_v2(const array& x, const array2d& fx, array2d& image, array2d& kernel, array2d& g)
 {
 	/* f(g[i]) = image[i] */
 	for (size_t i = 0; i < fx.size(); ++i) {

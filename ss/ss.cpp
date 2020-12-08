@@ -10,8 +10,8 @@ void generate_basis(const Database& db, const std::string& table_prefix, int t_m
 	if (drop_existing)
 		db.execute_cmd("DELETE FROM " + table_prefix + "_basis;");
 	std::vector<Deg> gen_degs = db.load_gen_degs(table_prefix + "_generators");
-	Mon2d leadings = db.load_leading_terms(table_prefix + "_relations");
-	std::map<Deg, Mon1d> basis = db.load_basis(table_prefix + "_basis");
+	Mon2d leadings = db.load_leading_terms(table_prefix + "_relations", t_max);
+	std::map<Deg, Mon1d> basis = db.load_basis(table_prefix + "_basis", t_max);
 
 	/* starting t value */
 	int t_min;
@@ -59,9 +59,9 @@ void generate_mon_diffs(const Database& db, const std::string& table_prefix, int
 
 	std::vector<Deg> gen_degs = db.load_gen_degs(table_prefix + "_generators");
 	Poly1d gen_diffs = db.load_gen_diffs(table_prefix + "_generators");
-	Poly1d gb = db.load_gb(table_prefix + "_relations");
-	std::map<Deg, Mon1d> basis = db.load_basis(table_prefix + "_basis");
-	std::map<Deg, Poly1d> mon_diffs = db.load_mon_diffs(table_prefix + "_basis", basis, r);
+	Poly1d gb = db.load_gb(table_prefix + "_relations", -1);
+	std::map<Deg, Mon1d> basis = db.load_basis(table_prefix + "_basis", -1);
+	std::map<Deg, Poly1d> mon_diffs = db.load_mon_diffs(table_prefix + "_basis", basis, r, -1);
 
 	/* compute diffs */
 
@@ -104,10 +104,9 @@ void generate_mon_diffs(const Database& db, const std::string& table_prefix, int
 /* generate the table of the spectral sequence */
 void generate_ss(const Database& db, const std::string& table_name_basis, const std::string& table_ss, int r)
 {
-
 	db.execute_cmd("DELETE FROM " + table_ss + ";");
 
-	std::map<Deg, array2d> mon_diffs_ind = db.load_mon_diffs_ind(table_name_basis);
+	std::map<Deg, array2d> mon_diffs_ind = db.load_mon_diffs_ind(table_name_basis, -1);
 	std::map<Deg, BasisSS> basis_ss;
 
 	/* fill basis_ss */
@@ -133,7 +132,7 @@ void generate_ss(const Database& db, const std::string& table_name_basis, const 
 			fx.push_back(mon_diffs_d[xi]);
 
 		array2d image, kernel, g;
-		set_linear_map(x, fx, image, kernel, g);
+		set_linear_map_v2(x, fx, image, kernel, g);
 
 		/* fill with other cycles after the boundaries */
 		array lead_kernel;
@@ -172,9 +171,9 @@ void generate_ss(const Database& db, const std::string& table_name_basis, const 
 /* generate the homology of the E_r page */
 void generate_next_page(const Database& db, const std::string& table_prefix, const std::string& table_H_prefix, int r)
 {
-	Poly1d gb = db.load_gb(table_prefix + "_relations");
-	std::map<Deg, Mon1d> basis = db.load_basis(table_prefix + "_basis");
-	std::map<Deg, BasisComplex> basis_ss = db.load_basis_ss(table_prefix + "_ss", r);
+	Poly1d gb = db.load_gb(table_prefix + "_relations", -1);
+	std::map<Deg, Mon1d> basis = db.load_basis(table_prefix + "_basis", -1);
+	std::map<Deg, BasisComplex> basis_ss = db.load_basis_ss(table_prefix + "_ss", r, -1);
 
 	std::vector<Deg> gen_degs_H;
 	array2d reprs_H;

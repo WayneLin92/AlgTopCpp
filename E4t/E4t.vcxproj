@@ -21,6 +21,7 @@
   <ItemGroup>
     <ClCompile Include="main_E4t.cpp" />
     <ClCompile Include="generate_E4t_2.cpp" />
+    <ClCompile Include="Reindex.cpp" />
     <ClCompile Include="utilities2.cpp" />
     <ClCompile Include="X_basis.cpp" />
   </ItemGroup>

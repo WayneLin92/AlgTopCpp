@@ -3,11 +3,11 @@
 #include "database.h"
 #include "linalg.h"
 
-std::map<Deg, DgaBasis1> load_dga_basis(const Database& db, const std::string& table_name, int r)
+std::map<Deg, DgaBasis1> load_dga_basis(const Database& db, const std::string& table_name, int r, int t_max)
 {
 	std::map<Deg, DgaBasis1> basis;
 	Statement stmt;
-	stmt.init(db, "SELECT mon, diff, s, t, v FROM " + table_name + " ORDER BY mon_id;");
+	stmt.init(db, "SELECT mon, diff, s, t, v FROM " + table_name + " WHERE t<=" + std::to_string(t_max) + " ORDER BY mon_id;");
 	int prev_t = 0;
 	std::map<Deg, array2d> mon_diffs;
 	while (stmt.step() == SQLITE_ROW) {

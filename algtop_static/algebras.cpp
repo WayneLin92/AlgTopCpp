@@ -1,6 +1,10 @@
 #include "algebras.h"
 #include <iterator>
 
+#ifdef _DEBUG
+#include <iostream>
+#endif
+
 Mon mul(const Mon& mon1, const Mon& mon2)
 {
 	Mon result;

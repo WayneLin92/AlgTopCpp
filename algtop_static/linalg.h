@@ -12,20 +12,6 @@
 using array = std::vector<int>;
 using array2d = std::vector<array>;
 
-inline array range(int n) {
-	array result;
-	for (int i = 0; i < n; ++i)
-		result.push_back(i);
-	return result;
-};
-
-inline array range(int a, int b) {
-	array result;
-	for (int i = a; i < b; ++i)
-		result.push_back(i);
-	return result;
-};
-
 array add_vectors(const array& v1, const array& v2);
 
 /* Reduce the space to the rref form */
@@ -38,7 +24,7 @@ array residue(const array2d& spaceV, array&& v);
 void set_linear_map(const array2d& fx, array2d& image, array2d& kernel, array2d& g);
 
 /* Setup a linear map */
-void set_linear_map(const array& x, const array2d& fx, array2d& image, array2d& kernel, array2d& g);
+void set_linear_map_v2(const array& x, const array2d& fx, array2d& image, array2d& kernel, array2d& g);
 
 /* Compute the image of v under a linear map */
 array get_image(const array2d& spaceV, const array2d& f, const array& v);
