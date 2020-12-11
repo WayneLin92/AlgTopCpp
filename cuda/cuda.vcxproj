@@ -80,7 +80,14 @@
     </CudaCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <CudaCompile Include="kernel.cu" />
+    <CudaCompile Include="linalg.cu" />
+    <CudaCompile Include="reduction.cu" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="mycuda.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="mycuda.cu" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

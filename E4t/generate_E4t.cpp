@@ -1,5 +1,5 @@
 #define MULTITHREAD
-#define BENCHMARK
+//#define BENCHMARK
 
 #include "main_E4t.h"
 #include "linalg.h"
@@ -242,7 +242,9 @@ void generate_HB(const Database& db, const int t_max, const int t_max_compute=-1
 	/*# Load data */
 	size_t index_x = (size_t)db.get_int("SELECT COUNT(*) FROM A_generators;") - 1; /* the gen_id of Xn is index_x + n */
 	size_t n = (size_t)db.get_int("SELECT COUNT(*) FROM B_generators;") - index_x - 1;
-	n = 6;////
+#ifdef BENCHMARK
+	n = 6;
+#endif
 	int t_min;
 	if (drop_existing)
 		t_min = 0;
@@ -526,7 +528,10 @@ int main_benchmark_E4t100(int argc, char** argv)
 	db.init(R"(C:\Users\lwnpk\Documents\MyProgramData\Math_AlgTop\database\HB.db)");
 	Timer timer;
 	int t_max = 100;
-	generate_HB(db, t_max, -1, true);
+	//generate_HB(db, t_max, -1, true);
+	generate_HB(db, 10, -1, true);
+	generate_HB(db, 30, -1, false);
+	generate_HB(db, 74, -1, false);
 
 	return 0;
 }
@@ -539,7 +544,7 @@ int main_generate_E4t(int argc, char** argv)
 	Database db;
 	db.init(R"(C:\Users\lwnpk\Documents\MyProgramData\Math_AlgTop\database\E4t.db)");
 	Timer timer;
-	int t_max = 200;
+	int t_max = 189;
 	generate_HB(db, t_max, -1, false);
 	return 0;
 #endif
