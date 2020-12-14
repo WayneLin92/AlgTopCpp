@@ -31,9 +31,9 @@ struct BasisSS
 class Database
 {
 public:
-	Database() : conn_(nullptr) {}
+	Database() = default;
+	explicit Database(const char* filename);
 	~Database();
-	void init(const char* filename);
 public:
 	void execute_cmd(const std::string& sql) const;
 	int get_int(const std::string& sql) const;
@@ -63,16 +63,16 @@ public:
 	void save_basis(const std::string& table_name, const std::map<Deg, Mon1d>& basis, const std::map<Deg, Poly1d>& mon_reprs) const;
 	void save_basis_ss(const std::string& table_name, const std::map<Deg, BasisSS>& basis_ss) const;
 private:
-	sqlite3* conn_;
+	sqlite3* conn_ = nullptr;
 };
 
 /* The wrapper for sqlite3_stmt* */
 class Statement
 {
 public:
-	Statement() : stmt_(nullptr) {}
+	Statement() = default;
+	explicit Statement(const Database& db, const std::string& sql);
 	~Statement();
-	void init(const Database& db, const std::string& sql);
 public:
 	void bind_str(int iCol, const std::string& str) const;
 	void bind_int(int iCol, int i) const;
@@ -83,7 +83,7 @@ public:
 	int reset() const;
 	void step_and_reset() const;
 private:
-	sqlite3_stmt* stmt_;
+	sqlite3_stmt* stmt_ = nullptr;
 };
 
 array str_to_array(const char* str_mon);

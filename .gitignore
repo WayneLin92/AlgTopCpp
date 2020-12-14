@@ -343,7 +343,5 @@ healthchecksdb
 *.filters
 
 # Custom
-/algtop/myparser.h
-/profiler reports/
 *.txt
-/archive/
+archive/

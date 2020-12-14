@@ -57,8 +57,7 @@ void ReorderHA(const Database& db, int t_max)
 
 int main_generate_Reindex(int argc, char** argv)
 {
-	Database db;
-	db.init(R"(C:\Users\lwnpk\Documents\MyProgramData\Math_AlgTop\database\E4t.db)");
+	Database db(R"(C:\Users\lwnpk\Documents\MyProgramData\Math_AlgTop\database\E4t.db)");
 
 	ReorderHA(db, 200);
 	return 0;

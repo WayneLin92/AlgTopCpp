@@ -48,8 +48,7 @@ void save_basis_X(Database& db, int start_x, int num_x)
 	try { db.execute_cmd("DROP TABLE " + table_name + ';'); }
 	catch (const char*) {}
 	db.execute_cmd("CREATE TABLE " + table_name + " (mon_id INTEGER PRIMARY KEY, mon TEXT NOT NULL UNIQUE, diff TEXT, s SMALLINT, t SMALLINT, v SMALLINT);");
-	Statement stmt;
-	stmt.init(db, "INSERT INTO " + table_name + " (s, t, v, mon, diff) VALUES (?1, ?2, ?3, ?4, ?5);");
+	Statement stmt(db, "INSERT INTO " + table_name + " (s, t, v, mon, diff) VALUES (?1, ?2, ?3, ?4, ?5);");
 
 	db.begin_transaction();
 	for (auto& [deg, basis_d] : basis_X) {
@@ -69,8 +68,7 @@ void save_basis_X(Database& db, int start_x, int num_x)
 
 int main_generate_X_basis(int argc, char** argv)
 {
-	Database db;
-	db.init(R"(C:\Users\lwnpk\Documents\MyProgramData\Math_AlgTop\database\HB.db)");
+	Database db(R"(C:\Users\lwnpk\Documents\MyProgramData\Math_AlgTop\database\HB.db)");
 
 	for (int n = 1; n <= 7; n++) /* Create Xi_basis */
 		save_basis_X(db, 58, n);

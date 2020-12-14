@@ -77,16 +77,24 @@
     </Link>
     <CudaCompile>
       <TargetMachinePlatform>64</TargetMachinePlatform>
+      <AdditionalOptions>--default-stream per-thread %(AdditionalOptions)</AdditionalOptions>
     </CudaCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <CudaCompile Include="linalg.cu" />
-    <CudaCompile Include="reduction.cu" />
+    <CudaCompile Include="min.cu" />
+    <CudaCompile Include="min_index.cu" />
+    <CudaCompile Include="small_kernels.cu" />
+    <CudaCompile Include="sum.cu" />
+    <CudaCompile Include="test.cu" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="mycuda.h" />
+    <ClInclude Include="mycuda_public.h" />
   </ItemGroup>
   <ItemGroup>
+    <CudaCompile Include="linalg.cu">
+      <FileType>Document</FileType>
+    </CudaCompile>
     <ClCompile Include="mycuda.cu" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

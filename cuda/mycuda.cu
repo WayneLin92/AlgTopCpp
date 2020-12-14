@@ -8,20 +8,30 @@ void cuda::SetDevice(int device) {
     }
 }
 
-void cuda::Malloc(void** devPtr, size_t size)
+void cuda::Malloc(void** devPtr, size_t bytes)
 {
-    CheckLastError();
-    if (cudaMalloc(devPtr, size) != cudaSuccess) {
-        std::cerr << "cudaMalloc failed!";
+    cudaError_t cudaStatus = cudaMalloc(devPtr, bytes);
+    if (cudaStatus != cudaSuccess) {
+        std::cerr << "cudaMalloc failed: " << cudaGetErrorString(cudaStatus) << '\n';
         throw "1e32d383";
     }
 }
 
-void cuda::Memcpy(void* dst, const void* src, size_t count, cudaMemcpyKind kind)
+void cuda::FillZero(void* devPtr, size_t bytes)
 {
-    if (cudaMemcpy(dst, src, count, kind) != cudaSuccess) {
-        std::cerr << "cudaMemcpy failed!";
+    cudaError_t cudaStatus = cudaMemset(devPtr, 0, bytes);
+    if (cudaStatus != cudaSuccess) {
+        std::cerr << "FillZero failed!: " << cudaGetErrorString(cudaStatus) << '\n';
         throw "798e95c";
+    }
+}
+
+void cuda::Memcpy(void* dst, const void* src, size_t bytes, cudaMemcpyKind kind)
+{
+    cudaError_t cudaStatus = cudaMemcpy(dst, src, bytes, kind);
+    if (cudaStatus != cudaSuccess) {
+        std::cerr << "cudaMemcpy failed: " << cudaGetErrorString(cudaStatus) << '\n';
+        throw "ac621fd2";
     }
 }
 
@@ -37,7 +47,7 @@ void cuda::DeviceSynchronize()
 {
     cudaError_t cudaStatus = cudaDeviceSynchronize();
     if (cudaStatus != cudaSuccess) {
-        std::cerr << "cudaDeviceSynchronize returned error code " << cudaStatus << '\n';
+        std::cerr << "cudaDeviceSynchronize failed: " << cudaGetErrorString(cudaStatus) << '\n';
         throw "19149f41";
     }
 }

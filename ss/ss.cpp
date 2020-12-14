@@ -65,8 +65,7 @@ void generate_mon_diffs(const Database& db, const std::string& table_prefix, int
 
 	/* compute diffs */
 
-	Statement stmt;
-	stmt.init(db, "UPDATE " + table_prefix + "_basis SET diff=?1 WHERE mon=?2;");
+	Statement stmt(db, "UPDATE " + table_prefix + "_basis SET diff=?1 WHERE mon=?2;");
 
 	db.begin_transaction();
 	int prev_t = 0;

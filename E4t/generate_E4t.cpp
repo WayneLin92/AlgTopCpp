@@ -516,16 +516,14 @@ void generate_HB(const Database& db, const int t_max, const int t_max_compute=-1
 
 int main_test1(int argc, char** argv)
 {
-	Database db;
-	db.init(R"(C:\Users\lwnpk\Documents\MyProgramData\Math_AlgTop\database\HB.db)");
+	Database db(R"(C:\Users\lwnpk\Documents\MyProgramData\Math_AlgTop\database\HB.db)");
 
 	return 0;
 }
 
 int main_benchmark_E4t100(int argc, char** argv)
 {
-	Database db;
-	db.init(R"(C:\Users\lwnpk\Documents\MyProgramData\Math_AlgTop\database\HB.db)");
+	Database db(R"(C:\Users\lwnpk\Documents\MyProgramData\Math_AlgTop\database\HB.db)");
 	Timer timer;
 	int t_max = 100;
 	//generate_HB(db, t_max, -1, true);
@@ -541,8 +539,7 @@ int main_generate_E4t(int argc, char** argv)
 #ifdef BENCHMARK
 	return main_benchmark_E4t100(argc, argv);
 #else
-	Database db;
-	db.init(R"(C:\Users\lwnpk\Documents\MyProgramData\Math_AlgTop\database\E4t.db)");
+	Database db(R"(C:\Users\lwnpk\Documents\MyProgramData\Math_AlgTop\database\E4t.db)");
 	Timer timer;
 	int t_max = 189;
 	generate_HB(db, t_max, -1, false);

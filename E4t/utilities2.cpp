@@ -6,8 +6,7 @@
 std::map<Deg, DgaBasis1> load_dga_basis(const Database& db, const std::string& table_name, int r, int t_max)
 {
 	std::map<Deg, DgaBasis1> basis;
-	Statement stmt;
-	stmt.init(db, "SELECT mon, diff, s, t, v FROM " + table_name + " WHERE t<=" + std::to_string(t_max) + " ORDER BY mon_id;");
+	Statement stmt(db, "SELECT mon, diff, s, t, v FROM " + table_name + " WHERE t<=" + std::to_string(t_max) + " ORDER BY mon_id;");
 	int prev_t = 0;
 	std::map<Deg, array2d> mon_diffs;
 	while (stmt.step() == SQLITE_ROW) {
@@ -33,8 +32,7 @@ std::map<Deg, DgaBasis1> load_dga_basis(const Database& db, const std::string& t
 std::map<Deg, DgaBasis1> load_basis_X(const Database& db, const std::string& table_name, int t_max, int r)
 {
 	std::map<Deg, DgaBasis1> basis;
-	Statement stmt;
-	stmt.init(db, "SELECT mon, diff, s, t, v FROM " + table_name + " WHERE t<=" + std::to_string(t_max) + " ORDER BY mon_id;");
+	Statement stmt(db, "SELECT mon, diff, s, t, v FROM " + table_name + " WHERE t<=" + std::to_string(t_max) + " ORDER BY mon_id;");
 	int prev_t = 0;
 	while (stmt.step() == SQLITE_ROW) {
 		Deg d = { stmt.column_int(2), stmt.column_int(3), stmt.column_int(4) };
@@ -47,8 +45,7 @@ std::map<Deg, DgaBasis1> load_basis_X(const Database& db, const std::string& tab
 
 void load_y(const Database& db, const std::string& table_name, Poly1d& y, array& t_y)
 {
-	Statement stmt;
-	stmt.init(db, "SELECT y, t FROM " + table_name + " ORDER BY t;");
+	Statement stmt(db, "SELECT y, t FROM " + table_name + " ORDER BY t;");
 	while (stmt.step() == SQLITE_ROW) {
 		y.push_back(str_to_Poly(stmt.column_str(0)));
 		t_y.push_back(stmt.column_int(1));
@@ -58,8 +55,7 @@ void load_y(const Database& db, const std::string& table_name, Poly1d& y, array&
 
 void save_y(const Database& db, const std::string& table_name, const Poly2d& y_t, int t)
 {
-	Statement stmt_update_relations;
-	stmt_update_relations.init(db, "INSERT INTO " + table_name + " (y, t) VALUES (?1, ?2);");
+	Statement stmt_update_relations(db, "INSERT INTO " + table_name + " (y, t) VALUES (?1, ?2);");
 
 	for (size_t i = 0; i < y_t.size(); ++i) {
 		stmt_update_relations.bind_str(1, Poly_to_str(y_t[i][0]));
@@ -73,8 +69,7 @@ void save_y(const Database& db, const std::string& table_name, const Poly2d& y_t
 
 void save_map_gen_id(const Database& db, const std::string& table_name, const array& map_gen_id, int i_start)
 {
-	Statement stmt_update_relations;
-	stmt_update_relations.init(db, "INSERT INTO " + table_name + " (gen_id) VALUES (?1);");
+	Statement stmt_update_relations(db, "INSERT INTO " + table_name + " (gen_id) VALUES (?1);");
 
 	for (size_t i = i_start; i < map_gen_id.size(); ++i) {
 		stmt_update_relations.bind_int(1, map_gen_id[i]);
@@ -87,8 +82,7 @@ void save_map_gen_id(const Database& db, const std::string& table_name, const ar
 
 void SaveGb(const Database& db, const std::string& table_name, const Poly1d& gb, const array& gen_degs, const array& gen_degs1, int t)
 {
-	Statement stmt_update_relations;
-	stmt_update_relations.init(db, "INSERT INTO " + table_name + " (leading_term, basis, t) VALUES (?1, ?2, ?3);"); ////
+	Statement stmt_update_relations(db, "INSERT INTO " + table_name + " (leading_term, basis, t) VALUES (?1, ?2, ?3);"); ////
 
 	for (int i = (int)gb.size() - 1; i >= 0; --i) {
 		int t1 = get_deg(gb[i].front(), gen_degs, gen_degs1);
