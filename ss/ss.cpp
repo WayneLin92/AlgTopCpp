@@ -124,14 +124,14 @@ void generate_ss(const Database& db, const std::string& table_name_basis, const 
 			lead_image.push_back(base.front());
 		std::sort(lead_image.begin(), lead_image.end());
 
-		array x = add_vectors(range_, lead_image);
+		array x = AddVectors(range_, lead_image);
 
 		array2d fx;
 		for (int xi : x)
 			fx.push_back(mon_diffs_d[xi]);
 
 		array2d image, kernel, g;
-		set_linear_map_v2(x, fx, image, kernel, g);
+		SetLinearMapV2(x, fx, image, kernel, g);
 
 		/* fill with other cycles after the boundaries */
 		array lead_kernel;
@@ -153,7 +153,7 @@ void generate_ss(const Database& db, const std::string& table_name_basis, const 
 
 		/* fill with the rest */
 
-		array rest = add_vectors(x, lead_kernel);
+		array rest = AddVectors(x, lead_kernel);
 		for (int i : rest) {
 			basis_ss_d.basis_ind.push_back({ i });
 			basis_ss_d.diffs_ind.push_back(std::move(mon_diffs_ind[deg][i]));
@@ -206,7 +206,7 @@ void generate_next_page(const Database& db, const std::string& table_prefix, con
 				}
 
 				array2d image, kernel, g, quotient;
-				set_linear_map(reprs_new, image, kernel, g);
+				SetLinearMap(reprs_new, image, kernel, g);
 				array lead_kernel;
 				for (array& p_indices : kernel) {
 					gb_H.push_back(indices_to_Poly(p_indices, mons_new));
@@ -219,8 +219,8 @@ void generate_next_page(const Database& db, const std::string& table_prefix, con
 				std::sort(lead_kernel.begin(), lead_kernel.end());
 
 				/* Find new generators and add to basis_H */
-				quotient = quotient_space(p_ss->second.cycles, image);
-				simplify_space(quotient);
+				quotient = QuotientSpace(p_ss->second.cycles, image);
+				SimplifySpace(quotient);
 				for (auto& x : quotient) {
 					gen_degs_H.push_back(deg);
 					reprs_H.push_back(x);
@@ -229,7 +229,7 @@ void generate_next_page(const Database& db, const std::string& table_prefix, con
 				}
 
 				/* Add to basis_H */
-				array index_basis = add_vectors(range(int(mons_new.size())), lead_kernel);
+				array index_basis = AddVectors(range(int(mons_new.size())), lead_kernel);
 				for (int i : index_basis) {
 					basis_H[deg].push_back(std::move(mons_new[i]));
 					mon_reprs_H[deg].push_back(std::move(reprs_new[i]));
@@ -237,7 +237,7 @@ void generate_next_page(const Database& db, const std::string& table_prefix, con
 			}
 			else {
 				/* Find new generators and add to basis_H */
-				for (array& x : simplify_space(p_ss->second.cycles)) {
+				for (array& x : SimplifySpace(p_ss->second.cycles)) {
 					gen_degs_H.push_back(deg);
 					reprs_H.push_back(x);
 					basis_H[deg].push_back({ {int(gen_degs_H.size()) - 1, 1} });
@@ -281,7 +281,7 @@ void generate_next_page(const Database& db, const std::string& table_prefix, con
 									auto poly1 = indices_to_Poly(repr1, basis[deg1]);
 									auto gen_repr = indices_to_Poly(reprs_H[gen_id], basis[g_deg]);
 									Poly repr = reduce(mul(poly1, gen_repr), gb);
-									array repr_indices = residue(basis_ss[deg].boundaries, Poly_to_indices(repr, basis[deg]));
+									array repr_indices = Residue(basis_ss[deg].boundaries, Poly_to_indices(repr, basis[deg]));
 									basis_H_new[deg].push_back(std::move(mon));
 									mon_reprs_H_new[deg].push_back(std::move(repr_indices));
 								}

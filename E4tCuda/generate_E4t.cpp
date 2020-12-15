@@ -1,12 +1,17 @@
-#define MULTITHREAD
-//#define BENCHMARK
+//#define MULTITHREAD
+#define BENCHMARK
 
 #include "main_E4t.h"
 #include "linalg.h"
+#include "myio.h" ////
 #include "benchmark.h"
+#include "mycuda_public.h"
+
 #ifdef MULTITHREAD
 #include <future>
 #endif
+
+inline array2d GetSpaceCuda(const array2d& vectors) { return cuda::EchelonCuda(vectors); }
 
 array ReduceToIndices(Poly poly, const Poly1d& gb, const Mon1d& basis)
 {
@@ -215,17 +220,23 @@ std::vector<PolyWithT> FindRels(std::map<Deg, Mon1d>& basis_HB, const std::map<D
 
 		array2d map_diff;
 		for (Poly& diff : diffs_B_sm1)
-			map_diff.push_back(ReduceToIndices(diff, gb_A, basis_B_s)); // Profiler: 369
-		array2d image_diff, kernel_diff, g_diff;
-		set_linear_map(map_diff, image_diff, kernel_diff, g_diff);
+			map_diff.push_back(ReduceToIndices(diff, gb_A, basis_B_s)); // Profiler: t=100, 5650
+		array2d image_diff = GetSpaceCuda(map_diff);
+		array2d image_diff1 = GetSpace(map_diff); ////
+		if (image_diff != image_diff1) { ////
+			std::cout << "map_diff = " << map_diff << '\n'; 
+			std::cout << "image_diff=" << image_diff << '\n';
+			std::cout << "image_diff1=" << image_diff1 << '\n';
+			throw "test";
+		}
 
 		array2d map_repr;
 		for (const Mon& mon : basis_HB[d]) {
-			array repr = residue(image_diff, Poly_to_indices(get_repr({ mon }, gen_reprs_B, gb_A), basis_B_s));
+			array repr = Residue(image_diff, Poly_to_indices(get_repr({ mon }, gen_reprs_B, gb_A), basis_B_s));
 			map_repr.push_back(std::move(repr));
 		}
 		array2d image_repr, kernel_repr, g_repr;
-		set_linear_map(map_repr, image_repr, kernel_repr, g_repr);
+		SetLinearMap(map_repr, image_repr, kernel_repr, g_repr);
 
 		for (const array& rel_indices : kernel_repr)
 			result.push_back(PolyWithT{ indices_to_Poly(rel_indices, basis_HB[d]), d.t });
@@ -446,7 +457,7 @@ void generate_HB(const Database& db, const int t_max, const int t_max_compute=-1
 				/* Degrees of relations */
 				std::map<int, array> rel_degs;
 				array range_gen_degs_HA = range((int)gen_degs_HA[i + 1].size());
-				array range_g = add_vectors(range_gen_degs_HA, map_gen_id[i]);
+				array range_g = AddVectors(range_gen_degs_HA, map_gen_id[i]);
 				for (size_t j = 0; j < range_g.size(); ++j) {
 					Poly check = gen_reprs_HA[i + 1][range_g[j]] + Poly{ {{int(index_x + i + 1), 2}} };
 					if (check.empty()) {
@@ -492,7 +503,7 @@ void generate_HB(const Database& db, const int t_max, const int t_max_compute=-1
 				}
 				for (size_t j = 0; j < futures.size(); ++j) {
 					futures[j].wait();
-					std::cout << "t=" << t << " completed thread=" << j + 1 << '/' << futures.size() << "          \r";
+					std::cout << "t=" << t << ", i=" << i << ", completed thread=" << j + 1 << '/' << futures.size() << "          \r";
 					for (auto& rel : futures[j].get())
 						heap_HA[i + 1].push(std::move(rel));
 				}
@@ -526,11 +537,8 @@ int main_benchmark_E4t100(int argc, char** argv)
 	Database db(R"(C:\Users\lwnpk\Documents\MyProgramData\Math_AlgTop\database\HB.db)");
 	Timer timer;
 	int t_max = 100;
-	//generate_HB(db, t_max, -1, true);
-	generate_HB(db, 10, -1, true);
-	generate_HB(db, 30, -1, false);
-	generate_HB(db, 74, -1, false);
-
+	generate_HB(db, t_max, -1, true);
+	
 	return 0;
 }
 

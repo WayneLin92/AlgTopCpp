@@ -42,12 +42,11 @@ int testTmp()
     cuda::ArrayInt dev_a(a), dev_b(size);
     Tmp(dev_a, dev_b, size);
     cuda::Memcpy(b, dev_b, size);
-    
+
     /*for (int i = 0; i < size; ++i)
         std::cout << "b" << i << '=' << b[i] << '\n';*/
     return 0;
 }
-
 
 int test_sum()
 {
@@ -136,22 +135,24 @@ int test_min_index()
     return 0;
 }
 
-array2d echelonCuda(const array2d& matrix_csr);
-void Echelon(cuda::ArrayInt& dev_m, int nRows, int nColumns, int i, int j);
-
 int test_echelon()
 {
     Timer timer;
 
     array2d m = { {1, 3, 4}, {1, 2, 4}, {3}, {0, 1, 2, 3, 4} };
-    array2d rref = echelonCuda(m);
+    array2d rref = cuda::EchelonCuda(m);
     for (size_t i = 0; i < rref.size(); ++i) {
         for (size_t j = 0; j < rref[i].size(); ++j)
             std::cout << rref[i][j] << ", ";
         std::cout << '\n';
     }
     std::cout << '\n';
+    return 0;
+}
 
+int main()
+{
+    int return_code = test_echelon();
 
     /* cudaDeviceReset must be called before exiting in order for profiling and
     ** tracing tools such as Nsight and Visual Profiler to show complete traces. */
@@ -160,11 +161,5 @@ int test_echelon()
         return 1;
     }
 
-    return 0;
-}
-
-
-int main()
-{
-    return test_echelon();
+    return return_code;
 }

@@ -7,7 +7,7 @@ constexpr int WARP_SIZE = 32;
 
 /* perform first level of reduction */
 template <unsigned int blockSize>
-__global__ void ReduceMinIndexKernel(const int* __restrict__ g_idata, int* __restrict__ g_odata, unsigned int n)
+__global__ void ReduceMinKernel(const int* __restrict__ g_idata, int* __restrict__ g_odata, unsigned int n)
 {
     extern __shared__ int sdata[];
     unsigned int tid = threadIdx.x;
@@ -16,90 +16,93 @@ __global__ void ReduceMinIndexKernel(const int* __restrict__ g_idata, int* __res
     /* we reduce multiple elements per thread.  The number is determined by gridSize.
     ** More blocks will result in a larger gridSize and therefore fewer elements per thread */
     unsigned int i = blockIdx.x * blockSize * 2 + threadIdx.x;
-    int myIndex = MAX_INT;
+    int myMin = INT_MAX;
     while (i < n) {
-        myIndex = min(myIndex, g_idata[i] > 0 ? i : MAX_INT);
+        myMin = min(myMin, g_idata[i]);
         if ((i + blockSize) < n)
-            myIndex = min(myIndex, g_idata[i + blockSize] > 0 ? i + blockSize : MAX_INT);
+            myMin = min(myMin, g_idata[i + blockSize]);
         i += gridSize2;
     }
 
     /* Reduce within warp using __shfl_down_sync */
     for (int offset = min(blockSize, WARP_SIZE) / 2; offset > 0; offset /= 2)
-        myIndex = min(myIndex, __shfl_down_sync(0xffffffff, myIndex, offset));
+        myMin = min(myMin, __shfl_down_sync(0xffffffff, myMin, offset));
     if ((tid % WARP_SIZE) == 0) /* each warp puts its local sum into shared memory */
-        sdata[tid / WARP_SIZE] = myIndex;
+        sdata[tid / WARP_SIZE] = myMin;
+
     __syncthreads();
 
     /* Reduce shared memory using __shfl_down_sync  */
     const unsigned int size_share_memory = (blockSize / WARP_SIZE) > 0 ? (blockSize / WARP_SIZE) : 1; /* size_share_memory <= 1024/32=32 */
     const unsigned int mask_ballot = __ballot_sync(0xffffffff, tid < size_share_memory);
     if (tid < size_share_memory) {
-        myIndex = sdata[tid];
+        myMin = sdata[tid];
         for (int offset = size_share_memory / 2; offset > 0; offset /= 2)
-            myIndex = min(myIndex, __shfl_down_sync(mask_ballot, myIndex, offset));
+            myMin = min(myMin, __shfl_down_sync(mask_ballot, myMin, offset));
     }
 
     /* write result for this block to global mem */
     if (tid == 0)
-        g_odata[blockIdx.x] = myIndex;
+        g_odata[blockIdx.x] = myMin;
 }
 
 /* Wrapper for the lauch of the kernel
 ** Reduce the array `dev_in` of size `size` to the array `dev_out` of size `blocks` */
-void ReduceMinIndex(const int* dev_in, int* dev_out, int threads, int blocks, int size)
+void ReduceMin(int size, int threads, int blocks, const int* dev_in, int* dev_out)
 {
     dim3 dimBlock(threads, 1, 1);
     dim3 dimGrid(blocks, 1, 1);
     int smemSize = ((threads / WARP_SIZE) + 1) * sizeof(int);
     switch (threads) {
     case 1024:
-        ReduceMinIndexKernel<1024><<<dimGrid, dimBlock, smemSize>>>(dev_in, dev_out, size);
+        ReduceMinKernel<1024><<<dimGrid, dimBlock, smemSize>>>(dev_in, dev_out, size);
         break;
     case 512:
-        ReduceMinIndexKernel<512><<<dimGrid, dimBlock, smemSize>>>(dev_in, dev_out, size);
+        ReduceMinKernel<512><<<dimGrid, dimBlock, smemSize>>>(dev_in, dev_out, size);
         break;
     case 256:
-        ReduceMinIndexKernel<256><<<dimGrid, dimBlock, smemSize>>>(dev_in, dev_out, size);
+        ReduceMinKernel<256><<<dimGrid, dimBlock, smemSize>>>(dev_in, dev_out, size);
         break;
     case 128:
-        ReduceMinIndexKernel<128><<<dimGrid, dimBlock, smemSize>>>(dev_in, dev_out, size);
+        ReduceMinKernel<128><<<dimGrid, dimBlock, smemSize>>>(dev_in, dev_out, size);
         break;
     case 64:
-        ReduceMinIndexKernel<64><<<dimGrid, dimBlock, smemSize>>>(dev_in, dev_out, size);
+        ReduceMinKernel<64><<<dimGrid, dimBlock, smemSize>>>(dev_in, dev_out, size);
         break;
     case 32:
-        ReduceMinIndexKernel<32><<<dimGrid, dimBlock, smemSize>>>(dev_in, dev_out, size);
+        ReduceMinKernel<32><<<dimGrid, dimBlock, smemSize>>>(dev_in, dev_out, size);
         break;
     case 16:
-        ReduceMinIndexKernel<16><<<dimGrid, dimBlock, smemSize>>>(dev_in, dev_out, size);
+        ReduceMinKernel<16><<<dimGrid, dimBlock, smemSize>>>(dev_in, dev_out, size);
         break;
     case  8:
-        ReduceMinIndexKernel<8><<<dimGrid, dimBlock, smemSize>>>(dev_in, dev_out, size);
+        ReduceMinKernel<8><<<dimGrid, dimBlock, smemSize>>>(dev_in, dev_out, size);
         break;
     case  4:
-        ReduceMinIndexKernel<4><<<dimGrid, dimBlock, smemSize>>>(dev_in, dev_out, size);
+        ReduceMinKernel<4><<<dimGrid, dimBlock, smemSize>>>(dev_in, dev_out, size);
         break;
     case  2:
-        ReduceMinIndexKernel<2><<<dimGrid, dimBlock, smemSize>>>(dev_in, dev_out, size);
+        ReduceMinKernel<2><<<dimGrid, dimBlock, smemSize>>>(dev_in, dev_out, size);
         break;
     case  1:
-        ReduceMinIndexKernel<1><<<dimGrid, dimBlock, smemSize>>>(dev_in, dev_out, size);
+        ReduceMinKernel<1><<<dimGrid, dimBlock, smemSize>>>(dev_in, dev_out, size);
         break;
     }
 }
 
-void ReduceMin(int size, int threads, int blocks, const int* dev_in, int* dev_out);
-
-void cuda::MinIndex(const int* dev_in, int* dev_out, size_t size_in)
+void cuda::Min(const int* dev_in, int* dev_out, size_t size_in)
 {
+    if (size_in == 0) {
+        *dev_out = INT_MAX;
+        return;
+    }
     int maxThreads = 256;
     int maxBlocks = 64;
     int numBlocks = 0;
     int numThreads = 0;
     getNumBlocksAndThreads((int)size_in, maxBlocks, maxThreads, numBlocks, numThreads);
     ArrayInt dev_c(numBlocks), dev_tmp(numBlocks);
-    ReduceMinIndex(dev_in, dev_c.data(), numThreads, numBlocks, (int)size_in);
+    ReduceMin((int)size_in, numThreads, numBlocks, dev_in, dev_c.data());
 #ifdef _DEBUG
     CheckLastError();
     DeviceSynchronize();
@@ -118,13 +121,4 @@ void cuda::MinIndex(const int* dev_in, int* dev_out, size_t size_in)
         s = (s + (threads * 2 - 1)) / (threads * 2);
     }
     Memcpy(dev_out, dev_c.data(), sizeof(int), cudaMemcpyDeviceToDevice);
-}
-
-int cuda::MinIndex(const int* dev_in, size_t size_in)
-{
-    cuda::ArrayInt dev_out(1);
-    MinIndex(dev_in, dev_out.data(), size_in);
-    int index;
-    cuda::Memcpy(&index, dev_out.data(), sizeof(int), cudaMemcpyDeviceToHost);
-    return index;
 }

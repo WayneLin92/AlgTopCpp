@@ -149,8 +149,8 @@ Poly d_inv(const Poly& poly, const std::vector<Deg>& gen_degs, const Poly1d& dif
 	for (const Mon& mon : basis_in_result)
 		map_diff.push_back(Poly_to_indices(reduce(get_diff(mon, diffs), gb), basis_in_poly));
 	array2d image, kernel, g;
-	set_linear_map(map_diff, image, kernel, g);
-	return indices_to_Poly(get_image(image, g, Poly_to_indices(poly, basis_in_poly)), basis_in_result);
+	SetLinearMap(map_diff, image, kernel, g);
+	return indices_to_Poly(GetImage(image, g, Poly_to_indices(poly, basis_in_poly)), basis_in_result);
 }
 
 Poly proj(const Poly& poly, const std::vector<Deg>& gen_degs, const Poly1d& gen_diffs, const Poly1d& gb, const std::map<Deg, DgaBasis1>& basis_A,
@@ -170,14 +170,13 @@ Poly proj(const Poly& poly, const std::vector<Deg>& gen_degs, const Poly1d& gen_
 	array2d map_diff;
 	for (const Mon& mon : basis_d1)
 		map_diff.push_back(Poly_to_indices(reduce(get_diff(mon, gen_diffs), gb), basis_d));
-	array2d image, kernel, g;
-	set_linear_map(map_diff, image, kernel, g);
+	array2d image = GetSpace(map_diff);
 
 	array2d map_repr;
 	for (const Mon& mon : basis_H[d])
-		map_repr.push_back(residue(image, Poly_to_indices(get_repr({ mon }, gen_reprs_H, gb), basis_d)));
+		map_repr.push_back(Residue(image, Poly_to_indices(get_repr({ mon }, gen_reprs_H, gb), basis_d)));
 	array2d image1, kernel1, g1;
-	set_linear_map(map_repr, image1, kernel1, g1);
+	SetLinearMap(map_repr, image1, kernel1, g1);
 
-	return indices_to_Poly(get_image(image1, g1, Poly_to_indices(poly, basis_d)), basis_H[d]);
+	return indices_to_Poly(GetImage(image1, g1, Poly_to_indices(poly, basis_d)), basis_H[d]);
 }

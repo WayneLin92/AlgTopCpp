@@ -14,7 +14,6 @@
 #include <vector>
 
 constexpr int MAX_THREADS = 1024;
-constexpr int MAX_INT = 0x7fffffff;
 
 namespace cuda {
     /* Wrapper of Cuda C functions */
