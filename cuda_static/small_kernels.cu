@@ -44,6 +44,8 @@ __global__ void DecompressKernel(const int* in, int* out, int size_in)
 
 void cuda::Decompress(const int* dev_in, int* dev_out, int size_in)
 {
+    if (size_in == 0)
+        return;
     int numBlocks;
     int numThreads;
     if (size_in < MAX_THREADS) {

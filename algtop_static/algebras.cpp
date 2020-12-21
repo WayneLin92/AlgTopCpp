@@ -168,7 +168,7 @@ int log(const Mon& mon1, const Mon& mon2)
 	return q;
 }
 
-Mon gcd(const Mon& mon1, const Mon& mon2)
+Mon GCD(const Mon& mon1, const Mon& mon2)
 {
 	Mon result;
 	MonInd k = mon1.begin(), l = mon2.begin();
@@ -185,7 +185,7 @@ Mon gcd(const Mon& mon1, const Mon& mon2)
 	return result;
 }
 
-Mon lcm(const Mon& mon1, const Mon& mon2)
+Mon LCM(const Mon& mon1, const Mon& mon2)
 {
 	Mon result;
 	MonInd k = mon1.begin(), l = mon2.begin();

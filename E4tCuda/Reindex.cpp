@@ -17,7 +17,7 @@ Poly reindex_v2(const Poly& poly, array map_gen_id)
 /* This function reorders the generator by t and reproduce the Groebner basis */
 std::pair<array, Poly1d> ReorderGens(const std::vector<Deg>& gen_degs, const Poly1d& gb, int t_max)
 {
-	array map_gen_id_inv = range((int)gen_degs.size()); /* the i`th new generator is the old map_gen_id_inv[i]`th generator */
+	array map_gen_id_inv = grbn::range((int)gen_degs.size()); /* the i`th new generator is the old map_gen_id_inv[i]`th generator */
 	std::sort(map_gen_id_inv.begin(), map_gen_id_inv.end(), [&gen_degs](int i, int j) {return gen_degs[i].t < gen_degs[j].t; });
 	array map_gen_id; map_gen_id.resize(gen_degs.size()); /* the i`th old generator becomes the map_gen_id[i]`th generator */
 	array gen_degs_new;
@@ -26,9 +26,9 @@ std::pair<array, Poly1d> ReorderGens(const std::vector<Deg>& gen_degs, const Pol
 		gen_degs_new.push_back(gen_degs[map_gen_id_inv[i]].t);
 	}
 
-	RelHeap heap;
+	grbn::RelHeap heap;
 	for (const Poly& g : gb)
-		heap.push(PolyWithT{ reindex_v2(g, map_gen_id), get_deg_t(g, gen_degs) });
+		heap.push(grbn::PolyWithT{ reindex_v2(g, map_gen_id), get_deg_t(g, gen_degs) });
 	Poly1d gb_new;
 	add_rels_from_heap(gb_new, heap, gen_degs_new, -1, t_max);
 	return std::make_pair(std::move(map_gen_id_inv), std::move(gb_new));

@@ -17,7 +17,7 @@ struct DgaBasis1
 
 inline Poly get_repr(const Poly& poly, const Poly1d& gen_reprs, const Poly1d& gb)
 {
-	return evaluate(poly, [&gen_reprs](int i) {return gen_reprs[i]; }, gb);
+	return grbn::evaluate(poly, [&gen_reprs](int i) {return gen_reprs[i]; }, gb);
 }
 
 std::map<Deg, DgaBasis1> load_dga_basis(const Database& db, const std::string& table_name, int r, int t_max);
@@ -33,8 +33,6 @@ Poly d_inv(const Poly& poly, const std::vector<Deg>& gen_degs, const Poly1d& dif
 /* Assume poly is a cycle. Return the homology class */
 Poly proj(const Poly& poly, const std::vector<Deg>& gen_degs, const Poly1d& gen_diffs, const Poly1d& gb, const std::map<Deg, DgaBasis1>& basis_A,
 	const std::map<Deg, DgaBasis1>& basis_X, const Poly1d& gen_reprs, std::map<Deg, Mon1d>& basis_H);
-template <typename Fn>
-void add_rels_freemodule(Poly1d& gb, RelHeap& heap, Fn get_deg, int deg, int deg_max);
 
 Poly reindex(const Poly& poly, array map_gen_id);
 

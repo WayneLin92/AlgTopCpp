@@ -2,6 +2,8 @@
 #include <algorithm>
 #include <iterator>
 
+namespace grbn {
+
 /******** Groebner Basis ********/
 
 Poly pow(const Poly& poly, int n, const Poly1d& gb)
@@ -12,15 +14,16 @@ Poly pow(const Poly& poly, int n, const Poly1d& gb)
 	Poly power = poly;
 	while (n) {
 		if (n & 1)
-			result = reduce(mul(result, power), gb);
+			result = Reduce(mul(result, power), gb);
 		n >>= 1;
 		if (n)
-			power = reduce(mul(power, power), gb);
+			power = Reduce(mul(power, power), gb);
 	}
 	return result;
 }
 
-Poly reduce(Poly poly, const Poly1d& gb)
+
+Poly Reduce(Poly poly, const Poly1d& gb)
 {
 	Poly result;
 	auto pbegin = poly.begin(); auto pend = poly.end();
@@ -58,15 +61,17 @@ bool gcd_nonzero(const Mon& mon1, const Mon& mon2)
 	return false;
 }
 
-/* Comsume relations from `heap` that is at most in degree `deg` while adding new relations to `heap` that is at most in degree `deg_max`.
+/********************************************************************************
+** Comsume relations from `stack` in degree <= `deg`
+** while adding new relations to `heap` in degree <= `deg_max`.
 ** deg=-1 or deg_max=-1 means infinity.
-*/
+*********************************************************************************/
 template <typename Fn>
 void add_rels_from_heap(Poly1d& gb, RelHeap& heap, Fn _get_deg, int deg, int deg_max)
 {
 	while (!heap.empty() && (deg == -1 ? (deg_max == -1 || heap.top().t <= deg_max) : heap.top().t <= deg)) {
 		PolyWithT heap_ele = MoveFromTop(heap);
-		Poly rel = reduce(heap_ele.poly, gb);
+		Poly rel = Reduce(heap_ele.poly, gb);
 		if (!rel.empty()) {
 			for (Poly& g : gb) {
 				if (gcd_nonzero(rel[0], g[0])) {
@@ -77,7 +82,7 @@ void add_rels_from_heap(Poly1d& gb, RelHeap& heap, Fn _get_deg, int deg, int deg
 						g.clear();
 					}
 					else {
-						Mon mlcm = lcm(rel[0], g[0]);
+						Mon mlcm = LCM(rel[0], g[0]);
 						int deg_new_rel = _get_deg(mlcm);
 						if (deg_max == -1 || deg_new_rel <= deg_max) {
 							Poly new_rel = rel * div(mlcm, rel[0]) + g * div(mlcm, g[0]);
@@ -105,7 +110,7 @@ void add_rels(Poly1d& gb, const Poly1d& rels, Fn _get_deg, int deg_max)
 
 void add_rels_from_heap(Poly1d& gb, RelHeap& heap, const array& gen_degs, int t, int deg_max)
 {
-	add_rels_from_heap(gb, heap, [&gen_degs](const Mon& m) {return get_deg(m, gen_degs); }, t, deg_max);
+	add_rels_from_heap(gb, heap, FnGetDeg{ gen_degs }, t, deg_max);
 }
 
 void add_rels_from_heap(Poly1d& gb, RelHeap& heap, const array& gen_degs, const array& gen_degs1, int t, int deg_max)
@@ -123,24 +128,23 @@ void add_rels(Poly1d& gb, const Poly1d& rels, const array& gen_degs, const array
 	add_rels(gb, rels, FnGetDegV2{ gen_degs, gen_degs1 }, deg_max);
 }
 
-template <typename Fn>
-void add_rels_freemodule(Poly1d& gb, RelHeap& heap, Fn get_deg, int deg, int deg_max)
+void add_rels_freemodule(Poly1d& gb, RelHeap& heap, const array& gen_degs, const array& gen_degs1, int deg, int deg_max)
 {
 	while (!heap.empty() && (deg == -1 ? (deg_max == -1 || heap.top().t <= deg_max) : heap.top().t <= deg)) {
 		PolyWithT heap_ele = MoveFromTop(heap);
-		Poly rel = reduce(heap_ele.poly, gb);
+		Poly rel = Reduce(heap_ele.poly, gb);
 		if (!rel.empty()) {
 			for (Poly& g : gb) {
 				if ((rel[0][0].gen >= 0 || g[0][0].gen >= 0 || rel[0][0].gen == g[0][0].gen) && gcd_nonzero(rel[0], g[0])) {
 					if (divides(rel[0], g[0])) {
 						Poly new_rel = rel * div(g[0], rel[0]) + g;
 						if (!new_rel.empty())
-							heap.push(PolyWithT{ std::move(new_rel), get_deg(g[0]) });
+							heap.push(PolyWithT{ std::move(new_rel), get_deg(g[0], gen_degs, gen_degs1) });
 						g.clear();
 					}
 					else {
-						Mon mlcm = lcm(rel[0], g[0]);
-						int deg_new_rel = get_deg(mlcm);
+						Mon mlcm = LCM(rel[0], g[0]);
+						int deg_new_rel = get_deg(mlcm, gen_degs, gen_degs1);
 						if (deg_max == -1 || deg_new_rel <= deg_max) {
 							Poly new_rel = rel * div(mlcm, rel[0]) + g * div(mlcm, g[0]);
 							if (!new_rel.empty())
@@ -155,13 +159,144 @@ void add_rels_freemodule(Poly1d& gb, RelHeap& heap, Fn get_deg, int deg, int deg
 	}
 }
 
+/********************************************************************************
+** Comsume relations from `buffer` in degree <= `deg`
+** while adding new relations to `buffer` in degree <= `deg_max`.
+** deg=-1 or deg_max=-1 means infinity.
+*********************************************************************************/
+template <typename Fn>
+void DumpRelBuffer(Poly1d& gb, RelBuffer& buffer, Fn _get_deg, int deg, int deg_max)
+{
+	while (!buffer.empty() && (deg == -1 ? (deg_max == -1 || buffer.next_deg() <= deg_max) : buffer.next_deg() <= deg)) {
+		int deg_rel = buffer.next_deg();
+		MonWithIndices m = buffer.pop();
+		Poly rel = Reduce(gb[m.index1] * div(gb[m.index2][0], m.gcd) +
+			gb[m.index2] * div(gb[m.index1][0], m.gcd), gb);
+		if (!rel.empty()) {
+			for (size_t i = 0; i < gb.size(); ++i) {
+				Mon gcd = GCD(rel[0], gb[i][0]);
+				if (!gcd.empty()) {
+					int deg_new_rel = deg_rel + _get_deg(gb[i][0]) - _get_deg(gcd);
+					if (deg_max == -1 || deg_new_rel <= deg_max) {
+						buffer.push(deg_new_rel, std::move(gcd), (int)i, (int)gb.size());
+					}
+				}
+			}
+			gb.push_back(std::move(rel));
+		}
+	}
+}
+
+/* Assume that rels are ordered in terms of deg */
+template <typename Fn>
+void AddRels(Poly1d& gb, const Poly1d& rels, Fn _get_deg, int deg_max)
+{
+	RelBuffer buffer;
+	int deg_prev = -1;
+	for (const Poly& rel : rels) {
+		if (!rel.empty()) {
+			int deg_rel = _get_deg(rel[0]);
+			for (size_t i = 0; i < gb.size(); ++i) {
+				Mon gcd = GCD(rel[0], gb[i][0]);
+				if (!gcd.empty()) {
+					int deg_new_rel = deg_rel + _get_deg(gb[i][0]) - _get_deg(gcd);
+					if (deg_max == -1 || deg_new_rel <= deg_max) {
+						buffer.push(deg_new_rel, std::move(gcd), (int)i, (int)gb.size());
+					}
+				}
+			}
+			gb.push_back(rel);
+			if (deg_rel != deg_prev) {
+				DumpRelBuffer(gb, buffer, _get_deg, deg_rel, deg_max);
+				deg_prev = deg_rel;
+			}
+		}
+	}
+	DumpRelBuffer(gb, buffer, _get_deg, -1, deg_max);
+}
+
+/* Assume that rels are of the same degree `deg` */
+template <typename Fn>
+void AddRels(Poly1d& gb, const Poly1d& rels, RelBuffer& buffer, Fn _get_deg, int deg, int deg_max)
+{
+	int deg_prev = -1;
+	for (const Poly& rel : rels) {
+		if (!rel.empty()) {
+			for (size_t i = 0; i < gb.size(); ++i) {
+				Mon gcd = GCD(rel[0], gb[i][0]);
+				if (!gcd.empty()) {
+					int deg_new_rel = deg + _get_deg(gb[i][0]) - _get_deg(gcd);
+					if (deg_max == -1 || deg_new_rel <= deg_max) {
+						buffer.push(deg_new_rel, std::move(gcd), (int)i, (int)gb.size());
+					}
+				}
+			}
+			gb.push_back(rel);
+		}
+	}
+	DumpRelBuffer(gb, buffer, _get_deg, deg, deg_max);
+}
+
+void DumpRelBuffer(Poly1d& gb, RelBuffer& buffer, const array& gen_degs, int t, int deg_max)
+{
+	DumpRelBuffer(gb, buffer, FnGetDeg{ gen_degs }, t, deg_max);
+}
+
+void DumpRelBuffer(Poly1d& gb, RelBuffer& buffer, const array& gen_degs, const array& gen_degs1, int t, int deg_max)
+{
+	DumpRelBuffer(gb, buffer, FnGetDegV2{ gen_degs, gen_degs1 }, t, deg_max);
+}
+
+void AddRels(Poly1d& gb, const Poly1d& rels, const array& gen_degs, int deg_max)
+{
+	AddRels(gb, rels, FnGetDeg{ gen_degs }, deg_max);
+}
+
+void AddRels(Poly1d& gb, const Poly1d& rels, const array& gen_degs, const array& gen_degs1, int deg_max)
+{
+	AddRels(gb, rels, FnGetDegV2{ gen_degs, gen_degs1 }, deg_max);
+}
+
+void AddRels(Poly1d& gb, const Poly1d& rels, RelBuffer& buffer, const array& gen_degs, int t, int deg_max)
+{
+	AddRels(gb, rels, buffer, FnGetDeg{ gen_degs }, t, deg_max);
+}
+
+void AddRels(Poly1d& gb, const Poly1d& rels, RelBuffer& buffer, const array& gen_degs, const array& gen_degs1, int t, int deg_max)
+{
+	AddRels(gb, rels, buffer, FnGetDegV2{ gen_degs, gen_degs1 }, t, deg_max);
+}
+
+template <typename Fn>
+void AddRelsFromCacheFM(Poly1d& gb, RelBuffer& buffer, Fn _get_deg, int deg, int deg_max)
+{
+	while (!buffer.empty() && (deg == -1 ? (deg_max == -1 || buffer.next_deg() <= deg_max) : buffer.next_deg() <= deg)) {
+		MonWithIndices m = buffer.pop();
+		Poly rel = Reduce(gb[m.index1] * div(gb[m.index2][0], m.gcd) +
+			gb[m.index2] * div(gb[m.index1][0], m.gcd), gb);
+		if (!rel.empty()) {
+			for (size_t i = 0; i < gb.size(); ++i) {
+				if (rel[0][0].gen >= 0 || gb[i][0][0].gen >= 0 || rel[0][0].gen == gb[i][0][0].gen) {
+					Mon gcd = GCD(rel[0], gb[i][0]);
+					if (!gcd.empty()) {
+						int deg_new_rel = _get_deg(rel[0]) + _get_deg(gb[i][0]) - _get_deg(gcd);
+						if (deg_max == -1 || deg_new_rel <= deg_max) {
+							buffer.push(deg_new_rel, std::move(gcd), i, (int)gb.size());
+						}
+					}
+				}
+			}
+			gb.push_back(std::move(rel));
+		}
+	}
+}
+
 /* Compute the generating set of `vectors` inplace */
 Poly2d& indecomposables(const Poly1d& gb, Poly2d& vectors, const array& gen_degs, const array& basis_degs)
 {
 	if (vectors.empty())
 		return vectors;
 	Poly1d gb1 = gb;
-	FnGetDegV2 get_deg_{ gen_degs, basis_degs };
 
 	/* Convert each vector v into a relation \\sum vi x_{-i-1} */
 	Poly1d rels;
@@ -171,20 +306,20 @@ Poly2d& indecomposables(const Poly1d& gb, Poly2d& vectors, const array& gen_degs
 		for (int i = 0; i < basis_degs.size(); ++i)
 			if (!v[i].empty())
 				rel += v[i] * Mon{ {-i - 1, 1} };
-		degs.push_back(get_deg_(rel[0]));
+		degs.push_back(get_deg(rel[0], gen_degs, basis_degs));
 		rels.push_back(std::move(rel));
 	}
 	array indices = range((int)vectors.size());
 	std::sort(indices.begin(), indices.end(), [&degs](int i, int j) {return degs[i] < degs[j]; });
 
 	/* Add relations ordered by degree to gb1 */
-	RelHeap heap;
+	RelHeap stack;
 	int deg_max = degs[indices.back()];
 	for (int i : indices) {
-		add_rels_freemodule(gb1, heap, get_deg_, degs[i], deg_max);
-		Poly rel = reduce(rels[i], gb1);
+		add_rels_freemodule(gb1, stack, gen_degs, basis_degs, degs[i], deg_max);
+		Poly rel = Reduce(rels[i], gb1);
 		if (!rel.empty())
-			heap.push(PolyWithT{ std::move(rel), degs[i] });
+			stack.push(PolyWithT{ std::move(rel), degs[i] });
 		else
 			vectors[i].clear();
 	}
@@ -223,7 +358,7 @@ Poly2d ann_seq(const Poly1d& gb, const Poly1d& polys, const array& gen_degs, int
 				MonInd p = m.begin();
 				for (; p != m.end() && p->gen < 0; ++p);
 				Mon m1(m.begin(), p), m2(p, m.end());
-				ann[size_t(-m1[0].gen) - 1] += reduce(mul(evaluate({ div(m1, { {m1[0].gen, 1} }) }, [&polys](int i) {return polys[size_t(-i) - 1]; }, gb), m2), gb);
+				ann[size_t(-m1[0].gen) - 1] += Reduce(mul(evaluate({ div(m1, { {m1[0].gen, 1} }) }, [&polys](int i) {return polys[size_t(-i) - 1]; }, gb), m2), gb);
 			}
 			result.push_back(std::move(ann));
 		}
@@ -248,18 +383,38 @@ Poly2d ann_seq(const Poly1d& gb, const Poly1d& polys, const array& gen_degs, int
 
 RelHeap GenerateHeap(const Poly1d& gb, const array& gen_degs, const array& gen_degs1, int t, int t_max)
 {
-	RelHeap heap;
+	RelHeap stack;
 	for (auto pg1 = gb.begin(); pg1 != gb.end(); ++pg1) {
 		for (auto pg2 = pg1 + 1; pg2 != gb.end(); ++pg2) {
 			if (gcd_nonzero(pg1->front(), pg2->front())) {
-				Mon mlcm = lcm(pg1->front(), pg2->front());
+				Mon mlcm = LCM(pg1->front(), pg2->front());
 				int deg_new_rel = get_deg(mlcm, gen_degs, gen_degs1);
 				if (t <= deg_new_rel && deg_new_rel <= t_max) {
 					Poly new_rel = (*pg1) * div(mlcm, pg1->front()) + (*pg2) * div(mlcm, pg2->front());
-					heap.push(PolyWithT{ std::move(new_rel), deg_new_rel });
+					stack.push(PolyWithT{ std::move(new_rel), deg_new_rel });
 				}
 			}
 		}
 	}
-	return heap;
+	return stack;
 }
+
+RelBuffer GenerateBuffer(const Poly1d& gb, const array& gen_degs, const array& gen_degs1, int t, int t_max)
+{
+	RelBuffer buffer;
+	for (auto pg1 = gb.begin(); pg1 != gb.end(); ++pg1) {
+		for (auto pg2 = pg1 + 1; pg2 != gb.end(); ++pg2) {
+			Mon gcd = GCD(pg1->front(), pg2->front());
+			if (!gcd.empty()) {
+				int deg_new_rel = get_deg(pg1->front(), gen_degs, gen_degs1) + get_deg(pg2->front(), gen_degs, gen_degs1) - get_deg(gcd, gen_degs, gen_degs1);
+				if (t <= deg_new_rel && deg_new_rel <= t_max) {
+					buffer.push(deg_new_rel, std::move(gcd), (int)(pg1 - gb.begin()), (int)(pg2 - gb.begin()));
+				}
+			}
+		}
+	}
+	return buffer;
+}
+
+
+} /* namespace grbn */

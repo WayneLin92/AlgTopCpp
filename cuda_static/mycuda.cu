@@ -1,14 +1,16 @@
 #include "mycuda.h"
 #include <iostream>
 
-void cuda::SetDevice(int device) {
+namespace cuda {
+
+void SetDevice(int device) {
     if (cudaSetDevice(device) != cudaSuccess) {
         std::cerr << "cudaSetDevice failed!  Do you have a CUDA-capable GPU installed?";
         throw "e31e20a";
     }
 }
 
-void cuda::Malloc(void** devPtr, size_t bytes)
+void Malloc(void** devPtr, size_t bytes)
 {
     cudaError_t cudaStatus = cudaMalloc(devPtr, bytes);
     if (cudaStatus != cudaSuccess) {
@@ -17,7 +19,7 @@ void cuda::Malloc(void** devPtr, size_t bytes)
     }
 }
 
-void cuda::FillZero(void* devPtr, size_t bytes)
+void FillZero(void* devPtr, size_t bytes)
 {
     cudaError_t cudaStatus = cudaMemset(devPtr, 0, bytes);
     if (cudaStatus != cudaSuccess) {
@@ -26,7 +28,7 @@ void cuda::FillZero(void* devPtr, size_t bytes)
     }
 }
 
-void cuda::Memcpy(void* dst, const void* src, size_t bytes, cudaMemcpyKind kind)
+void Memcpy(void* dst, const void* src, size_t bytes, cudaMemcpyKind kind)
 {
     cudaError_t cudaStatus = cudaMemcpy(dst, src, bytes, kind);
     if (cudaStatus != cudaSuccess) {
@@ -35,7 +37,7 @@ void cuda::Memcpy(void* dst, const void* src, size_t bytes, cudaMemcpyKind kind)
     }
 }
 
-void cuda::CheckLastError() {
+void CheckLastError() {
     cudaError_t cudaStatus = cudaGetLastError();
     if (cudaStatus != cudaSuccess) {
         std::cerr << "Cuda failed: " << cudaGetErrorString(cudaStatus) << '\n';
@@ -43,7 +45,7 @@ void cuda::CheckLastError() {
     }
 }
 
-void cuda::DeviceSynchronize()
+void DeviceSynchronize()
 {
     cudaError_t cudaStatus = cudaDeviceSynchronize();
     if (cudaStatus != cudaSuccess) {
@@ -51,3 +53,5 @@ void cuda::DeviceSynchronize()
         throw "19149f41";
     }
 }
+
+}/* Namespace cuda */

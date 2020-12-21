@@ -147,7 +147,7 @@ Poly d_inv(const Poly& poly, const std::vector<Deg>& gen_degs, const Poly1d& dif
 	std::sort(basis_in_result.begin(), basis_in_result.end());
 	array2d map_diff;
 	for (const Mon& mon : basis_in_result)
-		map_diff.push_back(Poly_to_indices(reduce(get_diff(mon, diffs), gb), basis_in_poly));
+		map_diff.push_back(Poly_to_indices(grbn::Reduce(get_diff(mon, diffs), gb), basis_in_poly));
 	array2d image, kernel, g;
 	SetLinearMap(map_diff, image, kernel, g);
 	return indices_to_Poly(GetImage(image, g, Poly_to_indices(poly, basis_in_poly)), basis_in_result);
@@ -169,7 +169,7 @@ Poly proj(const Poly& poly, const std::vector<Deg>& gen_degs, const Poly1d& gen_
 
 	array2d map_diff;
 	for (const Mon& mon : basis_d1)
-		map_diff.push_back(Poly_to_indices(reduce(get_diff(mon, gen_diffs), gb), basis_d));
+		map_diff.push_back(Poly_to_indices(grbn::Reduce(get_diff(mon, gen_diffs), gb), basis_d));
 	array2d image = GetSpace(map_diff);
 
 	array2d map_repr;

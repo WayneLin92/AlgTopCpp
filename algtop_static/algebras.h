@@ -101,8 +101,8 @@ inline int get_deg(const Poly& poly, const array& gen_degs, const array& gen_deg
 inline Deg get_deg(const Poly& poly, const std::vector<Deg>& gen_degs) { return poly.empty() ? Deg({ -10000, -10000, -10000 }) : get_deg(poly[0], gen_degs); }
 inline int get_deg_t(const Poly& poly, const std::vector<Deg>& gen_degs) { return poly.empty() ? -10000 : get_deg_t(poly[0], gen_degs); }
 
-Mon gcd(const Mon& m1, const Mon& m2);
-Mon lcm(const Mon& m1, const Mon& m2);
+Mon GCD(const Mon& m1, const Mon& m2);
+Mon LCM(const Mon& m1, const Mon& m2);
 
 Poly get_diff(const Mon& mon, const Poly1d& diffs);
 Poly get_diff(const Poly& poly, const Poly1d& diffs);

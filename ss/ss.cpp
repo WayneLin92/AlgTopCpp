@@ -87,7 +87,7 @@ void generate_mon_diffs(const Database& db, const std::string& table_prefix, int
 				Mon mon1 = div(basis_d[i], { {gen_id, 1} });
 				Deg d1 = d - gen_degs[gen_id];
 				size_t index_mon1 = std::lower_bound(basis.at(d1).begin(), basis.at(d1).end(), mon1) - basis.at(d1).begin();
-				mon_diffs[d].push_back(reduce(add(mul(gen_diffs[gen_id], mon1), mul({ {gen_id, 1} }, mon_diffs[d1][index_mon1])), gb));
+				mon_diffs[d].push_back(grbn::Reduce(add(mul(gen_diffs[gen_id], mon1), mul({ {gen_id, 1} }, mon_diffs[d1][index_mon1])), gb));
 				Deg d_diff = d + Deg{ 1, 0, -r };
 				diff_indices = Poly_to_indices(mon_diffs[d][i], basis[d_diff]);
 			}
@@ -117,7 +117,7 @@ void generate_ss(const Database& db, const std::string& table_name_basis, const 
 		}
 		BasisSS& basis_ss_d = basis_ss[deg];
 
-		array range_ = range((int)mon_diffs_d.size());
+		array range_ = grbn::range((int)mon_diffs_d.size());
 
 		array lead_image;
 		for (const auto& base : basis_ss_d.basis_ind)
@@ -196,7 +196,7 @@ void generate_next_page(const Database& db, const std::string& table_prefix, con
 			auto pNew = basis_H_new.find(deg);
 			if (pNew != basis_H_new.end()) {
 				/* Compute gb */
-				array indices = range(int(pNew->second.size()));
+				array indices = grbn::range(int(pNew->second.size()));
 				std::sort(indices.begin(), indices.end(), [&pNew](int a, int b) {return pNew->second[a] < pNew->second[b]; });
 				Mon1d mons_new;
 				array2d reprs_new;
@@ -229,7 +229,7 @@ void generate_next_page(const Database& db, const std::string& table_prefix, con
 				}
 
 				/* Add to basis_H */
-				array index_basis = AddVectors(range(int(mons_new.size())), lead_kernel);
+				array index_basis = AddVectors(grbn::range(int(mons_new.size())), lead_kernel);
 				for (int i : index_basis) {
 					basis_H[deg].push_back(std::move(mons_new[i]));
 					mon_reprs_H[deg].push_back(std::move(reprs_new[i]));
@@ -280,7 +280,7 @@ void generate_next_page(const Database& db, const std::string& table_prefix, con
 									/* Compute the represeting cycle of the base monomial */
 									auto poly1 = indices_to_Poly(repr1, basis[deg1]);
 									auto gen_repr = indices_to_Poly(reprs_H[gen_id], basis[g_deg]);
-									Poly repr = reduce(mul(poly1, gen_repr), gb);
+									Poly repr = grbn::Reduce(mul(poly1, gen_repr), gb);
 									array repr_indices = Residue(basis_ss[deg].boundaries, Poly_to_indices(repr, basis[deg]));
 									basis_H_new[deg].push_back(std::move(mon));
 									mon_reprs_H_new[deg].push_back(std::move(repr_indices));

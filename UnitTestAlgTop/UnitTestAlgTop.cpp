@@ -25,6 +25,7 @@ namespace UnitTestAlgTop
 
 		TEST_METHOD(test_pow)
 		{
+			using namespace grbn;
 			Poly poly = { {{1, 1}}, {{0, 1}} };
 			Poly1d gb = { {{{0, 1}, {1, 2}}, {{-1, 3}}} };
 			Poly power = pow(poly, 3, gb);
@@ -34,6 +35,7 @@ namespace UnitTestAlgTop
 
 		TEST_METHOD(test_evaluate)
 		{
+			using namespace grbn;
 			Poly p = { {{1, 3}}, {{0, 3}}, {{0, 1}, {2, 1}} };
 			Poly1d images = { {{{1, 1}}, {{0, 1}}}, {}, {{{3, 1}}} };
 			Poly fp = evaluate(p, [&images](int gen_id) {return images[gen_id]; }, {});
@@ -127,6 +129,7 @@ namespace UnitTestAlgTop
 
 		TEST_METHOD(test_groebner_B7)
 		{
+			using namespace grbn;
 			array gen_degs;
 			int n_max = 7;
 			for (int d = 1; d <= n_max; d++) {
@@ -154,7 +157,9 @@ namespace UnitTestAlgTop
 			}
 
 			Poly1d gb;
-			add_rels(gb, rels, gen_degs, -1);
+			std::sort(rels.begin(), rels.end(), [&gen_degs](const Poly& p1, const Poly& p2) {
+				return get_deg(p1, gen_degs) < get_deg(p2, gen_degs); });
+			AddRels(gb, rels, gen_degs, -1);
 			size_t gb_size = gb.size();
 			size_t answer = 65;
 			Assert::AreEqual(answer, gb_size);
@@ -162,6 +167,7 @@ namespace UnitTestAlgTop
 
 		TEST_METHOD(test_groebner)
 		{
+			using namespace grbn;
 			array gen_degs = { 1, 1, 1, 1 };
 			Poly1d rels = { {{{2, 3}}, {{1, 3}}, {{0, 1}, {1, 1}, {2, 1}}, {{0, 3}}} };
 			Poly1d rels1 = { {{{2, 1}}, {{1, 1}}, {{0, 1}}} };
@@ -174,6 +180,7 @@ namespace UnitTestAlgTop
 
 		TEST_METHOD(test_ann_seq)
 		{
+			using namespace grbn;
 			array gen_degs = { 1, 1, 1, 1 }; /* x, y, z, w */
 			Poly rel0 = { {{0, 4}} }; /* x^4 */
 			Poly rel1 = { {{0, 2}, {1, 4}} }; /* x^2y^4 */
