@@ -42,20 +42,22 @@ array Database::get_ints(const std::string& table_name, const std::string& colum
 	return result;
 }
 
-void Database::sqlite3_prepare_v100(const char* zSql, sqlite3_stmt** ppStmt) const
+void Database::sqlite3_prepare_v100(const char* zSql, sqlite3_stmt** ppStmt, bool bPrintError) const
 {
 	int error_code = sqlite3_prepare_v2(conn_, zSql, int(strlen(zSql)) + 1, ppStmt, NULL);
 	if (error_code != SQLITE_OK) {
-		std::cerr << sqlite3_errstr(error_code) << '\n';
+		if (bPrintError)
+			std::cerr << sqlite3_errstr(error_code) << '\n';
 		throw "bce2dcfe";
 	}
 }
 
-void Database::sqlite3_prepare_v100(const std::string& sql, sqlite3_stmt** ppStmt) const
+void Database::sqlite3_prepare_v100(const std::string& sql, sqlite3_stmt** ppStmt, bool bPrintError) const
 {
 	int error_code = sqlite3_prepare_v2(conn_, sql.c_str(), int(sql.size()) + 1, ppStmt, NULL);
 	if (error_code != SQLITE_OK) {
-		std::cerr << sqlite3_errstr(error_code) << '\n';
+		if (bPrintError)
+			std::cerr << sqlite3_errstr(error_code) << '\n';
 		throw "da6ab7f6";
 	}
 }

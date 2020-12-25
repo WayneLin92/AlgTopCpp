@@ -1,5 +1,5 @@
-#define MULTITHREAD
-//#define BENCHMARK
+//#define MULTITHREAD
+#define BENCHMARK
 
 #include "main_E4t.h"
 #include "linalg.h"

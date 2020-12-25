@@ -38,8 +38,8 @@ public:
 	void execute_cmd(const std::string& sql) const;
 	int get_int(const std::string& sql) const;
 	array get_ints(const std::string& table_name, const std::string& column_name, const std::string& conditions="") const;
-	void sqlite3_prepare_v100(const char* zSql, sqlite3_stmt** ppStmt) const;
-	void sqlite3_prepare_v100(const std::string& sql, sqlite3_stmt** ppStmt) const;
+	void sqlite3_prepare_v100(const char* zSql, sqlite3_stmt** ppStmt, bool bPrintError=false) const;
+	void sqlite3_prepare_v100(const std::string& sql, sqlite3_stmt** ppStmt, bool bPrintError=false) const;
 public:
 	void begin_transaction() const { execute_cmd("BEGIN TRANSACTION"); }
 	void end_transaction() const { execute_cmd("END TRANSACTION"); }
