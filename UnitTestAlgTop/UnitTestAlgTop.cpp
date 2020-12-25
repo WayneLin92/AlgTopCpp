@@ -159,7 +159,8 @@ namespace UnitTestAlgTop
 			Poly1d gb;
 			std::sort(rels.begin(), rels.end(), [&gen_degs](const Poly& p1, const Poly& p2) {
 				return get_deg(p1, gen_degs) < get_deg(p2, gen_degs); });
-			AddRels(gb, rels, gen_degs, -1);
+			RelBuffer buffer;
+			AddRels(gb, std::move(rels), buffer, gen_degs, -1);
 			size_t gb_size = gb.size();
 			size_t answer = 65;
 			Assert::AreEqual(answer, gb_size);
@@ -180,16 +181,15 @@ namespace UnitTestAlgTop
 
 		TEST_METHOD(test_ann_seq)
 		{
-			using namespace grbn;
 			array gen_degs = { 1, 1, 1, 1 }; /* x, y, z, w */
 			Poly rel0 = { {{0, 4}} }; /* x^4 */
 			Poly rel1 = { {{0, 2}, {1, 4}} }; /* x^2y^4 */
 			Poly rel2 = { {{0, 1}, {2, 2}}, {{0, 2}, {1, 1}} }; /* x^2y + xz^2 */
 			Poly rel3 = { {{3, 4}}, {{2, 4}} }; /* z^2 + w^4 */
 			Poly1d gb;
-			add_rels(gb, { rel0, rel1, rel2, rel3 }, gen_degs, -1);
+			grbn::add_rels(gb, { rel0, rel1, rel2, rel3 }, gen_degs, -1);
 
-			Poly2d ann = ann_seq(gb, { Poly{ {{0, 1}} } }, gen_degs, -1);
+			Poly2d ann = grbn::ann_seq_v2(gb, { Poly{ {{0, 1}} } }, gen_degs, -1);
 			Assert::AreEqual(3, int(ann.size()));
 		}
 	};

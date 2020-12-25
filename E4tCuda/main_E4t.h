@@ -4,6 +4,8 @@
 #include <iostream>
 #include <future>
 
+#define GENERATE_E4T_1
+
 
 /********** STRUCTS AND CLASSES **********/
 
@@ -34,5 +36,5 @@ Poly d_inv(const Poly& poly, const std::vector<Deg>& gen_degs, const Poly1d& dif
 Poly proj(const Poly& poly, const std::vector<Deg>& gen_degs, const Poly1d& gen_diffs, const Poly1d& gb, const std::map<Deg, DgaBasis1>& basis_A,
 	const std::map<Deg, DgaBasis1>& basis_X, const Poly1d& gen_reprs, std::map<Deg, Mon1d>& basis_H);
 
-Poly reindex(const Poly& poly, array map_gen_id);
+Poly reindex(const Poly& poly, const array& map_gen_id);
 

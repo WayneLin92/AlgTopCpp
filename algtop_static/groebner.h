@@ -1,4 +1,4 @@
-/* 
+/*
 ** Groebner Basis
 ** The default monomial ordering is revlex
 */
@@ -34,8 +34,7 @@ Poly Reduce(Poly poly, const Poly1d& gb);
 
 class RelBuffer {
 public:
-	void push(int deg, const Mon& gcd, int index1, int index2) { gcds[deg].push_back({ gcd, index1, index2 }); }
-	void push(int deg, Mon&& gcd, int index1, int index2) { gcds[deg].push_back({ gcd, index1, index2 }); }
+	void push(int deg, Mon gcd, int index1, int index2) { gcds[deg].push_back({ std::move(gcd), index1, index2 }); }
 	MonWithIndices pop() {
 		MonWithIndices m = std::move(gcds.begin()->second.back());
 		if (gcds.begin()->second.size() == 1)
@@ -79,13 +78,14 @@ void add_rels_from_heap(Poly1d& gb, RelHeap& heap, const array& gen_degs, int t,
 void add_rels_from_heap(Poly1d& gb, RelHeap& heap, const array& gen_degs, const array& gen_degs1, int t, int deg_max);
 
 /* Add new relations `rels` to groebner basis `gb` */
-void add_rels(Poly1d& gb, const Poly1d& rels, const array& gen_degs, int deg_max);
-void add_rels(Poly1d& gb, const Poly1d& rels, const array& gen_degs, const array& gen_degs1, int deg_max);
+void add_rels(Poly1d& gb, Poly1d rels, const array& gen_degs, int deg_max);
+void add_rels(Poly1d& gb, Poly1d rels, const array& gen_degs, const array& gen_degs1, int deg_max);
 
 void add_rels_freemodule(Poly1d& gb, RelHeap& heap, const array& gen_degs, const array& gen_degs1, int deg, int deg_max);
 
 /* return a_{ij} such that a_{i1}p_1+...+a_{in}p_n=0 */
 Poly2d ann_seq(const Poly1d& gb, const Poly1d& polys, const array& gen_degs, int deg_max);
+Poly2d ann_seq_v2(const Poly1d& gb, Poly1d polys, const array& gen_degs, int deg_max);
 
 /* Assume gb is truncated in degree < t. Prepare the heap in degrees [t, t_max] */
 RelHeap GenerateHeap(const Poly1d& gb, const array& gen_degs, const array& gen_degs1, int t, int t_max);
@@ -106,10 +106,11 @@ Poly evaluate(const Poly& poly, Fn map, const Poly1d& gb)
 
 
 /* Add new relations `rels` to groebner basis `gb` */
-void AddRels(Poly1d& gb, const Poly1d& rels, const array& gen_degs, int deg_max);
-void AddRels(Poly1d& gb, const Poly1d& rels, const array& gen_degs, const array& gen_degs1, int deg_max);
-void AddRels(Poly1d& gb, const Poly1d& rels, RelBuffer& buffer, const array& gen_degs, int t, int deg_max);
-void AddRels(Poly1d& gb, const Poly1d& rels, RelBuffer& buffer, const array& gen_degs, const array& gen_degs1, int t, int deg_max);
+void AddRels(Poly1d& gb, Poly1d rels, RelBuffer& buffer, const array& gen_degs, int deg_max);
+void AddRels(Poly1d& gb, Poly1d rels, RelBuffer& buffer, const array& gen_degs, const array& gen_degs1, int deg_max);
+void AddRels(Poly1d& gb, Poly1d rels, RelBuffer& buffer, const array& gen_degs, int t, int deg_max);
+void AddRels(Poly1d& gb, Poly1d rels, RelBuffer& buffer, const array& gen_degs, const array& gen_degs1, int t, int deg_max);
+void AddRelsFM(Poly1d& gb, Poly1d rels, RelBuffer& buffer, const array& gen_degs, const array& gen_degs1, int deg, int deg_max);
 
 /* Assume gb is truncated in degree < t. Prepare the buffer in degrees [t, t_max] */
 RelBuffer GenerateBuffer(const Poly1d& gb, const array& gen_degs, const array& gen_degs1, int t, int t_max);

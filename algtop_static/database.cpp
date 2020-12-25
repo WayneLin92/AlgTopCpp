@@ -44,14 +44,20 @@ array Database::get_ints(const std::string& table_name, const std::string& colum
 
 void Database::sqlite3_prepare_v100(const char* zSql, sqlite3_stmt** ppStmt) const
 {
-	if (sqlite3_prepare_v2(conn_, zSql, int(strlen(zSql)) + 1, ppStmt, NULL) != SQLITE_OK)
+	int error_code = sqlite3_prepare_v2(conn_, zSql, int(strlen(zSql)) + 1, ppStmt, NULL);
+	if (error_code != SQLITE_OK) {
+		std::cerr << sqlite3_errstr(error_code) << '\n';
 		throw "bce2dcfe";
+	}
 }
 
 void Database::sqlite3_prepare_v100(const std::string& sql, sqlite3_stmt** ppStmt) const
 {
-	if (sqlite3_prepare_v2(conn_, sql.c_str(), int(sql.size()) + 1, ppStmt, NULL) != SQLITE_OK)
+	int error_code = sqlite3_prepare_v2(conn_, sql.c_str(), int(sql.size()) + 1, ppStmt, NULL);
+	if (error_code != SQLITE_OK) {
+		std::cerr << sqlite3_errstr(error_code) << '\n';
 		throw "da6ab7f6";
+	}
 }
 
 std::vector<Deg> Database::load_gen_degs(const std::string& table_name) const

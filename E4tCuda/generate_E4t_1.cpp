@@ -1,21 +1,18 @@
-#include "main.h"
+#include "main_E4t.h"
+#include "linalg.h"
+#include "myio.h"
+#include "benchmark.h"
+#include "sqlite3/sqlite3.h"
 #include <fstream>
 #include <future>
 
-/********** STRUCTS AND CLASSES **********/
-
-struct DgaBasis1
-{
-	Mon1d basis;
-	Poly1d diffs;
-};
+#ifdef GENERATE_E4T_1
 
 /********** FUNCTIONS **********/
 
 void load_dga_basis(const Database& db, const std::string& table_name, std::map<Deg, DgaBasis1>& basis, int r)
 {
-	Statement stmt;
-	stmt.init(db, "SELECT mon, diff, s, t, v FROM " + table_name + " ORDER BY mon_id;");
+	Statement stmt(db, "SELECT mon, diff, s, t, v FROM " + table_name + " ORDER BY mon_id; ");
 	int prev_t = 0;
 	std::map<Deg, array2d> mon_diffs;
 	while (stmt.step() == SQLITE_ROW) {
@@ -165,7 +162,7 @@ void get_basis_E2t(const std::map<Deg, DgaBasis1>& basis_E2, const std::map<Deg,
 }
 
 /* Assume poly is a boundary. Return the chain with it as boundary */
-Poly d_inv(const Poly& poly, const Poly1d& gb, const Mon2d& leadings, const std::vector<Deg>& gen_degs, const Poly1d& diffs)
+Poly d_inv1(const Poly& poly, const Poly1d& gb, const Mon2d& leadings, const std::vector<Deg>& gen_degs, const Poly1d& diffs)
 {
 	if (poly.empty())
 		return {};
@@ -177,47 +174,48 @@ Poly d_inv(const Poly& poly, const Poly1d& gb, const Mon2d& leadings, const std:
 	std::sort(basis_in_result.begin(), basis_in_result.end());
 	array2d map_d;
 	for (const Mon& mon : basis_in_result)
-		map_d.push_back(Poly_to_indices(reduce(get_diff(mon, diffs), gb), basis_in_poly));
+		map_d.push_back(Poly_to_indices(grbn::Reduce(get_diff(mon, diffs), gb), basis_in_poly));
 	array2d image, kernel, g;
-	set_linear_map(map_d, image, kernel, g);
-	return indices_to_Poly(get_image(image, g, Poly_to_indices(poly, basis_in_poly)), basis_in_result);
+	SetLinearMap(map_d, image, kernel, g);
+	return indices_to_Poly(GetImage(image, g, Poly_to_indices(poly, basis_in_poly)), basis_in_result);
 }
 
-std::vector<rel_heap_t> find_relations(Deg d, Mon1d& basis_d, const std::map<Deg, DgaBasis1>& basis_E2, const std::map<Deg, DgaBasis1>& basis_bi, const Poly1d& gb_E2t, const Poly1d& reprs)
+std::vector<grbn::PolyWithT> find_relations(Deg d, Mon1d& basis_d, const std::map<Deg, DgaBasis1>& basis_E2, const std::map<Deg, DgaBasis1>& basis_bi, const Poly1d& gb_E2t, const Poly1d& reprs)
 {
 	Mon1d basis_d_E2t;
 	get_basis_E2t(basis_E2, basis_bi, &basis_d_E2t, nullptr, d);
 	Mon1d basis_d1_E2t;
 	Poly1d diffs_d_E2t;
 	get_basis_E2t(basis_E2, basis_bi, &basis_d1_E2t, &diffs_d_E2t, d - Deg{ 1, 0, -2 });
-	array indices = range((int)basis_d1_E2t.size());
+	array indices = grbn::range((int)basis_d1_E2t.size());
 	std::sort(indices.begin(), indices.end(), [&basis_d1_E2t](int i1, int i2) {return basis_d1_E2t[i1] < basis_d1_E2t[i2]; });
 	std::sort(basis_d_E2t.begin(), basis_d_E2t.end());
 	std::sort(basis_d1_E2t.begin(), basis_d1_E2t.end());
 
 	array2d map_diff;
 	for (int i : indices)
-		map_diff.push_back(Poly_to_indices(reduce(diffs_d_E2t[indices[i]], gb_E2t), basis_d_E2t));
-	array2d image_diff, kernel_diff, g_diff;
-	set_linear_map(map_diff, image_diff, kernel_diff, g_diff);
+		map_diff.push_back(Poly_to_indices(grbn::Reduce(diffs_d_E2t[indices[i]], gb_E2t), basis_d_E2t));
+	array2d image_diff = GetSpace(map_diff);
 
 	array2d map_repr;
-	for (const Mon& mon : basis_d) {on
-		array repr = residue(image_diff, Poly_to_indices(evaluate({ mon }, [&reprs](int i) {return reprs[i]; }, gb_E2t), basis_d_E2t));
+	for (const Mon& mon : basis_d) {
+		array repr = Residue(image_diff, Poly_to_indices(grbn::evaluate({ mon }, [&reprs](int i) {return reprs[i]; }, gb_E2t), basis_d_E2t));
 		map_repr.push_back(std::move(repr));
 	}
 	array2d image_repr, kernel_repr, g_repr;
-	set_linear_map(map_repr, image_repr, kernel_repr, g_repr);
+	SetLinearMap(map_repr, image_repr, kernel_repr, g_repr);
 
-	std::vector<rel_heap_t> result;
+	std::vector<grbn::PolyWithT> result;
 	for (const array& rel_indices : kernel_repr)
-		result.push_back(rel_heap_t{ indices_to_Poly(rel_indices, basis_d), d.t });
+		result.push_back(grbn::PolyWithT{ indices_to_Poly(rel_indices, basis_d), d.t });
 
 	for (const array& rel_indices : kernel_repr)
 		basis_d[rel_indices[0]].clear();
-	RemoveEmptyElements(basis_d);
+	grbn::RemoveEmptyElements(basis_d);
 	return result;
 }
+
+std::map<Deg, DgaBasis1> get_basis_X(const std::vector<Deg>& gen_degs, const Poly1d& gen_diffs, int start_x, int num_x, int t_max);
 
 void generate_E4bk(const Database& db, const std::string& table_prefix, const std::string& table1_prefix, const Poly& a, int bk_gen_id, int t_max)
 {
@@ -228,7 +226,7 @@ void generate_E4bk(const Database& db, const std::string& table_prefix, const st
 
 	Poly1d reprs = db.load_gen_reprs(table_prefix + "_generators");
 
-	Poly1d gb = db.load_gb(table_prefix + "_relations");
+	Poly1d gb = db.load_gb(table_prefix + "_relations", t_max);
 	Mon2d leadings;
 	leadings.resize(gen_degs.size());
 	for (const Poly& g : gb)
@@ -240,7 +238,7 @@ void generate_E4bk(const Database& db, const std::string& table_prefix, const st
 
 	Poly1d diffs_E2t = db.load_gen_diffs("E2t_generators");
 
-	Poly1d gb_E2t = db.load_gb("E2_relations");
+	Poly1d gb_E2t = db.load_gb("E2_relations", t_max);
 	Mon2d leadings_E2t;
 	leadings_E2t.resize(gen_degs_E2t.size());
 	for (const Poly& g : gb_E2t)
@@ -254,19 +252,19 @@ void generate_E4bk(const Database& db, const std::string& table_prefix, const st
 
 	/* generate basis of polynomials of b_1,...,b_k */
 
-	std::map<Deg, DgaBasis1> basis_bi = get_basis_bi(gen_degs_E2t, diffs_E2t, t_max);
+	std::map<Deg, DgaBasis1> basis_bi = get_basis_X(gen_degs_E2t, diffs_E2t, 58, gen_degs_E2t.size() - 58, t_max);
 	std::cout << "basis_bi loaded! Size=" << basis_bi.size() << '\n';
 
 	/* compute new generators */
 
-	Poly2d b_ = ann_seq(gb, { a }, gen_degs_t, t_max);
-	std::cout << "b_=" << b_ << '\n';
-	std::cout << "b_.size()=" << b_.size() << '\n';
+	Poly2d b_ = grbn::ann_seq_v2(gb, { a }, gen_degs_t, t_max);
+	//std::cout << "b_=" << b_ << '\n';
+	//std::cout << "b_.size()=" << b_.size() << '\n';
 
 	Poly1d b;
 	for (Poly1d& v : b_)
 		b.push_back(std::move(v[0]));
-	Poly2d c_ = ann_seq(gb, b, gen_degs_t, t_max - gen_degs_E2t[bk_gen_id].t);
+	Poly2d c_ = grbn::ann_seq_v2(gb, b, gen_degs_t, t_max - gen_degs_E2t[bk_gen_id].t);
 	std::cout << "c_.size()=" << c_.size() << '\n';
 
 	std::vector<Deg> gen_degs_E2bk_1(gen_degs_E2t);
@@ -274,8 +272,8 @@ void generate_E4bk(const Database& db, const std::string& table_prefix, const st
 	Poly1d ab_inv;
 	for (const Poly& bi : b) {
 		Poly abi = mul(a, bi);
-		Poly abi_repr = evaluate(abi, [&reprs](int i) {return reprs[i]; }, gb_E2t);
-		ab_inv.push_back(d_inv(abi_repr, gb_E2t, leadings_E2t, gen_degs_E2bk_1, diffs_E2t));//
+		Poly abi_repr = grbn::evaluate(abi, [&reprs](int i) {return reprs[i]; }, gb_E2t);
+		ab_inv.push_back(d_inv1(abi_repr, gb_E2t, leadings_E2t, gen_degs_E2bk_1, diffs_E2t));//
 	}
 
 	if (gen_degs_E2t.back().t * 2 <= t_max) { /* Add [x^2] */
@@ -286,12 +284,12 @@ void generate_E4bk(const Database& db, const std::string& table_prefix, const st
 	for (size_t i = 0; i < b.size(); ++i) { /* Add [xb+d^{-1}(ab)] */
 		gen_degs.push_back(gen_degs_E2t[bk_gen_id] + get_deg(b[i], gen_degs));
 		gen_degs_t.push_back(gen_degs.back().t);
-		reprs.push_back(add(mul(evaluate(b[i], [&reprs](int i) {return reprs[i]; }, gb_E2t), { {bk_gen_id, 1} }), ab_inv[i]));
+		reprs.push_back(add(mul(grbn::evaluate(b[i], [&reprs](int i) {return reprs[i]; }, gb_E2t), { {bk_gen_id, 1} }), ab_inv[i]));
 	}
 
 	/* compute the relations */ 
 
-	add_rels(gb, { a }, gen_degs_t, t_max); /* Add relations dx=0 */
+	grbn::add_rels(gb, { a }, gen_degs_t, t_max); /* Add relations dx=0 */
 	leadings.clear();
 	leadings.resize(gen_degs.size());
 	for (const Poly& g : gb)
@@ -313,19 +311,13 @@ void generate_E4bk(const Database& db, const std::string& table_prefix, const st
 	std::sort(rel_degs.begin(), rel_degs.end());
 	rel_degs.erase(std::unique(rel_degs.begin(), rel_degs.end()), rel_degs.end());
 
-	std::ofstream myfile;
-	myfile.open("rel_gens.txt");
-	for (const auto& d : rel_degs)
-		myfile << d << '\n';
-	myfile.close();
-
 	std::map<Deg, Mon1d> basis;
 	size_t i = 0;
-	std::vector<rel_heap_t> heap;
+	grbn::RelHeap heap;
 	for (int t = 1; t <= t_max; ++t) {
 		get_basis(leadings, gen_degs, basis, t);
 
-		std::vector<std::future<std::vector<rel_heap_t>>> futures;
+		std::vector<std::future<std::vector<grbn::PolyWithT>>> futures;
 		for (; i < rel_degs.size() && rel_degs[i].t == t; ++i) {
 			const Deg d = rel_degs[i];
 			Mon1d& basis_d = basis[d];
@@ -334,13 +326,10 @@ void generate_E4bk(const Database& db, const std::string& table_prefix, const st
 		for (size_t j = 0; j < futures.size(); ++j) {
 			futures[j].wait();
 			std::cout << "t=" << t << " completed thread=" << j + 1 << '/' << futures.size() << "          \r";
-			for (auto& rel : futures[j].get()) {
-				heap.push_back(std::move(rel));
-				std::push_heap(heap.begin(), heap.end(), cmp_heap_rels);
-			}
+			for (auto& rel : futures[j].get())
+				heap.push(std::move(rel));
 		}
-			
-		
+
 		add_rels_from_heap(gb, heap, gen_degs_t, std::min(t + 1, t_max), t_max);
 		leadings.clear();
 		leadings.resize(gen_degs.size());
@@ -348,19 +337,15 @@ void generate_E4bk(const Database& db, const std::string& table_prefix, const st
 			leadings[g[0][0].gen].push_back(g[0]);
 	}
 
-	/* Save generators */
+	db.begin_transaction();
 	db.save_generators(table1_prefix + "_generators", gen_degs, reprs);
-
-	/* Save relations */
 	db.save_gb(table1_prefix + "_relations", gb, gen_degs);
+	db.end_transaction();
 }
 
 int main_test1(int argc, char** argv)
 {
-	Database db;
-	db.init(R"(C:\Users\lwnpk\Documents\MyProgramData\Math_AlgTop\database\tmp.db)");
-
-	save_basis_bi(db); return 0;
+	Database db(R"(C:\Users\lwnpk\Documents\MyProgramData\Math_AlgTop\database\tmp.db)");
 
 	db.execute_cmd("DELETE FROM E4b1_generators;");
 	db.execute_cmd("DELETE FROM E4b1_relations;");
@@ -398,10 +383,9 @@ int main_generate_E4t(int argc, char** argv)
 {
 	return main_test1(argc, argv);
 
-	Database db;
-	db.init(R"(C:\Users\lwnpk\Documents\MyProgramData\Math_AlgTop\database\ss.db)");
+	Database db(R"(C:\Users\lwnpk\Documents\MyProgramData\Math_AlgTop\database\ss.db)");
 
-	auto start = std::chrono::system_clock::now();
+	Timer timer;
 
 	int t_max = 189;
 	/*std::cout << "E4b1\n";
@@ -419,9 +403,7 @@ int main_generate_E4t(int argc, char** argv)
 	//std::cout << "E4b7\n";
 	//generate_E4bk(conn, "E4b6", "E4b7", 64);
 
-	auto end = std::chrono::system_clock::now();
-	std::chrono::duration<double> elapsed = end - start;
-	std::cout << "Elapsed time: " << elapsed.count() << "s\n";
-
 	return 0;
 }
+
+#endif

@@ -1,15 +1,16 @@
-//#define MULTITHREAD
-#define BENCHMARK
+#define MULTITHREAD
+//#define BENCHMARK
 
 #include "main_E4t.h"
 #include "linalg.h"
-#include "myio.h" ////
 #include "benchmark.h"
 #include "mycuda_public.h"
 
 #ifdef MULTITHREAD
 #include <future>
 #endif
+
+#ifndef GENERATE_E4T_1
 
 inline array2d GetSpaceCuda(const array2d& vectors) { return cuda::EchelonCuda(vectors); }
 
@@ -41,7 +42,7 @@ array ReduceToIndices(Poly poly, const Poly1d& gb, const Mon1d& basis)
 }
 
 /* assume that the sequence map_gen_id is increasing */
-Poly reindex(const Poly& poly, array map_gen_id)
+Poly reindex(const Poly& poly, const array& map_gen_id)
 {
 	Poly result;
 	for (const Mon& m : poly) {
@@ -53,36 +54,39 @@ Poly reindex(const Poly& poly, array map_gen_id)
 	return result;
 }
 
-/* Add rels from gb in <= t to gb1 */
-void AddRelFromGb(const Poly1d& gb, const array& gen_degs, Poly1d& gb1, grbn::RelHeap& heap1, int t, int t_max)
+/* Add rels from gb in degree `t` to gb1 */
+void AddRelsFromGb(const Poly1d& gb, const array& gen_degs, Poly1d& gb1, grbn::RelBuffer& buffer1, int t, int t_max)
 {
 	/* Add relations from gb to gb1 */
 	auto p1 = std::lower_bound(gb.begin(), gb.end(), t, [&gen_degs](const Poly& g, int t) {return get_deg(g, gen_degs) < t; });
 	auto p2 = std::lower_bound(p1, gb.end(), t, [&gen_degs](const Poly& g, int t) {return get_deg(g, gen_degs) < t + 1; });
+	Poly1d gb_t;
 	for (auto pg = p1; pg != p2; ++pg)
-		heap1.push(grbn::PolyWithT{ *pg, t });
-	add_rels_from_heap(gb1, heap1, gen_degs, t, t_max);
+		gb_t.push_back(*pg);
+	grbn::AddRels(gb1, std::move(gb_t), buffer1, gen_degs, t, t_max);
 }
 
-/* Add rels from gb in <= t to gb1 */
-void AddRelFromGb(const Poly1d& gb, const array& gen_degs, Poly1d& gb1, grbn::RelHeap& heap1, const array& gen_degs1, const array& map_gen_id, int t, int t_max)
+/* Add reindexed rels from gb in degree `t` to gb1 */
+void AddRelsFromGb(const Poly1d& gb, const array& gen_degs, Poly1d& gb1, grbn::RelBuffer& buffer1, const array& gen_degs1, const array& map_gen_id, int t, int t_max)
 {
 	/* Add relations from gb to gb1 */
 	auto p1 = std::lower_bound(gb.begin(), gb.end(), t, [&gen_degs](const Poly& g, int t) {return get_deg(g, gen_degs) < t; });
 	auto p2 = std::lower_bound(p1, gb.end(), t, [&gen_degs](const Poly& g, int t) {return get_deg(g, gen_degs) < t + 1; });
+	Poly1d gb_t;
 	for (auto pg = p1; pg != p2; ++pg)
-		heap1.push(grbn::PolyWithT{ reindex(*pg, map_gen_id), t });
-	add_rels_from_heap(gb1, heap1, gen_degs1, t, t_max);
+		gb_t.push_back(reindex(*pg, map_gen_id));
+	grbn::AddRels(gb1, std::move(gb_t), buffer1, gen_degs1 /* !! */, t, t_max);
 }
 
 /* compute ann * polys = 0 in degree t */
-Poly2d ExtendAnn(const Poly1d& gb, const array& gen_degs, Poly1d& gb1, grbn::RelHeap& heap1, const Poly1d& polys, const array& deg_polys, int t, int t_max)
+Poly2d ExtendAnn(const Poly1d& gb, const array& gen_degs, Poly1d& gb1, grbn::RelBuffer& buffer1, const Poly1d& polys, const array& deg_polys, int t, int t_max) // Copy polys by value
 {
 	/* Add relations from gb to gb1 */
 	auto p1 = std::lower_bound(gb.begin(), gb.end(), t, [&gen_degs](const Poly& g, int t) {return get_deg(g, gen_degs) < t; });
 	auto p2 = std::lower_bound(p1, gb.end(), t, [&gen_degs](const Poly& g, int t) {return get_deg(g, gen_degs) < t + 1; });
+	Poly1d rels;
 	for (auto pg = p1; pg != p2; ++pg)
-		heap1.push(grbn::PolyWithT{ *pg, t });
+		rels.push_back(*pg);
 
 	/* Add relations Xi=polys[i] to gb1 */
 	int N = (int)polys.size();
@@ -91,9 +95,9 @@ Poly2d ExtendAnn(const Poly1d& gb, const array& gen_degs, Poly1d& gb1, grbn::Rel
 			break;
 		Poly p = polys[i];
 		p.push_back({ {-i - 1, 1} });
-		heap1.push(grbn::PolyWithT{ std::move(p), t });
+		rels.push_back(std::move(p));
 	}
-	add_rels_from_heap(gb1, heap1, gen_degs, deg_polys, t, t_max);
+	grbn::AddRels(gb1, std::move(rels), buffer1, gen_degs, deg_polys, t, t_max);
 
 	Poly2d result;
 	if (polys.empty())
@@ -133,34 +137,31 @@ Poly2d ExtendAnn(const Poly1d& gb, const array& gen_degs, Poly1d& gb1, grbn::Rel
 }
 
 /* Remove decomposables */
-void Indecomposables(const Poly1d& gb, const array& gen_degs, Poly1d& gb1, grbn::RelHeap& heap1, Poly2d& vectors, const array& basis_degs, int t, int t_max)
+void Indecomposables(const Poly1d& gb, const array& gen_degs, Poly1d& gb1, grbn::RelBuffer& buffer1, Poly2d& vectors, const array& basis_degs, int t, int t_max)
 {
 	/* Add relations from gb to gb1 */
 	auto p1 = std::lower_bound(gb.begin(), gb.end(), t, [&gen_degs](const Poly& g, int t) {return get_deg(g, gen_degs) < t; });
 	auto p2 = std::lower_bound(p1, gb.end(), t, [&gen_degs](const Poly& g, int t) {return get_deg(g, gen_degs) < t + 1; });
+	Poly1d rels;
 	for (auto pg = p1; pg != p2; ++pg)
-		heap1.push(grbn::PolyWithT{ *pg, t });
+		rels.push_back(*pg);
+	grbn::AddRelsFM(gb1, std::move(rels), buffer1, gen_degs, basis_degs, t, t_max);
 
 	/* Convert each vector v to a relation \\sum vi x_{-i-1} */
-	Poly1d rels;
-	for (const Poly1d& v : vectors) {
+	rels.clear();
+	for (size_t j = 0; j < vectors.size(); ++j) {
 		Poly rel;
 		for (int i = 0; i < basis_degs.size(); ++i)
-			if (!v[i].empty())
-				rel += v[i] * Mon{ {-i - 1, 1} };
-		rels.push_back(std::move(rel));
-	}
-	grbn::add_rels_freemodule(gb1, heap1, gen_degs, basis_degs, t, t_max);
-
-	/* Add relations ordered by degree to gb1 */
-	for (size_t i = 0; i < vectors.size(); ++i) {
-		Poly rel = grbn::Reduce(rels[i], gb1);
+			if (!vectors[j][i].empty())
+				rel += vectors[j][i] * Mon{ {-i - 1, 1} };
+		rel = grbn::Reduce(std::move(rel), gb1);
 		if (!rel.empty())
-			heap1.push(grbn::PolyWithT{ std::move(rel), t });
+			rels.push_back(std::move(rel));
 		else
-			vectors[i].clear();
+			vectors[j].clear();
 	}
-	grbn::add_rels_freemodule(gb1, heap1, gen_degs, basis_degs, t, t_max);
+
+	grbn::AddRelsFM(gb1, std::move(rels), buffer1, gen_degs, basis_degs, t, t_max);
 
 	/* Keep only the indecomposables in `vectors` */
 	grbn::RemoveEmptyElements(vectors);
@@ -268,7 +269,7 @@ void generate_HB(const Database& db, const int t_max, const int t_max_compute=-1
 	std::vector<Poly1d> gen_reprs_HA;
 	std::vector<Poly1d> gb_HA;
 	std::vector<Mon2d> leadings_HA; /* derived from gb_HA */
-	std::vector<grbn::RelHeap> heap_HA; /* derived from gb_HA */
+	std::vector<grbn::RelBuffer> buffer_HA; /* derived from gb_HA */
 	std::vector<std::map<Deg, Mon1d>> basis_HA;
 	std::vector<Poly1d> y;
 	std::vector<array> t_y;
@@ -278,10 +279,10 @@ void generate_HB(const Database& db, const int t_max, const int t_max_compute=-1
 	std::vector<Poly1d> gb_HA_ind_y;
 	std::vector<Poly1d> gb_HA_ann_y;
 	std::vector<Poly1d> gb_HA_ind_a;
-	std::vector<grbn::RelHeap> heap_HA_ann_c; /* derived from gb_HA_ann_c */
-	std::vector<grbn::RelHeap> heap_HA_ind_y; /* derived from gb_HA_ind_y */
-	std::vector<grbn::RelHeap> heap_HA_ann_y; /* derived from gb_HA_ann_y */
-	std::vector<grbn::RelHeap> heap_HA_ind_a; /* derived from gb_HA_ind_a */
+	std::vector<grbn::RelBuffer> buffer_HA_ann_c; /* derived from gb_HA_ann_c */
+	std::vector<grbn::RelBuffer> buffer_HA_ind_y; /* derived from gb_HA_ind_y */
+	std::vector<grbn::RelBuffer> buffer_HA_ann_y; /* derived from gb_HA_ann_y */
+	std::vector<grbn::RelBuffer> buffer_HA_ind_a; /* derived from gb_HA_ind_a */
 	for (int i = 0; i <= n; ++i) {
 		std::string table_prefix = i == 0 ? "HA" : "HA" + std::to_string(i);
 
@@ -308,8 +309,8 @@ void generate_HB(const Database& db, const int t_max, const int t_max_compute=-1
 		/* Initialize leadings_HA */
 		leadings_HA.push_back({});
 
-		/* Generate heap_HA */
-		heap_HA.push_back(i == 0 ? grbn::RelHeap{} : grbn::GenerateHeap(gb_HA.back(), gen_degs_t_HA.back(), {}, t_min, t_max));
+		/* Generate buffer_HA */
+		buffer_HA.push_back(i == 0 ? grbn::RelBuffer{} : grbn::GenerateBuffer(gb_HA.back(), gen_degs_t_HA.back(), {}, t_min, t_max));
 
 		/* Load basis_HA */
 		try { db.execute_cmd("CREATE TABLE " + table_prefix + "_basis  (mon_id INTEGER PRIMARY KEY, mon TEXT NOT NULL UNIQUE, diff TEXT, repr TEXT, s SMALLINT, t SMALLINT, v SMALLINT);"); }
@@ -360,16 +361,15 @@ void generate_HB(const Database& db, const int t_max, const int t_max_compute=-1
 
 			/* Generate heaps */
 			int t_x = gen_degs_B[index_x + i + 1].t; /* x = x_{i + 1} */
-			heap_HA_ann_c.push_back(grbn::GenerateHeap(gb_HA_ann_c.back(), gen_degs_t_HA.back(), { gen_degs_B[index_x + i + 1].t }, t_min, t_max));
-			heap_HA_ind_y.push_back(grbn::GenerateHeap(gb_HA_ind_y.back(), gen_degs_t_HA.back(), { gen_degs_B[index_x + i + 1].t }, t_min, t_max));
-			heap_HA_ann_y.push_back(grbn::GenerateHeap(gb_HA_ann_y.back(), gen_degs_t_HA.back(), t_y[i], t_min - t_x, t_max - t_x));
-			heap_HA_ind_a.push_back(grbn::GenerateHeap(gb_HA_ind_a.back(), gen_degs_t_HA.back(), t_y[i], t_min - t_x, t_max - t_x));
+			buffer_HA_ann_c.push_back(grbn::GenerateBuffer(gb_HA_ann_c.back(), gen_degs_t_HA.back(), { gen_degs_B[index_x + i + 1].t }, t_min, t_max));
+			buffer_HA_ind_y.push_back(grbn::GenerateBuffer(gb_HA_ind_y.back(), gen_degs_t_HA.back(), { gen_degs_B[index_x + i + 1].t }, t_min, t_max));
+			buffer_HA_ann_y.push_back(grbn::GenerateBuffer(gb_HA_ann_y.back(), gen_degs_t_HA.back(), t_y[i], t_min - t_x, t_max - t_x));
+			buffer_HA_ind_a.push_back(grbn::GenerateBuffer(gb_HA_ind_a.back(), gen_degs_t_HA.back(), t_y[i], t_min - t_x, t_max - t_x));
 		}
 	}
 
 	/*# Compute */
-	Poly1d c; /* dx[i+1] = c[i] */
-	c.resize(n);
+	Poly1d c(n); /* dx[i+1] = c[i] */
 	for (size_t i = 0; i < (size_t)n; ++i) {
 		int t_x = gen_degs_B[index_x + i + 1].t; /* x = x_{i + 1} */
 		if (t_min > t_x)
@@ -389,7 +389,7 @@ void generate_HB(const Database& db, const int t_max, const int t_max_compute=-1
 			int t_x = deg_x.t; /* x = x_{i + 1} */
 			if (t == t_x) {
 				c[i] = proj(gen_diffs_B[index_x + i + 1], gen_degs_B, gen_diffs_B, gb_A0, basis_A0, basis_X[i], gen_reprs_HA[i], basis_HA[i]);
-				heap_HA[i + 1].push(grbn::PolyWithT{ c[i], t_x }); /* Add relation dx=0 */
+				grbn::AddRels(gb_HA[i + 1], { c[i] }, buffer_HA[i + 1], gen_degs_t_HA[i + 1], t, t_max); /* Add relation dx=0 */
 			}
 
 			Poly2d y_new; /* annilators of c in gb_HA[i] in degree t - t_x */
@@ -406,10 +406,10 @@ void generate_HB(const Database& db, const int t_max, const int t_max_compute=-1
 				gen_degs_t_HA[i + 1].push_back(gen_degs_HA[i + 1].back().t);
 				gen_reprs_HA[i + 1].push_back(gen_reprs_HA[i][p_degs - gen_degs_HA[i].begin()]);
 			}
-			AddRelFromGb(gb_HA[i], gen_degs_t_HA[i], gb_HA[i + 1], heap_HA[i + 1], gen_degs_t_HA[i + 1], map_gen_id[i], t, t_max); /* Add relations of HA[i] to HA[i+1] */
+			AddRelsFromGb(gb_HA[i], gen_degs_t_HA[i], gb_HA[i + 1], buffer_HA[i + 1], gen_degs_t_HA[i + 1], map_gen_id[i], t, t_max); /* Add relations of HA[i] to HA[i+1] */
 			if (t < t_x) {
-				AddRelFromGb(gb_HA[i], gen_degs_t_HA[i], gb_HA_ann_c[i], heap_HA_ann_c[i], t, t_max);
-				AddRelFromGb(gb_HA[i], gen_degs_t_HA[i], gb_HA_ann_y[i], heap_HA_ann_y[i], t - t_x, t_max);
+				AddRelsFromGb(gb_HA[i], gen_degs_t_HA[i], gb_HA_ann_c[i], buffer_HA_ann_c[i], t, t_max);
+				AddRelsFromGb(gb_HA[i], gen_degs_t_HA[i], gb_HA_ann_y[i], buffer_HA_ann_y[i], t - t_x, t_max);
 				leadings_HA[i + 1].clear();
 				leadings_HA[i + 1].resize(gen_degs_HA[i + 1].size());
 				for (const Poly& g : gb_HA[i + 1])
@@ -417,16 +417,16 @@ void generate_HB(const Database& db, const int t_max, const int t_max_compute=-1
 				basis_t = ExtendBasis(gen_degs_HA[i + 1], leadings_HA[i + 1], basis_HA[i + 1], t);
 			}
 			else {
-				y_new = ExtendAnn(gb_HA[i], gen_degs_t_HA[i], gb_HA_ann_c[i], heap_HA_ann_c[i], { c[i] }, { t_x }, t, t_max);
-				Indecomposables(gb_HA[i], gen_degs_t_HA[i], gb_HA_ind_y[i], heap_HA_ind_y[i], y_new, { t_x }, t, t_max);
+				y_new = ExtendAnn(gb_HA[i], gen_degs_t_HA[i], gb_HA_ann_c[i], buffer_HA_ann_c[i], { c[i] }, { t_x }, t, t_max);
+				Indecomposables(gb_HA[i], gen_degs_t_HA[i], gb_HA_ind_y[i], buffer_HA_ind_y[i], y_new, { t_x }, t, t_max);
 				for (auto& yi : y_new) {
 					y[i].push_back(yi[0]);
 					t_y[i].push_back(t - t_x);
 				}
 				save_y(db, table_prefix + "_y", y_new, t - t_x);
 
-				Poly2d a = ExtendAnn(gb_HA[i], gen_degs_t_HA[i], gb_HA_ann_y[i], heap_HA_ann_y[i], y[i], t_y[i], t - t_x, t_max - t_x);
-				Indecomposables(gb_HA[i], gen_degs_t_HA[i], gb_HA_ind_a[i], heap_HA_ind_a[i], a, t_y[i], t - t_x, t_max - t_x);
+				Poly2d a = ExtendAnn(gb_HA[i], gen_degs_t_HA[i], gb_HA_ann_y[i], buffer_HA_ann_y[i], y[i], t_y[i], t - t_x, t_max - t_x);
+				Indecomposables(gb_HA[i], gen_degs_t_HA[i], gb_HA_ind_a[i], buffer_HA_ind_a[i], a, t_y[i], t - t_x, t_max - t_x);
 
 				/* Add new generators to HA[i+1] */
 				Poly1d cy_inv;
@@ -446,9 +446,8 @@ void generate_HB(const Database& db, const int t_max, const int t_max_compute=-1
 					gen_reprs_HA[i + 1].push_back(Mon{ {int(index_x + i + 1), 1} } * get_repr(y_new[j][0], gen_reprs_HA[i], gb_A0) + cy_inv[j]);
 				}
 
-				/* Add new relations to HA[i + 1] */
-				/* Degrees of relations */
-				std::map<int, array> rel_degs;
+				/* Add new relations to HA[i + 1]. Compute degrees of relations first. */
+				std::map<int, array> rel_degs; /* Degrees of relations */
 				array range_gen_degs_HA = grbn::range((int)gen_degs_HA[i + 1].size());
 				array range_g = AddVectors(range_gen_degs_HA, map_gen_id[i]);
 				for (size_t j = 0; j < range_g.size(); ++j) {
@@ -482,11 +481,12 @@ void generate_HB(const Database& db, const int t_max, const int t_max_compute=-1
 				for (const Poly& g : gb_HA[i + 1])
 					leadings_HA[i + 1][g[0][0].gen].push_back(g[0]);
 				basis_t = ExtendBasis(gen_degs_HA[i + 1], leadings_HA[i + 1], basis_HA[i + 1], t);
+				Poly1d rels_HA_ip1;
 #ifndef MULTITHREAD
 				for (auto& [v2s, v_s] : rel_degs) {
 					std::vector<grbn::PolyWithT> rels = FindRels(basis_t, basis_A0, basis_X[i + 1], gb_A0, gen_reprs_HA[i + 1], t, v2s, v_s);
-					for (grbn::PolyWithT& rel : rels)
-						heap_HA[i + 1].push(std::move(rel));
+					for (grbn::PolyWithT& rel : rels) // Change return type
+						rels_HA_ip1.push_back(std::move(rel.poly));
 				}
 #else
 				std::vector<std::future<std::vector<grbn::PolyWithT>>> futures;
@@ -498,10 +498,10 @@ void generate_HB(const Database& db, const int t_max, const int t_max_compute=-1
 					futures[j].wait();
 					std::cout << "t=" << t << ", i=" << i << ", completed thread=" << j + 1 << '/' << futures.size() << "          \r";
 					for (auto& rel : futures[j].get())
-						heap_HA[i + 1].push(std::move(rel));
+						rels_HA_ip1.push_back(std::move(rel.poly));
 				}
 #endif
-				add_rels_from_heap(gb_HA[i + 1], heap_HA[i + 1], gen_degs_t_HA[i + 1], t, t_max);
+				grbn::AddRels(gb_HA[i + 1], std::move(rels_HA_ip1), buffer_HA[i + 1], gen_degs_t_HA[i + 1], t, t_max);
 			}
 
 			/* Save data */
@@ -521,7 +521,7 @@ void generate_HB(const Database& db, const int t_max, const int t_max_compute=-1
 int main_test1(int argc, char** argv)
 {
 	Database db(R"(C:\Users\lwnpk\Documents\MyProgramData\Math_AlgTop\database\HB.db)");
-
+	 
 	return 0;
 }
 
@@ -547,3 +547,5 @@ int main_generate_E4t(int argc, char** argv)
 	return 0;
 #endif
 }
+
+#endif /* GENERATE_E4T_1 */
