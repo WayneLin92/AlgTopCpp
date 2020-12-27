@@ -84,6 +84,17 @@ bool divides(const Mon& m1, const Mon& m2);
 /* return the largest integer e where m1 = m2^e * r */
 int log(const Mon& m1, const Mon& m2);
 
+Mon GCD(const Mon& m1, const Mon& m2);
+Mon LCM(const Mon& m1, const Mon& m2);
+
+/* Operator overloadings */
+inline Poly operator+(const Poly& lhs, const Poly& rhs) { return add(lhs, rhs); }
+inline Poly& operator+=(Poly& lhs, const Poly& rhs) { lhs = add(lhs, rhs); return lhs; }
+inline Poly operator*(const Poly& lhs, const Poly& rhs) { return mul(lhs, rhs); }
+inline Poly operator*(const Poly& lhs, const Mon& rhs) { return mul(lhs, rhs); }
+inline Poly operator*(const Mon& lhs, const Poly& rhs) { return mul(lhs, rhs); }
+inline Mon operator/(const Mon& lhs, const Mon& rhs) { return div(lhs, rhs); }
+
 inline int get_deg(const Mon& mon) { int result = 0; for (MonInd p = mon.begin(); p != mon.end(); ++p) result += p->exp; return result; };
 inline int get_deg(const Mon& mon, const array& gen_degs) { int result = 0; for (MonInd p = mon.begin(); p != mon.end(); ++p) result += gen_degs[p->gen] * p->exp; return result; };
 inline int get_deg(const Mon& mon, const array& gen_degs, const array& gen_degs1) {
@@ -101,30 +112,19 @@ inline int get_deg(const Poly& poly, const array& gen_degs, const array& gen_deg
 inline Deg get_deg(const Poly& poly, const std::vector<Deg>& gen_degs) { return poly.empty() ? Deg({ -10000, -10000, -10000 }) : get_deg(poly[0], gen_degs); }
 inline int get_deg_t(const Poly& poly, const std::vector<Deg>& gen_degs) { return poly.empty() ? -10000 : get_deg_t(poly[0], gen_degs); }
 
-Mon GCD(const Mon& m1, const Mon& m2);
-Mon LCM(const Mon& m1, const Mon& m2);
-
-Poly get_diff(const Mon& mon, const Poly1d& diffs);
-Poly get_diff(const Poly& poly, const Poly1d& diffs);
-
-inline Poly operator+(const Poly& lhs, const Poly& rhs) { return add(lhs, rhs); }
-inline Poly& operator+=(Poly& lhs, const Poly& rhs) { lhs = add(lhs, rhs); return lhs; }
-inline Poly operator*(const Poly& lhs, const Poly& rhs) { return mul(lhs, rhs); }
-inline Poly operator*(const Poly& lhs, const Mon& rhs) { return mul(lhs, rhs); }
-inline Poly operator*(const Mon& lhs, const Poly& rhs) { return mul(lhs, rhs); }
-inline Mon operator/(const Mon& lhs, const Mon& rhs) { return div(lhs, rhs); }
-
-/* A functor which computes the degree of a monomial */
+/* Functors which compute the degree of a monomial */
 struct FnGetDeg {
 	const array& gen_degs;
 	int operator()(const Mon& mon) const { return get_deg(mon, gen_degs); }
 };
-
-/* A functor which computes the degree of a monomial with negative indices */
 struct FnGetDegV2 {
 	const array& gen_degs;
 	const array& gen_degs1;
 	int operator()(const Mon& mon) const { return get_deg(mon, gen_degs, gen_degs1); }
 };
+
+/* Compute the differential */
+Poly get_diff(const Mon& mon, const Poly1d& diffs);
+Poly get_diff(const Poly& poly, const Poly1d& diffs);
 
 #endif /* ALGEBRAS_H */

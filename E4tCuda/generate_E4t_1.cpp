@@ -180,7 +180,7 @@ Poly d_inv1(const Poly& poly, const Poly1d& gb, const Mon2d& leadings, const std
 	return indices_to_Poly(GetImage(image, g, Poly_to_indices(poly, basis_in_poly)), basis_in_result);
 }
 
-std::vector<grbn::PolyWithT> find_relations(Deg d, Mon1d& basis_d, const std::map<Deg, DgaBasis1>& basis_E2, const std::map<Deg, DgaBasis1>& basis_bi, const Poly1d& gb_E2t, const Poly1d& reprs)
+grbn::RelBuffer find_relations(Deg d, Mon1d& basis_d, const std::map<Deg, DgaBasis1>& basis_E2, const std::map<Deg, DgaBasis1>& basis_bi, const Poly1d& gb_E2t, const Poly1d& reprs)
 {
 	Mon1d basis_d_E2t;
 	get_basis_E2t(basis_E2, basis_bi, &basis_d_E2t, nullptr, d);
@@ -205,9 +205,9 @@ std::vector<grbn::PolyWithT> find_relations(Deg d, Mon1d& basis_d, const std::ma
 	array2d image_repr, kernel_repr, g_repr;
 	SetLinearMap(map_repr, image_repr, kernel_repr, g_repr);
 
-	std::vector<grbn::PolyWithT> result;
+	grbn::RelBuffer result;
 	for (const array& rel_indices : kernel_repr)
-		result.push_back(grbn::PolyWithT{ indices_to_Poly(rel_indices, basis_d), d.t });
+		result[d.t].push_back(indices_to_Poly(rel_indices, basis_d));
 
 	for (const array& rel_indices : kernel_repr)
 		basis_d[rel_indices[0]].clear();
@@ -257,14 +257,14 @@ void generate_E4bk(const Database& db, const std::string& table_prefix, const st
 
 	/* compute new generators */
 
-	Poly2d b_ = grbn::ann_seq_v2(gb, { a }, gen_degs_t, t_max);
+	Poly2d b_ = grbn::ann_seq(gb, { a }, gen_degs_t, t_max);
 	//std::cout << "b_=" << b_ << '\n';
 	//std::cout << "b_.size()=" << b_.size() << '\n';
 
 	Poly1d b;
 	for (Poly1d& v : b_)
 		b.push_back(std::move(v[0]));
-	Poly2d c_ = grbn::ann_seq_v2(gb, b, gen_degs_t, t_max - gen_degs_E2t[bk_gen_id].t);
+	Poly2d c_ = grbn::ann_seq(gb, b, gen_degs_t, t_max - gen_degs_E2t[bk_gen_id].t);
 	std::cout << "c_.size()=" << c_.size() << '\n';
 
 	std::vector<Deg> gen_degs_E2bk_1(gen_degs_E2t);
@@ -289,7 +289,7 @@ void generate_E4bk(const Database& db, const std::string& table_prefix, const st
 
 	/* compute the relations */ 
 
-	grbn::add_rels(gb, { a }, gen_degs_t, t_max); /* Add relations dx=0 */
+	grbn::AddRels(gb, { a }, gen_degs_t, t_max); /* Add relations dx=0 */
 	leadings.clear();
 	leadings.resize(gen_degs.size());
 	for (const Poly& g : gb)
@@ -313,11 +313,11 @@ void generate_E4bk(const Database& db, const std::string& table_prefix, const st
 
 	std::map<Deg, Mon1d> basis;
 	size_t i = 0;
-	grbn::RelHeap heap;
+	grbn::RelBuffer buffer;
 	for (int t = 1; t <= t_max; ++t) {
 		get_basis(leadings, gen_degs, basis, t);
 
-		std::vector<std::future<std::vector<grbn::PolyWithT>>> futures;
+		std::vector<std::future<grbn::RelBuffer>> futures;
 		for (; i < rel_degs.size() && rel_degs[i].t == t; ++i) {
 			const Deg d = rel_degs[i];
 			Mon1d& basis_d = basis[d];
@@ -326,11 +326,11 @@ void generate_E4bk(const Database& db, const std::string& table_prefix, const st
 		for (size_t j = 0; j < futures.size(); ++j) {
 			futures[j].wait();
 			std::cout << "t=" << t << " completed thread=" << j + 1 << '/' << futures.size() << "          \r";
-			for (auto& rel : futures[j].get())
-				heap.push(std::move(rel));
+			for (auto& [i, polys] : futures[j].get())
+				std::move(polys.begin(), polys.end(), std::back_inserter(buffer[i]));
 		}
 
-		add_rels_from_heap(gb, heap, gen_degs_t, std::min(t + 1, t_max), t_max);
+		grbn::AddRelsB(gb, buffer, gen_degs_t, std::min(t + 1, t_max), t_max);
 		leadings.clear();
 		leadings.resize(gen_degs.size());
 		for (const Poly& g : gb)
@@ -363,18 +363,35 @@ int main_test1(int argc, char** argv)
 	Timer timer;
 
 	int t_max = 74;
+	int gen;
+
 	std::cout << "E4b1\n";
 	generate_E4bk(db, "E4", "E4b1", { {{0, 1}} }, 58, t_max);
+	
 	std::cout << "E4b2\n";
-	generate_E4bk(db, "E4b1", "E4b2", { {{54, 1}} }, 59, t_max);
+	gen = db.get_int("select gen_id from E4b1_generators where repr=\"1,1,58,1\"");
+	std::cout << "gen=" << gen << '\n';
+	generate_E4bk(db, "E4b1", "E4b2", { {{gen, 1}} }, 59, t_max);
+	
 	std::cout << "E4b3\n";
-	generate_E4bk(db, "E4b2", "E4b3", { {{75, 1}} }, 60, t_max);
+	gen = db.get_int("select gen_id from E4b2_generators where repr=\"2,1,59,1\"");
+	std::cout << "gen=" << gen << '\n';
+	generate_E4bk(db, "E4b2", "E4b3", { {{gen, 1}} }, 60, t_max);
+	
 	std::cout << "E4b4\n";
-	generate_E4bk(db, "E4b3", "E4b4", { {{113, 1}} }, 61, t_max);
+	gen = db.get_int("select gen_id from E4b3_generators where repr=\"3,1,60,1\"");
+	std::cout << "gen=" << gen << '\n';
+	generate_E4bk(db, "E4b3", "E4b4", { {{gen, 1}} }, 61, t_max);
+	
 	std::cout << "E4b5\n";
-	generate_E4bk(db, "E4b4", "E4b5", { {{172, 1}} }, 62, t_max);
+	gen = db.get_int("select gen_id from E4b4_generators where repr=\"4,1,61,1\"");
+	std::cout << "gen=" << gen << '\n';
+	generate_E4bk(db, "E4b4", "E4b5", { {{gen, 1}} }, 62, t_max);
+	
 	std::cout << "E4b6\n";
-	generate_E4bk(db, "E4b5", "E4b6", { {{253, 1}} }, 63, t_max);
+	gen = db.get_int("select gen_id from E4b5_generators where repr=\"5,1,62,1\"");
+	std::cout << "gen=" << gen << '\n';
+	generate_E4bk(db, "E4b5", "E4b6", { {{gen, 1}} }, 63, t_max);
 
 	return 0;
 }

@@ -26,11 +26,11 @@ std::pair<array, Poly1d> ReorderGens(const std::vector<Deg>& gen_degs, const Pol
 		gen_degs_new.push_back(gen_degs[map_gen_id_inv[i]].t);
 	}
 
-	grbn::RelHeap heap;
+	grbn::RelBuffer buffer;
 	for (const Poly& g : gb)
-		heap.push(grbn::PolyWithT{ reindex_v2(g, map_gen_id), get_deg_t(g, gen_degs) });
+		buffer[get_deg_t(g, gen_degs)].push_back(reindex_v2(g, map_gen_id));
 	Poly1d gb_new;
-	add_rels_from_heap(gb_new, heap, gen_degs_new, -1, t_max);
+	grbn::AddRelsB(gb_new, buffer, gen_degs_new, -1, t_max);
 	return std::make_pair(std::move(map_gen_id_inv), std::move(gb_new));
 }
 

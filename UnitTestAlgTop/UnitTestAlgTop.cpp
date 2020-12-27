@@ -127,11 +127,14 @@ namespace UnitTestAlgTop
 	{
 	public:
 
-		TEST_METHOD(test_groebner_B7)
+		TEST_METHOD(test_groebner_B7B8)
 		{
-			using namespace grbn;
 			array gen_degs;
+#ifdef _DEBUG
 			int n_max = 7;
+#else
+			int n_max = 8;
+#endif
 			for (int d = 1; d <= n_max; d++) {
 				for (int i = 0; i <= n_max - d; i++) {
 					int j = i + d;
@@ -159,10 +162,13 @@ namespace UnitTestAlgTop
 			Poly1d gb;
 			std::sort(rels.begin(), rels.end(), [&gen_degs](const Poly& p1, const Poly& p2) {
 				return get_deg(p1, gen_degs) < get_deg(p2, gen_degs); });
-			RelBuffer buffer;
-			AddRels(gb, std::move(rels), buffer, gen_degs, -1);
+			grbn::AddRels(gb, std::move(rels), gen_degs, -1);
 			size_t gb_size = gb.size();
+#ifdef _DEBUG
 			size_t answer = 65;
+#else
+			size_t answer = 163;
+#endif
 			Assert::AreEqual(answer, gb_size);
 		}
 
@@ -170,12 +176,10 @@ namespace UnitTestAlgTop
 		{
 			using namespace grbn;
 			array gen_degs = { 1, 1, 1, 1 };
-			Poly1d rels = { {{{2, 3}}, {{1, 3}}, {{0, 1}, {1, 1}, {2, 1}}, {{0, 3}}} };
-			Poly1d rels1 = { {{{2, 1}}, {{1, 1}}, {{0, 1}}} };
+			Poly1d rels = { {{{2, 3}}, {{1, 3}}, {{0, 1}, {1, 1}, {2, 1}}, {{0, 3}}}, {{{2, 1}}, {{1, 1}}, {{0, 1}}} };
 
 			Poly1d gb;
-			add_rels(gb, rels, gen_degs, -1);
-			add_rels(gb, rels1, gen_degs, -1);
+			AddRels(gb, rels, gen_degs, -1);
 			Assert::AreEqual(1, int(gb.size()));
 		}
 
@@ -187,9 +191,9 @@ namespace UnitTestAlgTop
 			Poly rel2 = { {{0, 1}, {2, 2}}, {{0, 2}, {1, 1}} }; /* x^2y + xz^2 */
 			Poly rel3 = { {{3, 4}}, {{2, 4}} }; /* z^2 + w^4 */
 			Poly1d gb;
-			grbn::add_rels(gb, { rel0, rel1, rel2, rel3 }, gen_degs, -1);
+			grbn::AddRels(gb, { rel0, rel1, rel2, rel3 }, gen_degs, -1);
 
-			Poly2d ann = grbn::ann_seq_v2(gb, { Poly{ {{0, 1}} } }, gen_degs, -1);
+			Poly2d ann = grbn::ann_seq(gb, { Poly{ {{0, 1}} } }, gen_degs, -1);
 			Assert::AreEqual(3, int(ann.size()));
 		}
 	};
