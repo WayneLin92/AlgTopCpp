@@ -180,7 +180,7 @@ Poly d_inv1(const Poly& poly, const Poly1d& gb, const Mon2d& leadings, const std
 	return indices_to_Poly(GetImage(image, g, Poly_to_indices(poly, basis_in_poly)), basis_in_result);
 }
 
-grbn::RelBuffer find_relations(Deg d, Mon1d& basis_d, const std::map<Deg, DgaBasis1>& basis_E2, const std::map<Deg, DgaBasis1>& basis_bi, const Poly1d& gb_E2t, const Poly1d& reprs)
+grbn::GbBuffer find_relations(Deg d, Mon1d& basis_d, const std::map<Deg, DgaBasis1>& basis_E2, const std::map<Deg, DgaBasis1>& basis_bi, const Poly1d& gb_E2t, const Poly1d& reprs)
 {
 	Mon1d basis_d_E2t;
 	get_basis_E2t(basis_E2, basis_bi, &basis_d_E2t, nullptr, d);
@@ -205,7 +205,7 @@ grbn::RelBuffer find_relations(Deg d, Mon1d& basis_d, const std::map<Deg, DgaBas
 	array2d image_repr, kernel_repr, g_repr;
 	SetLinearMap(map_repr, image_repr, kernel_repr, g_repr);
 
-	grbn::RelBuffer result;
+	grbn::GbBuffer result;
 	for (const array& rel_indices : kernel_repr)
 		result[d.t].push_back(indices_to_Poly(rel_indices, basis_d));
 
@@ -252,7 +252,7 @@ void generate_E4bk(const Database& db, const std::string& table_prefix, const st
 
 	/* generate basis of polynomials of b_1,...,b_k */
 
-	std::map<Deg, DgaBasis1> basis_bi = get_basis_X(gen_degs_E2t, diffs_E2t, 58, gen_degs_E2t.size() - 58, t_max);
+	std::map<Deg, DgaBasis1> basis_bi = get_basis_X(gen_degs_E2t, diffs_E2t, 58, (int)gen_degs_E2t.size() - 58, t_max);
 	std::cout << "basis_bi loaded! Size=" << basis_bi.size() << '\n';
 
 	/* compute new generators */
@@ -313,11 +313,11 @@ void generate_E4bk(const Database& db, const std::string& table_prefix, const st
 
 	std::map<Deg, Mon1d> basis;
 	size_t i = 0;
-	grbn::RelBuffer buffer;
+	grbn::GbBuffer buffer;
 	for (int t = 1; t <= t_max; ++t) {
 		get_basis(leadings, gen_degs, basis, t);
 
-		std::vector<std::future<grbn::RelBuffer>> futures;
+		std::vector<std::future<grbn::GbBuffer>> futures;
 		for (; i < rel_degs.size() && rel_degs[i].t == t; ++i) {
 			const Deg d = rel_degs[i];
 			Mon1d& basis_d = basis[d];

@@ -8,47 +8,18 @@
 
 #include "algebras.h"
 #include <map>
-#include <queue>
+#include <memory>
+
+//#define GROEBNER_MULTITHREAD
 
 namespace grbn {
 
-/********** STRUCTS AND CLASSES **********/
-using RelBuffer = std::map<int, Poly1d>;
-
-struct BaseEleBuffer
-{
-
-};
-
-struct MonWithIndices {
-	Mon gcd;
-	int index1;
-	int index2;
-};
-
+/**********************************************************
+* Small functions
+**********************************************************/
 /* Reduce `poly` by groebner basis `gb` */
 Poly Reduce(Poly poly, const Poly1d& gb);
 
-class RelBufferV2 {
-public:
-	void push(int deg, Mon gcd, int index1, int index2) { gcds[deg].push_back({ std::move(gcd), index1, index2 }); }
-	MonWithIndices pop() {
-		MonWithIndices m = std::move(gcds.begin()->second.back());
-		if (gcds.begin()->second.size() == 1)
-			gcds.erase(gcds.begin());
-		else
-			gcds.begin()->second.pop_back();
-		return m;
-	}
-	bool empty() const { return gcds.empty(); }
-	int next_deg() const { return gcds.begin()->first; }
-private:
-	std::map<int, std::vector<MonWithIndices>> gcds;
-};
-
-/********** FUNCTIONS **********/
-
-/* Move from and remove top() of heap */
 template <typename Container1d>
 inline void RemoveEmptyElements(Container1d& cont)
 {
@@ -64,27 +35,6 @@ inline array range(int n) {
 
 Poly pow(const Poly& poly, int n, const Poly1d& gb);
 
-/* Create Groebner basis */
-void AddRelsB(Poly1d& gb, RelBuffer& buffer, const array& gen_degs, int t, int deg_max);
-void AddRelsB(Poly1d& gb, RelBuffer& buffer, const array& gen_degs, const array& gen_degs1, int t, int deg_max);
-void AddRels(Poly1d& gb, Poly1d rels, const array& gen_degs, int deg_max);
-void AddRels(Poly1d& gb, Poly1d rels, const array& gen_degs, const array& gen_degs1, int deg_max);
-void AddRelsM(Poly1d& gb, RelBuffer& buffer, const array& gen_degs, const array& gen_degs1, int deg, int deg_max);
-
-/* Create Groebner basis
-This version reduces the use of memory with little cost */
-void AddRelsV2(Poly1d& gb, Poly1d rels, RelBufferV2& buffer, const array& gen_degs, int deg_max);
-void AddRelsV2(Poly1d& gb, Poly1d rels, RelBufferV2& buffer, const array& gen_degs, const array& gen_degs1, int deg_max);
-void AddRelsV2(Poly1d& gb, Poly1d rels, RelBufferV2& buffer, const array& gen_degs, int t, int deg_max);
-void AddRelsV2(Poly1d& gb, Poly1d rels, RelBufferV2& buffer, const array& gen_degs, const array& gen_degs1, int t, int deg_max);
-void AddRelsMV2(Poly1d& gb, Poly1d rels, RelBufferV2& buffer, const array& gen_degs, const array& gen_degs1, int deg, int deg_max);
-
-/* return a_{ij} such that a_{i1}p_1+...+a_{in}p_n=0 */
-Poly2d ann_seq(const Poly1d& gb, const Poly1d& polys, const array& gen_degs, int deg_max);
-
-/* Assume gb is truncated in degree < t. Prepare the heap in degrees [t, t_max] */
-RelBuffer GenerateBuffer(const Poly1d& gb, const array& gen_degs, const array& gen_degs1, int t, int t_max);
-
 template <typename Fn>
 Poly evaluate(const Poly& poly, Fn map, const Poly1d& gb)
 {
@@ -98,8 +48,70 @@ Poly evaluate(const Poly& poly, Fn map, const Poly1d& gb)
 	return result;
 }
 
+/**********************************************************
+* Groebner basis
+**********************************************************/
+
+using GbBuffer = std::map<int, Poly1d>;
+
+void AddRelsB(Poly1d& gb, GbBuffer& buffer, const array& gen_degs, int t, int deg_max);
+void AddRelsB(Poly1d& gb, GbBuffer& buffer, const array& gen_degs, const array& gen_degs1, int t, int deg_max);
+void AddRels(Poly1d& gb, Poly1d rels, const array& gen_degs, int deg_max);
+void AddRels(Poly1d& gb, Poly1d rels, const array& gen_degs, const array& gen_degs1, int deg_max);
+void AddRelsM(Poly1d& gb, GbBuffer& buffer, const array& gen_degs, const array& gen_degs1, int deg, int deg_max);
+
+/* Assume gb is truncated in degree < t. Prepare the heap in degrees [t, t_max] */
+GbBuffer GenerateBuffer(const Poly1d& gb, const array& gen_degs, const array& gen_degs1, int t, int t_max);
+
+
+/**********************************************************
+* Groebner basis version 2
+* This implementation uses polymorphism to reduce the use of memory
+* with little cost.
+**********************************************************/
+
+struct BaseEleBuffer
+{
+	virtual Poly GetPoly(const Poly1d& gb) = 0;
+};
+
+struct GcdEleBuffer : BaseEleBuffer
+{
+	Mon gcd_; int i1_, i2_;
+	GcdEleBuffer(Mon gcd, int i1, int i2) : gcd_(std::move(gcd)), i1_(i1), i2_(i2) {};
+	Poly GetPoly(const Poly1d& gb) override {
+		Poly result = gb[i1_] * div(gb[i2_][0], gcd_) + gb[i2_] * div(gb[i1_][0], gcd_);
+		Mon{}.swap(gcd_); /* Deallocate */
+		return result;
+	}
+};
+
+struct PolyEleBuffer : BaseEleBuffer
+{
+	Poly p_;
+	PolyEleBuffer(Poly p) : p_(std::move(p)) {};
+	Poly GetPoly(const Poly1d& gb) override {
+		return std::move(p_);
+	}
+};
+
+using GbBufferV2 = std::map<int, std::vector<std::unique_ptr<BaseEleBuffer>>>;
+
+void AddRelsBV2(Poly1d& gb, GbBufferV2& buffer, const array& gen_degs, int t, int deg_max);
+void AddRelsBV2(Poly1d& gb, GbBufferV2& buffer, const array& gen_degs, const array& gen_degs1, int t, int deg_max);
+void AddRelsV2(Poly1d& gb, Poly1d rels, const array& gen_degs, int deg_max);
+void AddRelsV2(Poly1d& gb, Poly1d rels, const array& gen_degs, const array& gen_degs1, int deg_max);
+void AddRelsMV2(Poly1d& gb, GbBufferV2& buffer, const array& gen_degs, const array& gen_degs1, int deg, int deg_max);
+
 /* Assume gb is truncated in degree < t. Prepare the buffer in degrees [t, t_max] */
-RelBufferV2 GenerateBufferV2(const Poly1d& gb, const array& gen_degs, const array& gen_degs1, int t, int t_max);
+GbBufferV2 GenerateBufferV2(const Poly1d& gb, const array& gen_degs, const array& gen_degs1, int t, int t_max);
+
+/**********************************************************
+* Algorithms that use Groebner basis
+**********************************************************/
+
+/* return a_{ij} such that a_{i1}p_1+...+a_{in}p_n=0 */
+Poly2d ann_seq(const Poly1d& gb, const Poly1d& polys, const array& gen_degs, int deg_max);
 
 } /* namespace grbn */
 

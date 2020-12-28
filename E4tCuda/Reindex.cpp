@@ -26,7 +26,7 @@ std::pair<array, Poly1d> ReorderGens(const std::vector<Deg>& gen_degs, const Pol
 		gen_degs_new.push_back(gen_degs[map_gen_id_inv[i]].t);
 	}
 
-	grbn::RelBuffer buffer;
+	grbn::GbBuffer buffer;
 	for (const Poly& g : gb)
 		buffer[get_deg_t(g, gen_degs)].push_back(reindex_v2(g, map_gen_id));
 	Poly1d gb_new;
