@@ -6,11 +6,9 @@
 #include <fstream>
 #include <future>
 
-#ifdef GENERATE_E4T_1
-
 /********** FUNCTIONS **********/
 
-void load_dga_basis(const Database& db, const std::string& table_name, std::map<Deg, DgaBasis1>& basis, int r)
+void load_dga_basis1(const Database& db, const std::string& table_name, std::map<Deg, DgaBasis1>& basis, int r)
 {
 	Statement stmt(db, "SELECT mon, diff, s, t, v FROM " + table_name + " ORDER BY mon_id; ");
 	int prev_t = 0;
@@ -162,7 +160,7 @@ void get_basis_E2t(const std::map<Deg, DgaBasis1>& basis_E2, const std::map<Deg,
 }
 
 /* Assume poly is a boundary. Return the chain with it as boundary */
-Poly d_inv1(const Poly& poly, const Poly1d& gb, const Mon2d& leadings, const std::vector<Deg>& gen_degs, const Poly1d& diffs)
+Poly d_inv1(const Poly& poly, const grbn::GbWithCache& gb, const Mon2d& leadings, const std::vector<Deg>& gen_degs, const Poly1d& diffs)
 {
 	if (poly.empty())
 		return {};
@@ -180,7 +178,7 @@ Poly d_inv1(const Poly& poly, const Poly1d& gb, const Mon2d& leadings, const std
 	return indices_to_Poly(GetImage(image, g, Poly_to_indices(poly, basis_in_poly)), basis_in_result);
 }
 
-grbn::GbBuffer find_relations(Deg d, Mon1d& basis_d, const std::map<Deg, DgaBasis1>& basis_E2, const std::map<Deg, DgaBasis1>& basis_bi, const Poly1d& gb_E2t, const Poly1d& reprs)
+grbn::GbBuffer find_relations(Deg d, Mon1d& basis_d, const std::map<Deg, DgaBasis1>& basis_E2, const std::map<Deg, DgaBasis1>& basis_bi, const grbn::GbWithCache& gb_E2t, const Poly1d& reprs)
 {
 	Mon1d basis_d_E2t;
 	get_basis_E2t(basis_E2, basis_bi, &basis_d_E2t, nullptr, d);
@@ -226,7 +224,7 @@ void generate_E4bk(const Database& db, const std::string& table_prefix, const st
 
 	Poly1d reprs = db.load_gen_reprs(table_prefix + "_generators");
 
-	Poly1d gb = db.load_gb(table_prefix + "_relations", t_max);
+	grbn::GbWithCache gb = db.load_gb(table_prefix + "_relations", t_max);
 	Mon2d leadings;
 	leadings.resize(gen_degs.size());
 	for (const Poly& g : gb)
@@ -238,7 +236,7 @@ void generate_E4bk(const Database& db, const std::string& table_prefix, const st
 
 	Poly1d diffs_E2t = db.load_gen_diffs("E2t_generators");
 
-	Poly1d gb_E2t = db.load_gb("E2_relations", t_max);
+	grbn::GbWithCache gb_E2t = db.load_gb("E2_relations", t_max);
 	Mon2d leadings_E2t;
 	leadings_E2t.resize(gen_degs_E2t.size());
 	for (const Poly& g : gb_E2t)
@@ -247,7 +245,7 @@ void generate_E4bk(const Database& db, const std::string& table_prefix, const st
 	/* load E2_basis */
 
 	std::map<Deg, DgaBasis1> basis_E2;
-	load_dga_basis(db, "E2_basis", basis_E2, 2);
+	load_dga_basis1(db, "E2_basis", basis_E2, 2);
 	std::cout << "basis_E2 loaded! Size=" << basis_E2.size() << '\n';
 
 	/* generate basis of polynomials of b_1,...,b_k */
@@ -339,11 +337,11 @@ void generate_E4bk(const Database& db, const std::string& table_prefix, const st
 
 	db.begin_transaction();
 	db.save_generators(table1_prefix + "_generators", gen_degs, reprs);
-	db.save_gb(table1_prefix + "_relations", gb, gen_degs);
+	db.save_gb(table1_prefix + "_relations", gb.gb, gen_degs);
 	db.end_transaction();
 }
 
-int main_test1(int argc, char** argv)
+int main_test_910ddac8(int argc, char** argv)
 {
 	Database db(R"(C:\Users\lwnpk\Documents\MyProgramData\Math_AlgTop\database\tmp.db)");
 
@@ -396,9 +394,11 @@ int main_test1(int argc, char** argv)
 	return 0;
 }
 
+
+#ifdef GENERATE_E4T_1
 int main_generate_E4t(int argc, char** argv)
 {
-	return main_test1(argc, argv);
+	return main_test_910ddac8(argc, argv);
 
 	Database db(R"(C:\Users\lwnpk\Documents\MyProgramData\Math_AlgTop\database\ss.db)");
 

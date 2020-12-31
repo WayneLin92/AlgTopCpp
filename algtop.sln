@@ -4,10 +4,16 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 VisualStudioVersion = 16.0.28803.352
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "UnitTestAlgTop", "UnitTestAlgTop\UnitTestAlgTop.vcxproj", "{2B531CA9-E5B1-4684-9923-CB228EA78FE2}"
+	ProjectSection(ProjectDependencies) = postProject
+		{2080CD93-029E-4D3A-BBCA-9F9718E4BB29} = {2080CD93-029E-4D3A-BBCA-9F9718E4BB29}
+	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "algtop_static", "algtop_static\algtop_static.vcxproj", "{2080CD93-029E-4D3A-BBCA-9F9718E4BB29}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ss", "ss\ss.vcxproj", "{A9266E0F-7F11-48CA-8C9F-248DFE332737}"
+	ProjectSection(ProjectDependencies) = postProject
+		{2080CD93-029E-4D3A-BBCA-9F9718E4BB29} = {2080CD93-029E-4D3A-BBCA-9F9718E4BB29}
+	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "E4tCuda", "E4tCuda\E4tCuda.vcxproj", "{A2F678BF-628B-4F5A-A65E-C60E47928A77}"
 	ProjectSection(ProjectDependencies) = postProject

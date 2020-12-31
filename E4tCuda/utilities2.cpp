@@ -3,6 +3,19 @@
 #include "database.h"
 #include "linalg.h"
 
+/* assume that the sequence map_gen_id is increasing */
+Poly reindex(const Poly& poly, const array& map_gen_id)
+{
+	Poly result;
+	for (const Mon& m : poly) {
+		Mon m1;
+		for (GenPow ge : m)
+			m1.push_back({ map_gen_id[ge.gen], ge.exp });
+		result.push_back(m1);
+	}
+	return result;
+}
+
 std::map<Deg, DgaBasis1> load_dga_basis(const Database& db, const std::string& table_name, int r, int t_max)
 {
 	std::map<Deg, DgaBasis1> basis;
@@ -133,7 +146,7 @@ void get_basis_with_diff_B(const std::map<Deg, DgaBasis1>& basis_A, const std::m
 	}
 }
 
-Poly d_inv(const Poly& poly, const std::vector<Deg>& gen_degs, const Poly1d& diffs, const Poly1d& gb, const std::map<Deg, DgaBasis1>& basis_A, const std::map<Deg, DgaBasis1>& basis_X)
+Poly d_inv(const Poly& poly, const std::vector<Deg>& gen_degs, const Poly1d& diffs, const grbn::GbWithCache& gb, const std::map<Deg, DgaBasis1>& basis_A, const std::map<Deg, DgaBasis1>& basis_X)
 {
 	if (poly.empty())
 		return {};
@@ -153,7 +166,7 @@ Poly d_inv(const Poly& poly, const std::vector<Deg>& gen_degs, const Poly1d& dif
 	return indices_to_Poly(GetImage(image, g, Poly_to_indices(poly, basis_in_poly)), basis_in_result);
 }
 
-Poly proj(const Poly& poly, const std::vector<Deg>& gen_degs, const Poly1d& gen_diffs, const Poly1d& gb, const std::map<Deg, DgaBasis1>& basis_A,
+Poly proj(const Poly& poly, const std::vector<Deg>& gen_degs, const Poly1d& gen_diffs, const grbn::GbWithCache& gb, const std::map<Deg, DgaBasis1>& basis_A,
 	const std::map<Deg, DgaBasis1>& basis_X, const Poly1d& gen_reprs_H, std::map<Deg, Mon1d>& basis_H)
 {
 	if (poly.empty())

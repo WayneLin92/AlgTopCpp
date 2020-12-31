@@ -12,7 +12,7 @@ void generate_basis(const Database& db, const std::string& table_prefix, int t_m
 	std::vector<Deg> gen_degs = db.load_gen_degs(table_prefix + "_generators");
 	Mon2d leadings = db.load_leading_terms(table_prefix + "_relations", t_max);
 	std::map<Deg, Mon1d> basis = db.load_basis(table_prefix + "_basis", t_max);
-
+	 
 	/* starting t value */
 	int t_min;
 	if (!basis.empty())

@@ -38,7 +38,7 @@ namespace UnitTestAlgTop
 			using namespace grbn;
 			Poly p = { {{1, 3}}, {{0, 3}}, {{0, 1}, {2, 1}} };
 			Poly1d images = { {{{1, 1}}, {{0, 1}}}, {}, {{{3, 1}}} };
-			Poly fp = evaluate(p, [&images](int gen_id) {return images[gen_id]; }, {});
+			Poly fp = evaluate(p, [&images](int gen_id) {return images[gen_id]; }, Poly1d{});
 			Poly anwer = { {{1, 1}, {3, 1}}, {{1, 3}}, {{0, 1}, {3, 1}}, {{0, 1}, {1, 2}}, {{0, 2}, {1, 1}}, {{0, 3}} };
 			Assert::AreEqual(Poly_to_str(anwer), Poly_to_str(fp));
 		};
@@ -159,7 +159,7 @@ namespace UnitTestAlgTop
 				}
 			}
 
-			Poly1d gb;
+			grbn::GbWithCache gb;
 			std::sort(rels.begin(), rels.end(), [&gen_degs](const Poly& p1, const Poly& p2) {
 				return get_deg(p1, gen_degs) < get_deg(p2, gen_degs); });
 			grbn::AddRels(gb, std::move(rels), gen_degs, -1);

@@ -4,7 +4,7 @@
 #include <iostream>
 #include <future>
 
-//#define GENERATE_E4T_1
+#define GENERATE_E4T_1
 
 
 /********** STRUCTS AND CLASSES **********/
@@ -16,8 +16,8 @@ struct DgaBasis1
 };
 
 /********** FUNCTIONS **********/
-
-inline Poly get_repr(const Poly& poly, const Poly1d& gen_reprs, const Poly1d& gb)
+template<typename GbType>
+Poly get_repr(const Poly& poly, const Poly1d& gen_reprs, const GbType& gb)
 {
 	return grbn::evaluate(poly, [&gen_reprs](int i) {return gen_reprs[i]; }, gb);
 }
@@ -31,10 +31,11 @@ void SaveGb(const Database& db, const std::string& table_name, const Poly1d& gb,
 void get_basis_B(const std::map<Deg, DgaBasis1>& basis_A, const std::map<Deg, DgaBasis1>& basis_X, Mon1d& basis_B, const Deg& deg);
 void get_basis_with_diff_B(const std::map<Deg, DgaBasis1>& basis_A, const std::map<Deg, DgaBasis1>& basis_X, Mon1d& basis_B, Poly1d& mon_diffs_B, const Deg& deg);
 /* Assume poly is a boundary. Return the chain with it as boundary */
-Poly d_inv(const Poly& poly, const std::vector<Deg>& gen_degs, const Poly1d& diffs, const Poly1d& gb, const std::map<Deg, DgaBasis1>& basis_A, const std::map<Deg, DgaBasis1>& basis_X);
+Poly d_inv(const Poly& poly, const std::vector<Deg>& gen_degs, const Poly1d& diffs, const grbn::GbWithCache& gb, const std::map<Deg, DgaBasis1>& basis_A, const std::map<Deg, DgaBasis1>& basis_X);
 /* Assume poly is a cycle. Return the homology class */
-Poly proj(const Poly& poly, const std::vector<Deg>& gen_degs, const Poly1d& gen_diffs, const Poly1d& gb, const std::map<Deg, DgaBasis1>& basis_A,
+Poly proj(const Poly& poly, const std::vector<Deg>& gen_degs, const Poly1d& gen_diffs, const grbn::GbWithCache& gb, const std::map<Deg, DgaBasis1>& basis_A,
 	const std::map<Deg, DgaBasis1>& basis_X, const Poly1d& gen_reprs, std::map<Deg, Mon1d>& basis_H);
 
+/* assume that the sequence map_gen_id is increasing */
 Poly reindex(const Poly& poly, const array& map_gen_id);
 
