@@ -202,15 +202,15 @@ Poly1d FindRels(std::map<Deg, Mon1d>& basis_HB, const std::map<Deg, DgaBasis1>& 
 		array2d map_diff;
 		for (Poly& diff : diffs_B_sm1)
 			map_diff.push_back(ReduceToIndices(diff, gb_A, basis_B_s)); // Profiler: t=100, 5650
-		array2d image_diff = GetSpace(map_diff);
+		array2d image_diff = lina::GetSpace(map_diff);
 
 		array2d map_repr;
 		for (const Mon& mon : basis_HB[d]) {
-			array repr = Residue(image_diff, Poly_to_indices(get_repr({ mon }, gen_reprs_B, gb_A), basis_B_s));
+			array repr = lina::Residue(image_diff, Poly_to_indices(get_repr({ mon }, gen_reprs_B, gb_A), basis_B_s));
 			map_repr.push_back(std::move(repr));
 		}
 		array2d image_repr, kernel_repr, g_repr;
-		SetLinearMap(map_repr, image_repr, kernel_repr, g_repr);
+		lina::SetLinearMap(map_repr, image_repr, kernel_repr, g_repr);
 
 		for (const array& rel_indices : kernel_repr)
 			result.push_back(indices_to_Poly(rel_indices, basis_HB[d]));
@@ -430,7 +430,7 @@ void generate_HB(const Database& db, const int t_max, const int t_max_compute=-1
 				/* Add new relations to HA[i + 1]. Compute degrees of relations first. */
 				std::map<int, array> rel_degs; /* Degrees of relations */
 				array range_gen_degs_HA = grbn::range((int)gen_degs_HA[i + 1].size());
-				array range_g = AddVectors(range_gen_degs_HA, map_gen_id[i]);
+				array range_g = lina::AddVectors(range_gen_degs_HA, map_gen_id[i]);
 				for (size_t j = 0; j < range_g.size(); ++j) {
 					Poly check = gen_reprs_HA[i + 1][range_g[j]] + Poly{ {{int(index_x + i + 1), 2}} };
 					if (check.empty()) {

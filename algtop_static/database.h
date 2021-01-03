@@ -10,7 +10,7 @@
 
 /********** STRUCTS AND CLASSES **********/
 /* Declarations */
-constexpr auto T_MAX = 10000;
+constexpr auto kLevelMax = 10000;
 struct sqlite3;
 struct sqlite3_stmt;
 
@@ -23,7 +23,15 @@ struct BasisComplex
 struct BasisSS
 {
 	array2d basis_ind;
-	array2d diffs_ind;
+	array2d diffs_ind; /* element {-1} means null */
+	array levels;
+};
+
+struct BasisSSV2
+{
+	array base_ids;
+	array2d basis_ind;
+	array2d diffs_ind; /* element {-1} means null */
 	array levels;
 };
 
@@ -50,9 +58,10 @@ public:
 	Mon2d load_leading_terms(const std::string& table_name, int t_max) const;
 	Poly1d load_gb(const std::string& table_name, int t_max) const;
 	std::map<Deg, Mon1d> load_basis(const std::string& table_name, int t_max) const;
-	std::map<Deg, array2d> load_mon_diffs_ind(const std::string& table_name, int t_max) const;
+	std::map<Deg, array2d> load_mon_diffs_ind(const std::string& table_name, int t_max, int withnull=false) const;
 	std::map<Deg, Poly1d> load_mon_diffs(const std::string& table_name, const std::map<Deg, Mon1d>& basis, int r, int t_max) const;
-	std::map<Deg, BasisComplex> load_basis_ss(const std::string& table_name_ss, int r, int t_max) const;
+	std::map<Deg, BasisComplex> load_basis_ss(const std::string& table_name_ss, int r, int t_max) const; /* load E_r-cycles and E_r-boundaries */
+	std::map<Deg, BasisSSV2> load_basis_ss(const std::string& table_name_ss, int t_max) const;
 public:
 	void save_generators(const std::string& table_name, const std::vector<Deg>& gen_degs, const Poly1d& gen_reprs, size_t i_start) const;
 	void save_generators(const std::string& table_name, const std::vector<Deg>& gen_degs, const Poly1d& gen_reprs) const { save_generators(table_name, gen_degs, gen_reprs, 0); }
@@ -76,6 +85,7 @@ public:
 public:
 	void bind_str(int iCol, const std::string& str) const;
 	void bind_int(int iCol, int i) const;
+	void bind_null(int iCol) const;
 	const char* column_str(int iCol) const;
 	int column_int(int iCol) const;
 	int column_type(int iCol) const;

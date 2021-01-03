@@ -52,8 +52,8 @@ namespace UnitTestAlgTop
 		{
 			array2d spaceV = { {1, 3, 4}, {2, 4, 5} };
 			array v = { 1, 2 };
-			array r = Residue(spaceV, v);
-			array r1 = Residue(spaceV, std::move(v));
+			array r = lina::Residue(spaceV, v);
+			array r1 = lina::Residue(spaceV, std::move(v));
 			array expected = { 3, 5 };
 			Assert::AreEqual(array_to_str(expected), array_to_str(r));
 			Assert::AreEqual(array_to_str(expected), array_to_str(r1));
@@ -64,12 +64,12 @@ namespace UnitTestAlgTop
 			array x = { 1, 2, 3 };
 			array2d fx = { {1, 3, 4}, {2, 4, 5}, {1, 2, 3, 5} };
 			array2d image, kernel, g;
-			SetLinearMapV2(x, fx, image, kernel, g);
+			lina::SetLinearMapV2(x, fx, image, kernel, g);
 			Assert::AreEqual(ToString(array2d({ {1, 3, 4}, {2, 4, 5} })), ToString(image));
 			Assert::AreEqual(ToString(array2d({ {1, 2, 3} })), ToString(kernel));
 
 			image.clear(); kernel.clear(); g.clear();
-			SetLinearMap(fx, image, kernel, g);
+			lina::SetLinearMap(fx, image, kernel, g);
 			Assert::AreEqual(ToString(array2d({ {0, 1, 2} })), ToString(kernel));
 		};
 		TEST_METHOD(test_get_image)
@@ -78,12 +78,12 @@ namespace UnitTestAlgTop
 			array2d f = { {1}, {2, 5}, {3}, {4} };
 			array v = { 2, 3 };
 			array answer = { 2, 4, 5 };
-			Assert::AreEqual(array_to_str(answer), array_to_str(GetImage(spaceV, f, v)));
+			Assert::AreEqual(array_to_str(answer), array_to_str(lina::GetImage(spaceV, f, v)));
 #ifdef _DEBUG
 			v = { 2, 5 };
 			bool bException = false;
 			try {
-				GetImage(spaceV, f, v);
+				lina::GetImage(spaceV, f, v);
 			}
 			catch (const char* e) {
 				Assert::AreEqual("6a4fe8a1", e);
@@ -97,14 +97,14 @@ namespace UnitTestAlgTop
 		{
 			array2d spaceV = { {1, 2, 3, 4}, {2, 3, 4}, {3, 4}, {4} };
 			array2d spaceW = { {2, 3}, {4} };
-			array2d quotient = QuotientSpace(spaceV, spaceW);
+			array2d quotient = lina::QuotientSpace(spaceV, spaceW);
 			array2d answer = { {1}, {3} };
 			Assert::AreEqual(ToString(answer), ToString(quotient));
 #ifdef _DEBUG
 			spaceW = { {2, 3}, {5} };
 			bool bException = false;
 			try {
-				quotient = QuotientSpace(spaceV, spaceW);
+				quotient = lina::QuotientSpace(spaceV, spaceW);
 			}
 			catch (const char* e) {
 				Assert::AreEqual("cec7f701", e);
@@ -118,7 +118,7 @@ namespace UnitTestAlgTop
 		{
 			array2d spaceV = { {1, 2, 3, 4}, {2, 3, 4}, {3} };
 			array2d answer = { {1}, {2, 4}, {3} };
-			Assert::AreEqual(ToString(answer), ToString(SimplifySpace(spaceV)));
+			Assert::AreEqual(ToString(answer), ToString(lina::SimplifySpace(spaceV)));
 		}
 	};
 

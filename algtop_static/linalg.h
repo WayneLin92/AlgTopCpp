@@ -15,6 +15,8 @@
 using array = std::vector<int>;
 using array2d = std::vector<array>;
 
+namespace lina {
+
 /* Add two compressed vectors */
 inline array AddVectors(const array& v1, const array& v2) {
 	array result;
@@ -36,11 +38,14 @@ array Residue(const array2d& spaceV, array&& v);
 void GetInvMap(const array2d& fx, array2d& image, array2d& g);
 void SetLinearMap(const array2d& fx, array2d& image, array2d& kernel, array2d& g);
 void SetLinearMapV2(const array& x, const array2d& fx, array2d& image, array2d& kernel, array2d& g);
+void SetLinearMapV3(const array2d& x, const array2d& fx, array2d& domain, array2d& f, array2d& image, array2d& g, array2d& kernel);
 
 /* Return f(v) for v\\in V. fi=f(vi) */
 array GetImage(const array2d& spaceV, const array2d& f, const array& v);
 
 /* Compute the quotient of linear spaces V/W assuming that W is a subspace of V */
 array2d QuotientSpace(const array2d& spaceV, const array2d& spaceW);
+
+} /* namespace lina */
 
 #endif /* LINALG_H */

@@ -1,5 +1,6 @@
 #include "main.h"
 #include "groebner.h"
+#include "benchmark.h"
 #include "linalg.h"
 #include <iostream>
 
@@ -12,6 +13,8 @@ void generate_basis(const Database& db, const std::string& table_prefix, int t_m
 	std::vector<Deg> gen_degs = db.load_gen_degs(table_prefix + "_generators");
 	Mon2d leadings = db.load_leading_terms(table_prefix + "_relations", t_max);
 	std::map<Deg, Mon1d> basis = db.load_basis(table_prefix + "_basis", t_max);
+
+	Timer timer;
 	 
 	/* starting t value */
 	int t_min;
@@ -101,11 +104,11 @@ void generate_mon_diffs(const Database& db, const std::string& table_prefix, int
 }
 
 /* generate the table of the spectral sequence */
-void generate_ss(const Database& db, const std::string& table_name_basis, const std::string& table_ss, int r)
+void generate_ss(const Database& db, const std::string& table_basis, const std::string& table_ss, int r)
 {
 	db.execute_cmd("DELETE FROM " + table_ss + ";");
 
-	std::map<Deg, array2d> mon_diffs_ind = db.load_mon_diffs_ind(table_name_basis, -1);
+	std::map<Deg, array2d> mon_diffs_ind = db.load_mon_diffs_ind(table_basis, -1, true);
 	std::map<Deg, BasisSS> basis_ss;
 
 	/* fill basis_ss */
@@ -115,49 +118,63 @@ void generate_ss(const Database& db, const std::string& table_name_basis, const 
 			prev_t = deg.t;
 			std::cout << "Compute basis_ss, t=" << deg.t << "          \r";
 		}
+
+		array all_indices = grbn::range((int)mon_diffs_d.size());
+		array indices_with_diffs;
+
+		array2d non_trivial_mon_diffs_d;
+		for (int i = 0; i < (int)mon_diffs_d.size(); ++i)
+			if (mon_diffs_d[i] != array{ -1 }) {
+				non_trivial_mon_diffs_d.push_back(mon_diffs_d[i]);
+				indices_with_diffs.push_back(i);
+			}
 		BasisSS& basis_ss_d = basis_ss[deg];
 
-		array range_ = grbn::range((int)mon_diffs_d.size());
+		array lead_indices_of_boudaries;
+		for (const array& base : basis_ss_d.basis_ind)
+			if (base != array{ -1 })
+				lead_indices_of_boudaries.push_back(base.front());
+		std::sort(lead_indices_of_boudaries.begin(), lead_indices_of_boudaries.end());
 
-		array lead_image;
-		for (const auto& base : basis_ss_d.basis_ind)
-			lead_image.push_back(base.front());
-		std::sort(lead_image.begin(), lead_image.end());
+		array indices_non_boundaries = lina::AddVectors(indices_with_diffs, lead_indices_of_boudaries);
 
-		array x = AddVectors(range_, lead_image);
-
-		array2d fx;
-		for (int xi : x)
-			fx.push_back(mon_diffs_d[xi]);
+		array2d map_diff;
+		for (int i : indices_non_boundaries)
+			map_diff.push_back(non_trivial_mon_diffs_d[i]);
 
 		array2d image, kernel, g;
-		SetLinearMapV2(x, fx, image, kernel, g);
+		lina::SetLinearMapV2(indices_non_boundaries, map_diff, image, kernel, g);
 
-		/* fill with other cycles after the boundaries */
+		/* fill with boundaries in deg_diff */
+		Deg deg_diff = deg + Deg{ 1, 0, -r };
+		for (array& boundary : image) {
+			basis_ss[deg_diff].basis_ind.push_back(std::move(boundary));
+			basis_ss[deg_diff].diffs_ind.push_back({});
+			basis_ss[deg_diff].levels.push_back(r);
+		}
+
+		/* fill with cycles after boundaries */
 		array lead_kernel;
 		for (auto& cycle : kernel) {
 			lead_kernel.push_back(cycle.front());
 			basis_ss_d.basis_ind.push_back(cycle);
 			basis_ss_d.diffs_ind.push_back({});
-			basis_ss_d.levels.push_back(T_MAX - r);
+			basis_ss_d.levels.push_back(kLevelMax - r);
 		}
 		std::sort(lead_kernel.begin(), lead_kernel.end());
 
-		/* fill with boundaries */
-		Deg deg_diff = deg + Deg{ 1, 0, -r };
-		for (auto& boundaries : image) {
-			basis_ss[deg_diff].basis_ind.push_back(std::move(boundaries));
-			basis_ss[deg_diff].diffs_ind.push_back({});
-			basis_ss[deg_diff].levels.push_back(r);
-		}
-
 		/* fill with the rest */
-
-		array rest = AddVectors(x, lead_kernel);
-		for (int i : rest) {
+		array rest_indices_with_diffs = lina::AddVectors(indices_non_boundaries, lead_kernel);
+		for (int i : rest_indices_with_diffs) {
 			basis_ss_d.basis_ind.push_back({ i });
 			basis_ss_d.diffs_ind.push_back(std::move(mon_diffs_ind[deg][i]));
-			basis_ss_d.levels.push_back(T_MAX);
+			basis_ss_d.levels.push_back(kLevelMax);
+		}
+		array indices_without_diffs = lina::AddVectors(all_indices, indices_with_diffs);
+		for (int i : indices_without_diffs) {
+			basis_ss_d.basis_ind.push_back({ i });
+			basis_ss_d.diffs_ind.push_back({ -1 });
+			basis_ss_d.levels.push_back(kLevelMax);
 		}
 	}
 
@@ -206,7 +223,7 @@ void generate_next_page(const Database& db, const std::string& table_prefix, con
 				}
 
 				array2d image, kernel, g, quotient;
-				SetLinearMap(reprs_new, image, kernel, g);
+				lina::SetLinearMap(reprs_new, image, kernel, g);
 				array lead_kernel;
 				for (array& p_indices : kernel) {
 					gb_H.push_back(indices_to_Poly(p_indices, mons_new));
@@ -219,8 +236,8 @@ void generate_next_page(const Database& db, const std::string& table_prefix, con
 				std::sort(lead_kernel.begin(), lead_kernel.end());
 
 				/* Find new generators and add to basis_H */
-				quotient = QuotientSpace(p_ss->second.cycles, image);
-				SimplifySpace(quotient);
+				quotient = lina::QuotientSpace(p_ss->second.cycles, image);
+				lina::SimplifySpace(quotient);
 				for (auto& x : quotient) {
 					gen_degs_H.push_back(deg);
 					reprs_H.push_back(x);
@@ -229,7 +246,7 @@ void generate_next_page(const Database& db, const std::string& table_prefix, con
 				}
 
 				/* Add to basis_H */
-				array index_basis = AddVectors(grbn::range(int(mons_new.size())), lead_kernel);
+				array index_basis = lina::AddVectors(grbn::range(int(mons_new.size())), lead_kernel);
 				for (int i : index_basis) {
 					basis_H[deg].push_back(std::move(mons_new[i]));
 					mon_reprs_H[deg].push_back(std::move(reprs_new[i]));
@@ -237,7 +254,7 @@ void generate_next_page(const Database& db, const std::string& table_prefix, con
 			}
 			else {
 				/* Find new generators and add to basis_H */
-				for (array& x : SimplifySpace(p_ss->second.cycles)) {
+				for (array& x : lina::SimplifySpace(p_ss->second.cycles)) {
 					gen_degs_H.push_back(deg);
 					reprs_H.push_back(x);
 					basis_H[deg].push_back({ {int(gen_degs_H.size()) - 1, 1} });
@@ -281,7 +298,7 @@ void generate_next_page(const Database& db, const std::string& table_prefix, con
 									auto poly1 = indices_to_Poly(repr1, basis[deg1]);
 									auto gen_repr = indices_to_Poly(reprs_H[gen_id], basis[g_deg]);
 									Poly repr = grbn::Reduce(mul(poly1, gen_repr), gb);
-									array repr_indices = Residue(basis_ss[deg].boundaries, Poly_to_indices(repr, basis[deg]));
+									array repr_indices = lina::Residue(basis_ss[deg].boundaries, Poly_to_indices(repr, basis[deg]));
 									basis_H_new[deg].push_back(std::move(mon));
 									mon_reprs_H_new[deg].push_back(std::move(repr_indices));
 								}
@@ -293,9 +310,9 @@ void generate_next_page(const Database& db, const std::string& table_prefix, con
 		}
 	}
 
-	/* Save generators */
 	db.begin_transaction();
 
+	/* Save generators */
 	Poly1d reprs_poly_H;
 	for (size_t i = 0; i < (int)reprs_H.size(); ++i)
 		reprs_poly_H.push_back(indices_to_Poly(reprs_H[i], basis[gen_degs_H[i]]));

@@ -136,15 +136,26 @@ std::map<Deg, Mon1d> Database::load_basis(const std::string& table_name, int t_m
 	return basis;
 }
 
-std::map<Deg, array2d> Database::load_mon_diffs_ind(const std::string& table_name, int t_max) const
+std::map<Deg, array2d> Database::load_mon_diffs_ind(const std::string& table_name, int t_max, int withnull /* = false */) const
 {
 	std::map<Deg, array2d> diffs_ind;
-	Statement stmt(*this, "SELECT s, t, v, diff FROM " + table_name + (t_max == -1 ? "" : " WHERE t<=" + std::to_string(t_max)) + " AND diff IS NOT NULL ORDER BY mon_id;");
+	std::string sql;
+	if (!withnull)
+		sql = "SELECT s, t, v, diff FROM " + table_name + (t_max == -1 ? "" : " WHERE t<=" + std::to_string(t_max)) + " AND diff IS NOT NULL ORDER BY mon_id;";
+	else
+		sql = "SELECT s, t, v, diff FROM " + table_name + (t_max == -1 ? "" : " WHERE t<=" + std::to_string(t_max)) + " ORDER BY mon_id;";
+	Statement stmt(*this, sql);
+
+	int count = 0;
 	while (stmt.step() == SQLITE_ROW) {
+		++count;
 		Deg deg = { stmt.column_int(0), stmt.column_int(1), stmt.column_int(2) };
-		diffs_ind[deg].push_back(str_to_array(stmt.column_str(3)));
+		if (stmt.column_type(3) == SQLITE_TEXT)
+			diffs_ind[deg].push_back(str_to_array(stmt.column_str(3)));
+		else
+			diffs_ind[deg].push_back({ -1 });
 	}
-	std::cout << "diffs_ind loaded from " << table_name << ", size=" << diffs_ind.size() << '\n';
+	std::cout << "diffs_ind loaded from " << table_name << ", size=" << count << '\n';
 	return diffs_ind;
 }
 
@@ -152,12 +163,14 @@ std::map<Deg, Poly1d> Database::load_mon_diffs(const std::string& table_name, co
 {
 	std::map<Deg, Poly1d> diffs;
 	Statement stmt(*this, "SELECT s, t, v, diff FROM " + table_name + (t_max == -1 ? "" : " WHERE t<=" + std::to_string(t_max)) + " AND diff IS NOT NULL ORDER BY mon_id;");
+	int count = 0;
 	while (stmt.step() == SQLITE_ROW) {
+		++count;
 		Deg deg = { stmt.column_int(0), stmt.column_int(1), stmt.column_int(2) };
 		array diff_index = str_to_array(stmt.column_str(3));
 		diffs[deg].push_back(diff_index.empty() ? Poly{} : indices_to_Poly(std::move(diff_index), basis.at(deg + Deg{ 1, 0, -r })));
 	}
-	std::cout << "diffs loaded from " << table_name << ", size=" << diffs.size() << '\n';
+	std::cout << "diffs loaded from " << table_name << ", size=" << count << '\n';
 	return diffs;
 }
 
@@ -165,15 +178,42 @@ std::map<Deg, BasisComplex> Database::load_basis_ss(const std::string& table_nam
 {
 	std::map<Deg, BasisComplex> basis_ss;
 	Statement stmt(*this, "SELECT s, t, v, level, base FROM " + table_name + (t_max == -1 ? "" : " WHERE t<=" + std::to_string(t_max)) + " ;");
+	int count = 0;
 	while (stmt.step() == SQLITE_ROW) {
+		++count;
 		Deg deg = { stmt.column_int(0), stmt.column_int(1), stmt.column_int(2) };
 		int level = stmt.column_int(3);
 		if (level <= r)
 			basis_ss[deg].boundaries.push_back(str_to_array(stmt.column_str(4)));
-		else if (level <= T_MAX - r)
+		else if (level <= kLevelMax - r)
 			basis_ss[deg].cycles.push_back(str_to_array(stmt.column_str(4)));
 	}
-	std::cout << "basis_ss loaded from " << table_name << ", size=" << basis_ss.size() << '\n';
+	std::cout << "basis_ss loaded from " << table_name << ", size=" << count << '\n';
+	return basis_ss;
+}
+
+std::map<Deg, BasisSSV2> Database::load_basis_ss(const std::string& table_name, int t_max) const
+{
+	std::map<Deg, BasisSSV2> basis_ss;
+	Statement stmt(*this, "SELECT s, t, v, level, base, diff, base_id FROM " + table_name + (t_max == -1 ? "" : " WHERE t<=" + std::to_string(t_max)) + " ;");
+	int count = 0;
+	while (stmt.step() == SQLITE_ROW) {
+		++count;
+		Deg deg = { stmt.column_int(0), stmt.column_int(1), stmt.column_int(2) };
+		int level = stmt.column_int(3);
+		array diff = str_to_array(stmt.column_str(4));
+		array base = str_to_array(stmt.column_str(5));
+
+		int base_id = stmt.column_int(6);
+		basis_ss[deg].base_ids.push_back(base_id);
+		basis_ss[deg].basis_ind.push_back(std::move(base));
+		basis_ss[deg].levels.push_back(level);
+		if (stmt.column_type(4) == SQLITE_TEXT)
+			basis_ss[deg].diffs_ind.push_back(diff);
+		else
+			basis_ss[deg].diffs_ind.push_back({ -1 });
+	}
+	std::cout << "basis_ss loaded from " << table_name << ", size=" << count << '\n';
 	return basis_ss;
 }
 
@@ -279,7 +319,10 @@ void Database::save_basis_ss(const std::string& table_name, const std::map<Deg, 
 	for (const auto& [deg, basis_ss_d] : basis_ss) {
 		for (size_t i = 0; i < basis_ss_d.basis_ind.size(); ++i) {
 			stmt.bind_str(1, array_to_str(basis_ss_d.basis_ind[i]));
-			stmt.bind_str(2, array_to_str(basis_ss_d.diffs_ind[i]));
+			if (basis_ss_d.diffs_ind[i] == array{ -1 })
+				stmt.bind_null(2);
+			else
+				stmt.bind_str(2, array_to_str(basis_ss_d.diffs_ind[i]));
 			stmt.bind_int(3, basis_ss_d.levels[i]);
 			stmt.bind_int(4, deg.s);
 			stmt.bind_int(5, deg.t);
@@ -306,6 +349,12 @@ void Statement::bind_int(int iCol, int i) const
 {
 	if (sqlite3_bind_int(stmt_, iCol, i) != SQLITE_OK)
 		throw "a61e05b2";
+}
+
+void Statement::bind_null(int iCol) const
+{
+	if (sqlite3_bind_null(stmt_, iCol) != SQLITE_OK)
+		throw "e22b11c4";
 }
 
 const char* Statement::column_str(int iCol) const

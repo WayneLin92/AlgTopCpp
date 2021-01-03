@@ -49,17 +49,17 @@ Mon1d get_basis(const Mon2d& leadings, const std::vector<Deg>& gen_degs, Deg deg
 
 	while (true) {
 		//std::cout << "index=" << index << '\n';
-		mon_dense[index] = T_MAX;
-		int e_max = T_MAX;
+		mon_dense[index] = kLevelMax;
+		int e_max = kLevelMax;
 		for (const Mon& lead : leadings[index]) {
 			if (divides(lead, mon_dense.begin() + index, mon_dense.end(), index)) {
 				if (lead[0].exp - 1 < e_max)
 					e_max = lead[0].exp - 1;
 			}
 		}
-		int qs = gen_degs[index].s ? deg.s / gen_degs[index].s : T_MAX;
-		int qt = gen_degs[index].t ? deg.t / gen_degs[index].t : T_MAX;
-		int qv = gen_degs[index].v ? deg.v / gen_degs[index].v : T_MAX;
+		int qs = gen_degs[index].s ? deg.s / gen_degs[index].s : kLevelMax;
+		int qt = gen_degs[index].t ? deg.t / gen_degs[index].t : kLevelMax;
+		int qv = gen_degs[index].v ? deg.v / gen_degs[index].v : kLevelMax;
 		e_max = std::min({ e_max, qs, qt, qv });
 		//std::cout << "e_max=" << e_max << '\n';
 		mon_dense[index] = e_max;
@@ -174,8 +174,8 @@ Poly d_inv1(const Poly& poly, const grbn::GbWithCache& gb, const Mon2d& leadings
 	for (const Mon& mon : basis_in_result)
 		map_d.push_back(Poly_to_indices(grbn::Reduce(get_diff(mon, diffs), gb), basis_in_poly));
 	array2d image, kernel, g;
-	SetLinearMap(map_d, image, kernel, g);
-	return indices_to_Poly(GetImage(image, g, Poly_to_indices(poly, basis_in_poly)), basis_in_result);
+	lina::SetLinearMap(map_d, image, kernel, g);
+	return indices_to_Poly(lina::GetImage(image, g, Poly_to_indices(poly, basis_in_poly)), basis_in_result);
 }
 
 grbn::GbBuffer find_relations(Deg d, Mon1d& basis_d, const std::map<Deg, DgaBasis1>& basis_E2, const std::map<Deg, DgaBasis1>& basis_bi, const grbn::GbWithCache& gb_E2t, const Poly1d& reprs)
@@ -193,15 +193,15 @@ grbn::GbBuffer find_relations(Deg d, Mon1d& basis_d, const std::map<Deg, DgaBasi
 	array2d map_diff;
 	for (int i : indices)
 		map_diff.push_back(Poly_to_indices(grbn::Reduce(diffs_d_E2t[indices[i]], gb_E2t), basis_d_E2t));
-	array2d image_diff = GetSpace(map_diff);
+	array2d image_diff = lina::GetSpace(map_diff);
 
 	array2d map_repr;
 	for (const Mon& mon : basis_d) {
-		array repr = Residue(image_diff, Poly_to_indices(grbn::evaluate({ mon }, [&reprs](int i) {return reprs[i]; }, gb_E2t), basis_d_E2t));
+		array repr = lina::Residue(image_diff, Poly_to_indices(grbn::evaluate({ mon }, [&reprs](int i) {return reprs[i]; }, gb_E2t), basis_d_E2t));
 		map_repr.push_back(std::move(repr));
 	}
 	array2d image_repr, kernel_repr, g_repr;
-	SetLinearMap(map_repr, image_repr, kernel_repr, g_repr);
+	lina::SetLinearMap(map_repr, image_repr, kernel_repr, g_repr);
 
 	grbn::GbBuffer result;
 	for (const array& rel_indices : kernel_repr)

@@ -168,6 +168,7 @@
     <ClInclude Include="database.h" />
     <ClInclude Include="groebner.h" />
     <ClInclude Include="linalg.h" />
+    <ClInclude Include="myexception.h" />
     <ClInclude Include="myio.h" />
     <ClInclude Include="myparser.h" />
     <ClInclude Include="sqlite3\sqlite3.h" />
