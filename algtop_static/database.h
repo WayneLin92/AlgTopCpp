@@ -20,16 +20,8 @@ struct BasisComplex
 	array2d cycles;
 };
 
-struct BasisSS
+struct Staircase
 {
-	array2d basis_ind;
-	array2d diffs_ind; /* element {-1} means null */
-	array levels;
-};
-
-struct BasisSSV2
-{
-	array base_ids;
 	array2d basis_ind;
 	array2d diffs_ind; /* element {-1} means null */
 	array levels;
@@ -61,7 +53,7 @@ public:
 	std::map<Deg, array2d> load_mon_diffs_ind(const std::string& table_name, int t_max, int withnull=false) const;
 	std::map<Deg, Poly1d> load_mon_diffs(const std::string& table_name, const std::map<Deg, Mon1d>& basis, int r, int t_max) const;
 	std::map<Deg, BasisComplex> load_basis_ss(const std::string& table_name_ss, int r, int t_max) const; /* load E_r-cycles and E_r-boundaries */
-	std::map<Deg, BasisSSV2> load_basis_ss(const std::string& table_name_ss, int t_max) const;
+	std::map<Deg, Staircase> load_basis_ss(const std::string& table_name_ss, int t_max) const;
 public:
 	void save_generators(const std::string& table_name, const std::vector<Deg>& gen_degs, const Poly1d& gen_reprs, size_t i_start) const;
 	void save_generators(const std::string& table_name, const std::vector<Deg>& gen_degs, const Poly1d& gen_reprs) const { save_generators(table_name, gen_degs, gen_reprs, 0); }
@@ -70,7 +62,7 @@ public:
 	void save_basis(const std::string& table_name, const std::map<Deg, Mon1d>& basis) const;
 	void save_basis(const std::string& table_name, const std::map<Deg, Mon1d>& basis, const std::map<Deg, array2d>& mon_reprs) const;
 	void save_basis(const std::string& table_name, const std::map<Deg, Mon1d>& basis, const std::map<Deg, Poly1d>& mon_reprs) const;
-	void save_basis_ss(const std::string& table_name, const std::map<Deg, BasisSS>& basis_ss) const;
+	void save_basis_ss(const std::string& table_name, const std::map<Deg, Staircase>& basis_ss) const;
 private:
 	sqlite3* conn_ = nullptr;
 };

@@ -29,22 +29,12 @@ array2d& SimplifySpace(array2d& spaceV)
 	return spaceV;
 }
 
-array Residue(const array2d& spaceV, const array& v)
+array Residue(array2dIt spaceV_first, array2dIt spaceV_last, array v)
 {
-	array result(v);
-	for (const auto& vi : spaceV)
-		if (std::binary_search(result.begin(), result.end(), vi[0]))
-			result = AddVectors(result, vi);
-	return result;
-}
-
-array Residue(const array2d& spaceV, array&& v)//
-{
-	array result(v);
-	for (const auto& vi : spaceV)
-		if (std::binary_search(result.begin(), result.end(), vi[0]))
-			result = AddVectors(result, vi);
-	return result;
+	for (auto p_vi = spaceV_first; p_vi != spaceV_last; ++p_vi)
+		if (std::binary_search(v.begin(), v.end(), p_vi->front()))
+			v = AddVectors(v, *p_vi);
+	return v;
 }
 
 inline void AddToSpace(array2d& spaceV, const array& v)
@@ -79,6 +69,27 @@ void SetLinearMap(const array2d& fx, array2d& image, array2d& kernel, array2d& g
 	for (size_t i = 0; i < fx.size(); ++i) {
 		array src = { int(i) };
 		array tgt = fx[i];
+		for (size_t j = 0; j < image.size(); j++) {
+			if (std::binary_search(tgt.begin(), tgt.end(), image[j][0])) {
+				tgt = AddVectors(tgt, image[j]);
+				src = AddVectors(src, g[j]);
+			}
+		}
+		if (tgt.empty())
+			AddToSpace(kernel, src);
+		else {
+			image.push_back(std::move(tgt));
+			g.push_back(std::move(src));
+		}
+	}
+}
+
+void SetLinearMapV2(array2dIt x_first, array2dIt x_last, array2dIt fx_first, array2dIt fx_last, array2d& image, array2d& kernel, array2d& g)
+{
+	/* f(g[i]) = image[i] */
+	for (auto p_x = x_first, p_fx = fx_first; p_x != x_last; ++p_x, ++p_fx) {
+		array src = *p_x;
+		array tgt = *p_fx;
 		for (size_t j = 0; j < image.size(); j++) {
 			if (std::binary_search(tgt.begin(), tgt.end(), image[j][0])) {
 				tgt = AddVectors(tgt, image[j]);
@@ -150,19 +161,17 @@ void SetLinearMapV3(const array2d& x, const array2d& fx, array2d& domain, array2
 	}
 }
 
-array GetImage(const array2d& spaceV, const array2d& f, const array& v)
+array GetImage(array2dIt spaceV_first, array2dIt spaceV_last, array2dIt f_first, array2dIt f_last, array v)
 {
 	array result;
-	array v1(v);
-	for (size_t i = 0; i < spaceV.size() && !v1.empty(); ++i)
-		if (std::binary_search(v1.begin(), v1.end(), spaceV[i][0])) {
-			v1 = AddVectors(v1, spaceV[i]);
-			result = AddVectors(result, f[i]);
+	for (auto p_Vi = spaceV_first, p_fi = f_first; p_Vi != spaceV_last && !v.empty(); ++p_Vi, ++p_fi)
+		if (std::binary_search(v.begin(), v.end(), p_Vi->front())) {
+			v = AddVectors(v, *p_Vi);
+			result = AddVectors(result, *p_fi);
 		}
 #if _DEBUG
-	if (!v1.empty()) {
-		std::cerr << "v is not in space V!\n";
-		throw "6a4fe8a1";
+	if (!v.empty()) {
+		throw MyException(0x6a4fe8a1U, "v is not in spaceV");
 	}
 #endif
 	return result;

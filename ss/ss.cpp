@@ -106,10 +106,8 @@ void generate_mon_diffs(const Database& db, const std::string& table_prefix, int
 /* generate the table of the spectral sequence */
 void generate_ss(const Database& db, const std::string& table_basis, const std::string& table_ss, int r)
 {
-	db.execute_cmd("DELETE FROM " + table_ss + ";");
-
 	std::map<Deg, array2d> mon_diffs_ind = db.load_mon_diffs_ind(table_basis, -1, true);
-	std::map<Deg, BasisSS> basis_ss;
+	std::map<Deg, Staircase> basis_ss;
 
 	/* fill basis_ss */
 	int prev_t = 0;
@@ -128,7 +126,7 @@ void generate_ss(const Database& db, const std::string& table_basis, const std::
 				non_trivial_mon_diffs_d.push_back(mon_diffs_d[i]);
 				indices_with_diffs.push_back(i);
 			}
-		BasisSS& basis_ss_d = basis_ss[deg];
+		Staircase& basis_ss_d = basis_ss[deg];
 
 		array lead_indices_of_boudaries;
 		for (const array& base : basis_ss_d.basis_ind)
@@ -145,41 +143,45 @@ void generate_ss(const Database& db, const std::string& table_basis, const std::
 		array2d image, kernel, g;
 		lina::SetLinearMapV2(indices_non_boundaries, map_diff, image, kernel, g);
 
-		/* fill with boundaries in deg_diff */
+		/* fill Im(d_r) */
 		Deg deg_diff = deg + Deg{ 1, 0, -r };
-		for (array& boundary : image) {
-			basis_ss[deg_diff].basis_ind.push_back(std::move(boundary));
-			basis_ss[deg_diff].diffs_ind.push_back({});
+		for (size_t i = 0; i < image.size(); ++i) {
+			basis_ss[deg_diff].basis_ind.push_back(std::move(image[i]));
+			basis_ss[deg_diff].diffs_ind.push_back(std::move(g[i]));
 			basis_ss[deg_diff].levels.push_back(r);
 		}
 
-		/* fill with cycles after boundaries */
+		/* fill E_{r+2} */
 		array lead_kernel;
 		for (auto& cycle : kernel) {
 			lead_kernel.push_back(cycle.front());
 			basis_ss_d.basis_ind.push_back(cycle);
 			basis_ss_d.diffs_ind.push_back({});
-			basis_ss_d.levels.push_back(kLevelMax - r);
+			basis_ss_d.levels.push_back(kLevelMax - r - 2);
 		}
 		std::sort(lead_kernel.begin(), lead_kernel.end());
 
-		/* fill with the rest */
+		/* fill E_r */
 		array rest_indices_with_diffs = lina::AddVectors(indices_non_boundaries, lead_kernel);
 		for (int i : rest_indices_with_diffs) {
 			basis_ss_d.basis_ind.push_back({ i });
 			basis_ss_d.diffs_ind.push_back(std::move(mon_diffs_ind[deg][i]));
-			basis_ss_d.levels.push_back(kLevelMax);
+			basis_ss_d.levels.push_back(kLevelMax - r);
 		}
 		array indices_without_diffs = lina::AddVectors(all_indices, indices_with_diffs);
 		for (int i : indices_without_diffs) {
 			basis_ss_d.basis_ind.push_back({ i });
 			basis_ss_d.diffs_ind.push_back({ -1 });
-			basis_ss_d.levels.push_back(kLevelMax);
+			basis_ss_d.levels.push_back(kLevelMax - r);
 		}
 	}
 
+	basis_ss[Deg{ 0, 0, 0 }].diffs_ind = { {} };
+	basis_ss[Deg{ 0, 0, 0 }].levels = { kLevelMax / 2 };
+
 	/* insert into the database */
 	db.begin_transaction();
+	db.execute_cmd("DELETE FROM " + table_ss + ";");
 	db.save_basis_ss(table_ss, basis_ss);
 	db.end_transaction();
 }

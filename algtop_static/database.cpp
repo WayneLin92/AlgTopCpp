@@ -185,31 +185,30 @@ std::map<Deg, BasisComplex> Database::load_basis_ss(const std::string& table_nam
 		int level = stmt.column_int(3);
 		if (level <= r)
 			basis_ss[deg].boundaries.push_back(str_to_array(stmt.column_str(4)));
-		else if (level <= kLevelMax - r)
+		else if (level <= kLevelMax - r - 2)
 			basis_ss[deg].cycles.push_back(str_to_array(stmt.column_str(4)));
 	}
 	std::cout << "basis_ss loaded from " << table_name << ", size=" << count << '\n';
 	return basis_ss;
 }
 
-std::map<Deg, BasisSSV2> Database::load_basis_ss(const std::string& table_name, int t_max) const
+std::map<Deg, Staircase> Database::load_basis_ss(const std::string& table_name, int t_max) const
 {
-	std::map<Deg, BasisSSV2> basis_ss;
-	Statement stmt(*this, "SELECT s, t, v, level, base, diff, base_id FROM " + table_name + (t_max == -1 ? "" : " WHERE t<=" + std::to_string(t_max)) + " ;");
+	std::map<Deg, Staircase> basis_ss;
+	Statement stmt(*this, "SELECT s, t, v, level, base, diff FROM " + table_name + (t_max == -1 ? "" : " WHERE t<=" + std::to_string(t_max)) + " ;");
 	int count = 0;
 	while (stmt.step() == SQLITE_ROW) {
 		++count;
 		Deg deg = { stmt.column_int(0), stmt.column_int(1), stmt.column_int(2) };
 		int level = stmt.column_int(3);
-		array diff = str_to_array(stmt.column_str(4));
-		array base = str_to_array(stmt.column_str(5));
+		array base = str_to_array(stmt.column_str(4));
 
-		int base_id = stmt.column_int(6);
-		basis_ss[deg].base_ids.push_back(base_id);
 		basis_ss[deg].basis_ind.push_back(std::move(base));
 		basis_ss[deg].levels.push_back(level);
-		if (stmt.column_type(4) == SQLITE_TEXT)
+		if (stmt.column_type(5) == SQLITE_TEXT) {
+			array diff = str_to_array(stmt.column_str(5));
 			basis_ss[deg].diffs_ind.push_back(diff);
+		}
 		else
 			basis_ss[deg].diffs_ind.push_back({ -1 });
 	}
@@ -312,10 +311,11 @@ void Database::save_basis(const std::string& table_name, const std::map<Deg, Mon
 #endif
 }
 
-void Database::save_basis_ss(const std::string& table_name, const std::map<Deg, BasisSS>& basis_ss) const
+void Database::save_basis_ss(const std::string& table_name, const std::map<Deg, Staircase>& basis_ss) const
 {
-	Statement stmt(*this, "INSERT INTO " + table_name + " (base, diff, level, s, t, v) VALUES (?1, ?2, ?3, ?4, ?5, ?6);");
+	Statement stmt(*this, "INSERT INTO " + table_name + " (base, diff, level, s, t, v, base_id) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7);");
 
+	int count = 0;
 	for (const auto& [deg, basis_ss_d] : basis_ss) {
 		for (size_t i = 0; i < basis_ss_d.basis_ind.size(); ++i) {
 			stmt.bind_str(1, array_to_str(basis_ss_d.basis_ind[i]));
@@ -327,11 +327,13 @@ void Database::save_basis_ss(const std::string& table_name, const std::map<Deg, 
 			stmt.bind_int(4, deg.s);
 			stmt.bind_int(5, deg.t);
 			stmt.bind_int(6, deg.v);
+			stmt.bind_int(7, count);
 			stmt.step_and_reset();
+			++count;
 		}
 	}
 #ifdef DATABASE_SAVE_LOGGING
-	std::cout << "basis_ss is inserted into " + table_name + ", number of degrees=" << basis_ss.size() << '\n';
+	std::cout << "basis_ss is inserted into " + table_name + ", size=" << count << '\n';
 #endif
 }
 

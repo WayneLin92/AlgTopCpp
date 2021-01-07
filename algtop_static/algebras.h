@@ -15,7 +15,6 @@ using array = std::vector<int>;
 using array2d = std::vector<array>;
 using array3d = std::vector<array2d>;
 using array4d = std::vector<array3d>;
-using arrayInd = array::const_iterator;
 
 struct GenPow {
 	int gen, exp;

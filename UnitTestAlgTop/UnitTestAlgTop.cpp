@@ -3,6 +3,7 @@
 #include "groebner.h"
 #include "linalg.h"
 #include "myio.h"
+#include "myexception.h"
 #include "database.h"
 
 std::string array_to_str(const array& a);
@@ -85,8 +86,8 @@ namespace UnitTestAlgTop
 			try {
 				lina::GetImage(spaceV, f, v);
 			}
-			catch (const char* e) {
-				Assert::AreEqual("6a4fe8a1", e);
+			catch (MyException& e) {
+				Assert::AreEqual(0x6a4fe8a1U, e.id());
 				bException = true;
 			}
 			Assert::AreEqual(true, bException);
