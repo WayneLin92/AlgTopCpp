@@ -158,6 +158,7 @@
     <ClCompile Include="deduce_diffs.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="ss.cpp" />
+    <ClCompile Include="utilities.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="main.h" />
