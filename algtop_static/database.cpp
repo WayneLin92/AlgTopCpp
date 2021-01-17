@@ -1,6 +1,7 @@
 #include "database.h"
 #include "sqlite3/sqlite3.h"
 #include "myio.h"
+#include "myexception.h"
 #include <iostream>
 #include <sstream>
 
@@ -45,21 +46,15 @@ array Database::get_ints(const std::string& table_name, const std::string& colum
 void Database::sqlite3_prepare_v100(const char* zSql, sqlite3_stmt** ppStmt, bool bPrintError) const
 {
 	int error_code = sqlite3_prepare_v2(conn_, zSql, int(strlen(zSql)) + 1, ppStmt, NULL);
-	if (error_code != SQLITE_OK) {
-		if (bPrintError)
-			std::cerr << sqlite3_errstr(error_code) << '\n';
-		throw "bce2dcfe";
-	}
+	if (error_code != SQLITE_OK)
+		throw MyException(0xbce2dcfeU, sqlite3_errstr(error_code));
 }
 
 void Database::sqlite3_prepare_v100(const std::string& sql, sqlite3_stmt** ppStmt, bool bPrintError) const
 {
 	int error_code = sqlite3_prepare_v2(conn_, sql.c_str(), int(sql.size()) + 1, ppStmt, NULL);
-	if (error_code != SQLITE_OK) {
-		if (bPrintError)
-			std::cerr << sqlite3_errstr(error_code) << '\n';
-		throw "da6ab7f6";
-	}
+	if (error_code != SQLITE_OK)
+		throw MyException(0xda6ab7f6U, sqlite3_errstr(error_code));
 }
 
 std::vector<Deg> Database::load_gen_degs(const std::string& table_name) const
@@ -141,7 +136,7 @@ std::map<Deg, array2d> Database::load_mon_diffs_ind(const std::string& table_nam
 	std::map<Deg, array2d> diffs_ind;
 	std::string sql;
 	if (!withnull)
-		sql = "SELECT s, t, v, diff FROM " + table_name + (t_max == -1 ? "" : " WHERE t<=" + std::to_string(t_max)) + " AND diff IS NOT NULL ORDER BY mon_id;";
+		sql = "SELECT s, t, v, diff FROM " + table_name + (t_max == -1 ? "WHERE " : " WHERE t<=" + std::to_string(t_max) + " AND") + " diff IS NOT NULL ORDER BY mon_id;";
 	else
 		sql = "SELECT s, t, v, diff FROM " + table_name + (t_max == -1 ? "" : " WHERE t<=" + std::to_string(t_max)) + " ORDER BY mon_id;";
 	Statement stmt(*this, sql);
@@ -162,7 +157,9 @@ std::map<Deg, array2d> Database::load_mon_diffs_ind(const std::string& table_nam
 std::map<Deg, Poly1d> Database::load_mon_diffs(const std::string& table_name, const std::map<Deg, Mon1d>& basis, int r, int t_max) const
 {
 	std::map<Deg, Poly1d> diffs;
-	Statement stmt(*this, "SELECT s, t, v, diff FROM " + table_name + (t_max == -1 ? "" : " WHERE t<=" + std::to_string(t_max)) + " AND diff IS NOT NULL ORDER BY mon_id;");
+	std::string sql = t_max == -1 ? "SELECT s, t, v, diff FROM " + table_name + " WHERE diff IS NOT NULL ORDER BY mon_id;" :
+		"SELECT s, t, v, diff FROM " + table_name + " WHERE t<=" + std::to_string(t_max) + " AND diff IS NOT NULL ORDER BY mon_id;";
+	Statement stmt(*this, sql);
 	int count = 0;
 	while (stmt.step() == SQLITE_ROW) {
 		++count;
@@ -273,7 +270,7 @@ void Database::save_basis(const std::string& table_name, const std::map<Deg, Mon
 
 void Database::save_basis(const std::string& table_name, const std::map<Deg, Mon1d>& basis, const std::map<Deg, array2d>& mon_reprs) const
 {
-	Statement stmt(*this, "INSERT INTO " + table_name + " (mon, repr, s, t, v) VALUES (?1, ?2, ?3, ?4);");
+	Statement stmt(*this, "INSERT INTO " + table_name + " (mon, repr, s, t, v) VALUES (?1, ?2, ?3, ?4, ?5);");
 
 	int count = 0;
 	for (auto& [deg, basis_d] : basis) {
@@ -345,6 +342,7 @@ void Statement::bind_str(int iCol, const std::string& str) const
 {
 	if (sqlite3_bind_text(stmt_, iCol, str.c_str(), -1, SQLITE_TRANSIENT) != SQLITE_OK)
 		throw "29cc3b21";
+
 }
 
 void Statement::bind_int(int iCol, int i) const

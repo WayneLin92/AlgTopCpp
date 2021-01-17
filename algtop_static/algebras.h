@@ -33,6 +33,7 @@ using MonInd = Mon::const_iterator;
 struct Deg
 {
 	int s, t, v;
+	Deg() = default;
 	Deg(int s_, int t_, int v_) : s(s_), t(t_), v(v_) {};
 	bool operator<(const Deg& rhs) const {
 		if (t < rhs.t)

@@ -42,14 +42,16 @@ public:
 const Staircase& GetRecentStaircase(const std::vector<std::map<Deg, Staircase>>& basis_ss, const Deg& deg);
 void ApplyChanges(std::vector<std::map<Deg, Staircase>>& basis_ss);
 std::ostream& operator<<(std::ostream& sout, const Staircase& sc);
-size_t GetFirstIndex(const Staircase& sc, int level);
-std::pair<int, int> CountUndetermined(const Staircase& sc, int level_min);
-bool IsSingle(const Staircase& sc, int index);
+size_t GetFirstIndexOfLevel(const Staircase& sc, int level);
+size_t GetFirstIndexOfKnownLevels(const Staircase& sc, int level);
+std::tuple<int, Deg, int> CountTgt(const std::vector<std::map<Deg, Staircase>>& basis_ss, const Deg& deg, int r);
+std::tuple<int, Deg, int> CountSrc(const std::vector<std::map<Deg, Staircase>>& basis_ss, const Deg& deg, int level);
 
 /* Management of the data structure of spectral sequences */
-void AddImage(std::vector<std::map<Deg, Staircase>>& basis_ss, const Deg& deg_dx, array dx, array x, int r, bool bForSSToF2 = false);
-void AddDiff(std::vector<std::map<Deg, Staircase>>& basis_ss, const Deg& deg_x, array x, array dx, int r, bool bForSSToF2 = false);
-void SetDiff(const grbn::GbWithCache& gb, const std::map<Deg, Mon1d>& basis, std::vector<std::map<Deg, Staircase>>& basis_ss, Deg deg_x, array x, array dx, int r, bool bForSSToF2 = false);
+void AddImage(std::vector<std::map<Deg, Staircase>>& basis_ss, const Deg& deg_dx, array dx, array x, int r);
+void AddDiff(std::vector<std::map<Deg, Staircase>>& basis_ss, const Deg& deg_x, array x, array dx, int r);
+void SetDiff(const grbn::GbWithCache& gb, const std::map<Deg, Mon1d>& basis, std::vector<std::map<Deg, Staircase>>& basis_ss, Deg deg_x, array x, array dx, int r);
+void DeduceDiffs(const Database& db, const std::string& table_prefix, int t_max, bool bForEt = false);
 
 void generate_basis(const Database& db, const std::string& table_prefix, int t_max, bool drop_existing = false);
 void generate_mon_diffs(const Database& db, const std::string& table_prefix, int r);
