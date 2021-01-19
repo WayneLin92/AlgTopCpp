@@ -6,6 +6,8 @@
 #include "myexception.h"
 
 constexpr auto kLevelMin = 4;
+using Staircases = std::map<Deg, Staircase>;
+using Staircases1d = std::vector<Staircases>;
 
 /* A custom Exception class */
 class SSException : public MyException
@@ -25,32 +27,42 @@ public:
 
 struct NullDiff { int index, num_tgts, first_r; };
 
+class NullDiffs
+{
+public:
+	std::map<Deg, NullDiff> null_diffs_; //TODO: This only captures a single null differential in the same degree
+public:
+	void InitNullDiffs(const Staircases1d& basis_ss, bool bNew);
+};
+
 class CacheDeduction
 {
 public:
-	std::vector<std::map<Deg, NullDiff>> null_diffs_;
+	std::vector<std::map<Deg, NullDiff>> null_diffs_; //TODO: This only captures a single null differential in the same degree
 	std::vector<Deg> degs_;
 	std::vector<int> indices_;
 public:
 	const NullDiff& GetRecentNullDiff(const Deg& deg) const;
 	void push_back() { null_diffs_.push_back({}); degs_.push_back(Deg{ -1, -1, -1 }); indices_.push_back(-1); }
 	void pop_back() { null_diffs_.pop_back(); degs_.pop_back(); indices_.pop_back(); }
-	void InitNullDiffs(const std::vector<std::map<Deg, Staircase>>& basis_ss);
+	void InitNullDiffs(const Staircases1d& basis_ss);
 };
 
 /* Staircase utilities */
-const Staircase& GetRecentStaircase(const std::vector<std::map<Deg, Staircase>>& basis_ss, const Deg& deg);
-void ApplyChanges(std::vector<std::map<Deg, Staircase>>& basis_ss);
+const Staircase& GetRecentStaircase(const Staircases1d& basis_ss, const Deg& deg);
+void ApplyAllChanges(Staircases1d& basis_ss);
+void ApplyRecentChanges(Staircases1d& basis_ss);
 std::ostream& operator<<(std::ostream& sout, const Staircase& sc);
 size_t GetFirstIndexOfLevel(const Staircase& sc, int level);
 size_t GetFirstIndexOfKnownLevels(const Staircase& sc, int level);
-std::tuple<int, Deg, int> CountTgt(const std::vector<std::map<Deg, Staircase>>& basis_ss, const Deg& deg, int r);
-std::tuple<int, Deg, int> CountSrc(const std::vector<std::map<Deg, Staircase>>& basis_ss, const Deg& deg, int level);
+bool NoNullDiff(const Staircases1d& basis_ss);
+std::tuple<int, Deg, int> CountTgt(const Staircases1d& basis_ss, const Deg& deg, int r);
+std::tuple<int, Deg, int> CountSrc(const Staircases1d& basis_ss, const Deg& deg, int level);
 
 /* Management of the data structure of spectral sequences */
-void AddImage(std::vector<std::map<Deg, Staircase>>& basis_ss, const Deg& deg_dx, array dx, array x, int r);
-void AddDiff(std::vector<std::map<Deg, Staircase>>& basis_ss, const Deg& deg_x, array x, array dx, int r);
-void SetDiff(const grbn::GbWithCache& gb, const std::map<Deg, Mon1d>& basis, std::vector<std::map<Deg, Staircase>>& basis_ss, Deg deg_x, array x, array dx, int r);
+void AddImage(Staircases1d& basis_ss, const Deg& deg_dx, array dx, array x, int r);
+void AddDiff(Staircases1d& basis_ss, const Deg& deg_x, array x, array dx, int r);
+void SetDiff(const grbn::GbWithCache& gb, const std::map<Deg, Mon1d>& basis, Staircases1d& basis_ss, Deg deg_x, array x, array dx, int r);
 void DeduceDiffs(const Database& db, const std::string& table_prefix, int t_max, bool bForEt = false);
 
 void generate_basis(const Database& db, const std::string& table_prefix, int t_max, bool drop_existing = false);

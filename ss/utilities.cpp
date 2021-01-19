@@ -16,7 +16,7 @@ std::ostream& operator<<(std::ostream& sout, const Staircase& sc)
 }
 
 /* Return the newest version of the staircase in history */
-const Staircase& GetRecentStaircase(const std::vector<std::map<Deg, Staircase>>& basis_ss, const Deg& deg)
+const Staircase& GetRecentStaircase(const Staircases1d& basis_ss, const Deg& deg)
 {
 	for (auto p = basis_ss.rbegin(); p != basis_ss.rend(); ++p)
 		if (p->find(deg) != p->end())
@@ -24,14 +24,22 @@ const Staircase& GetRecentStaircase(const std::vector<std::map<Deg, Staircase>>&
 	throw MyException(0x553989e0U, "BUG: deg not found");
 }
 
-void ApplyChanges(std::vector<std::map<Deg, Staircase>>& basis_ss)
+void ApplyAllChanges(Staircases1d& basis_ss)
 {
 	for (auto p = basis_ss.front().begin(); p != basis_ss.front().end(); ++p) {
 		auto& sc = GetRecentStaircase(basis_ss, p->first);
 		if (&(p->second) != &sc)
-			p->second = sc;
+			p->second = std::move(sc);
 	}
 	basis_ss.resize(1);
+}
+
+void ApplyRecentChanges(Staircases1d& basis_ss)
+{
+	size_t index_before_last = basis_ss.size() - 2;
+	for (auto p = basis_ss.back().begin(); p != basis_ss.back().end(); ++p)
+		basis_ss[index_before_last][p->first] = std::move(p->second);
+	basis_ss.pop_back();
 }
 
 size_t GetFirstIndexOfLevel(const Staircase& sc, int level)
@@ -52,29 +60,51 @@ size_t GetFirstIndexOfKnownLevels(const Staircase& sc, int level)
 	return result;
 }
 
+bool NoNullDiff(const Staircases1d& basis_ss)
+{
+	for (auto p = basis_ss.front().begin(); p != basis_ss.front().end(); ++p) {
+		const Staircase& sc = GetRecentStaircase(basis_ss, p->first);
+		for (size_t i = 0; i < sc.diffs_ind.size(); ++i)
+			if (sc.diffs_ind[i] == array{ -1 })
+				return false;
+	}
+	return true;
+}
+
+/* Count the number of all possible d_r targets.
+ * Return (count, index). */
+std::pair<int, int> CountDrTgt(const Staircases1d& basis_ss, const Deg& deg_tgt, int r)
+{
+	std::pair<int, int> result;
+	if (basis_ss.front().find(deg_tgt) != basis_ss.front().end()) {
+		const Staircase& sc_tgt = GetRecentStaircase(basis_ss, deg_tgt);
+		result.second = (int)GetFirstIndexOfLevel(sc_tgt, r);
+		result.first = (int)GetFirstIndexOfKnownLevels(sc_tgt, kLevelMax - r + 2) - result.second;
+	}
+	else
+		result = { 0, -1 };
+	return result;
+}
+
 /* Count the number of all possible targets.
- * Return (deg, count, index).
+ * Return (count, deg, index).
  * count>=2 means there are >= 2 elements in the range and 
  * deg corresponds to the one with the least r. */
-std::tuple<int, Deg, int> CountTgt(const std::vector<std::map<Deg, Staircase>>& basis_ss, const Deg& deg, int r)
+std::tuple<int, Deg, int> CountTgt(const Staircases1d& basis_ss, const Deg& deg, int r)
 {
 	Deg deg_tgt; int count = 0, index = -1;
 	const Staircase& sc = GetRecentStaircase(basis_ss, deg);
 	for (int r1 = r; r1 <= deg.v; r1 += 2) {
 		Deg d_tgt = deg + Deg{ 1, 0, -r1 };
-		if (basis_ss.front().find(d_tgt) != basis_ss.front().end()) {
-			const Staircase& sc_tgt = GetRecentStaircase(basis_ss, d_tgt);
-			int first_r1 = (int)GetFirstIndexOfLevel(sc_tgt, r1);
-			int c = (int)GetFirstIndexOfKnownLevels(sc_tgt, kLevelMax / 2) - first_r1;
-			if (c > 0) {
-				if (count == 0) {
-					deg_tgt = d_tgt;
-					index = first_r1;
-				}
-				count += c;
-				if (count >= 2)
-					break;
+		auto [c, first_r1] = CountDrTgt(basis_ss, d_tgt, r1);
+		if (c > 0) {
+			if (count == 0) {
+				deg_tgt = d_tgt;
+				index = first_r1;
 			}
+			count += c;
+			if (count >= 2)
+				break;
 		}
 	}
 	return std::make_tuple(count, deg_tgt, index);
@@ -84,7 +114,7 @@ std::tuple<int, Deg, int> CountTgt(const std::vector<std::map<Deg, Staircase>>& 
  * Return (Deg, count, index)
  * count>=2 means there are >= 2 elements in the range and 
  * deg corresponds to the one with the least r. */
-std::tuple<int, Deg, int> CountSrc(const std::vector<std::map<Deg, Staircase>>& basis_ss, const Deg& deg, int level)
+std::tuple<int, Deg, int> CountSrc(const Staircases1d& basis_ss, const Deg& deg, int level)
 {
 	Deg deg_src; int count = 0, index = -1;
 	int r_max = std::min(level, 2 * (deg.t - deg.s + 1) - deg.v);
@@ -94,7 +124,7 @@ std::tuple<int, Deg, int> CountSrc(const std::vector<std::map<Deg, Staircase>>& 
 		if (basis_ss.front().find(d_src) != basis_ss.front().end()) {
 			const Staircase& sc_src = GetRecentStaircase(basis_ss, d_src);
 			int first_Nmr1 = (int)GetFirstIndexOfLevel(sc_src, kLevelMax - r1);
-			int c = (int)GetFirstIndexOfKnownLevels(sc_src, kLevelMax - r1) - first_Nmr1;
+			int c = (int)GetFirstIndexOfKnownLevels(sc_src, kLevelMax - r1 + 2) - first_Nmr1;
 			if (c > 0) {
 				if (count == 0) {
 					deg_src = d_src;
@@ -109,6 +139,29 @@ std::tuple<int, Deg, int> CountSrc(const std::vector<std::map<Deg, Staircase>>& 
 	return std::make_tuple(count, deg_src, index);
 }
 
+NullDiff GetNullDiff(const Staircases1d& basis_ss, const Deg& deg)
+{
+	NullDiff result{ -1, -1, -1 };
+	const Staircase& sc = GetRecentStaircase(basis_ss, deg);
+	for (size_t i = sc.diffs_ind.size(); i-- > 0;) {
+		if (sc.diffs_ind[i] == array{ -1 } && sc.levels[i] > kLevelMax / 4 * 3) {
+			int r = kLevelMax - sc.levels[i];
+			Deg deg_tgt = deg + Deg{ 1, 0, -r };
+			auto [num_tgts, first_r] = CountDrTgt(basis_ss, deg_tgt, r);
+			result = { (int)i, num_tgts, first_r };
+			break;
+		}
+	}
+	return result;
+}
+
+void NullDiffs::InitNullDiffs(const Staircases1d& basis_ss, bool bNew)
+{
+	const std::map<Deg, Staircase>& basis_ss0 = bNew ? basis_ss.front() : basis_ss.back();
+	for (auto p = basis_ss0.begin(); p != basis_ss0.end(); ++p)
+		null_diffs_[p->first] = GetNullDiff(basis_ss, p->first);
+}
+
 const NullDiff& CacheDeduction::GetRecentNullDiff(const Deg& deg) const
 {
 	for (auto p = null_diffs_.rbegin(); p != null_diffs_.rend(); ++p)
@@ -117,42 +170,23 @@ const NullDiff& CacheDeduction::GetRecentNullDiff(const Deg& deg) const
 	throw MyException(0xe7610d58U, "BUG: deg not found");
 }
 
-/* Cache the data about null diffs. Order them by number of targets. */
-void CacheDeduction::InitNullDiffs(const std::vector<std::map<Deg, Staircase>>& basis_ss) // r_min
+/* Cache the data about null diffs. Cache the deg of the least targets. */
+void CacheDeduction::InitNullDiffs(const Staircases1d& basis_ss)
 {
 	bool bNew = null_diffs_.size() == 1;
 	const std::map<Deg, Staircase>& basis_ss0 = bNew ? basis_ss.front() : basis_ss.back();
 
 	/* Initialize null_diffs_.back() */
-	for (auto p = basis_ss0.begin(); p != basis_ss0.end(); ++p) {
-		const Deg& deg = p->first;
-		const Staircase& sc = bNew ? GetRecentStaircase(basis_ss, deg) : basis_ss0.at(deg);
-		null_diffs_.back()[deg] = NullDiff{ -1, -1, -1 };
-		for (size_t i = 0; i < sc.diffs_ind.size(); ++i) {
-			if (sc.diffs_ind[i] == array{ -1 } && sc.levels[i] > kLevelMax / 2) {
-				int r = kLevelMax - sc.levels[i];
-				Deg deg_tgt = deg + Deg{ 1, 0, -r };
-				if (basis_ss.front().find(deg_tgt) != basis_ss.front().end()) {
-					const Staircase& sc_tgt = GetRecentStaircase(basis_ss, deg_tgt);
-					int first_r = (int)GetFirstIndexOfLevel(sc_tgt, r);
-					int num_tgt = (int)GetFirstIndexOfKnownLevels(sc_tgt, kLevelMax / 2) - first_r;
-					null_diffs_.back()[deg] = NullDiff{ (int)i, num_tgt, first_r };
-					break;
-				}
-				else
-					null_diffs_.back()[deg] = NullDiff{ (int)i, 0, -1 };
-			}
-		}
-	}
+	for (auto p = basis_ss0.begin(); p != basis_ss0.end(); ++p)
+		null_diffs_.back()[p->first] = GetNullDiff(basis_ss, p->first);
 
 	/* Initialize degs_.back() */
 	int min_num_tgts = INT_MAX;
 	for (auto p = null_diffs_.front().begin(); p != null_diffs_.front().end(); ++p) {
-		const Deg& deg = p->first;
-		int num_tgts = GetRecentNullDiff(deg).num_tgts;
+		int num_tgts = GetRecentNullDiff(p->first).num_tgts;
 		if (min_num_tgts > num_tgts && num_tgts >= 0) {
 			min_num_tgts = num_tgts;
-			degs_.back() = deg;
+			degs_.back() = p->first;
 		}
 	}
 }
@@ -203,7 +237,7 @@ Staircase triangularize(const Staircase& sc, size_t i_insert, array x, array dx,
 }
 
 /* Add d_r(x)=dx and d_r^{-1}(dx)=x. */
-void AddDiff(std::vector<std::map<Deg, Staircase>>& basis_ss, const Deg& deg_x, array x, array dx, int r)
+void AddDiff(Staircases1d& basis_ss, const Deg& deg_x, array x, array dx, int r)
 {
 	Deg deg_dx = deg_x + Deg{ 1, 0, -r };
 
@@ -259,7 +293,7 @@ void AddDiff(std::vector<std::map<Deg, Staircase>>& basis_ss, const Deg& deg_x, 
 
 /* Add an image of d_r.
  * Assume dx is nonempty. */
-void AddImage(std::vector<std::map<Deg, Staircase>>& basis_ss, const Deg& deg_dx, array dx, array x, int r)
+void AddImage(Staircases1d& basis_ss, const Deg& deg_dx, array dx, array x, int r)
 {
 	Deg deg_x = deg_dx - Deg{ 1, 0, -r };
 
@@ -300,7 +334,7 @@ void AddImage(std::vector<std::map<Deg, Staircase>>& basis_ss, const Deg& deg_dx
 
 /* Add d_r(x)=dx and all its implications.
  * deg_x must be in basis_ss. */
-void SetDiff(const grbn::GbWithCache& gb, const std::map<Deg, Mon1d>& basis, std::vector<std::map<Deg, Staircase>>& basis_ss, Deg deg_x, array x, array dx, int r)
+void SetDiff(const grbn::GbWithCache& gb, const std::map<Deg, Mon1d>& basis, Staircases1d& basis_ss, Deg deg_x, array x, array dx, int r)
 {
 	Deg deg_dx = deg_x + Deg{ 1, 0, -r };
 	int t_max = basis.rbegin()->first.t; //
