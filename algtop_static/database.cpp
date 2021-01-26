@@ -54,7 +54,7 @@ void Database::sqlite3_prepare_v100(const std::string& sql, sqlite3_stmt** ppStm
 {
 	int error_code = sqlite3_prepare_v2(conn_, sql.c_str(), int(sql.size()) + 1, ppStmt, NULL);
 	if (error_code != SQLITE_OK)
-		throw MyException(0xda6ab7f6U, sqlite3_errstr(error_code));
+		throw MyException(0xda6ab7f6U, "Sqlite3 compiling " + sql + " :" + sqlite3_errstr(error_code));
 }
 
 std::vector<Deg> Database::load_gen_degs(const std::string& table_name) const
@@ -115,6 +115,20 @@ Poly1d Database::load_gb(const std::string& table_name, int t_max) const
 	}
 	std::cout << "gb loaded from " << table_name << ", size=" << gb.size() << '\n';
 	return gb;
+}
+
+std::map<Deg, int> Database::load_indices(const std::string& table_name, int t_max) const
+{
+	std::map<Deg, int> result;
+	Statement stmt(*this, "SELECT s, t, v, min(base_id) FROM " + table_name + (t_max == -1 ? "" : " WHERE t<=" + std::to_string(t_max)) + " GROUP BY s, t, v;");
+	int count = 0;
+	while (stmt.step() == SQLITE_ROW) {
+		++count;
+		Deg d = { stmt.column_int(0), stmt.column_int(1), stmt.column_int(2) };
+		result[d] = stmt.column_int(3);
+	}
+	std::cout << "indices loaded from " << table_name << ", size=" << count << '\n';
+	return result;
 }
 
 std::map<Deg, Mon1d> Database::load_basis(const std::string& table_name, int t_max) const
@@ -331,6 +345,30 @@ void Database::save_basis_ss(const std::string& table_name, const std::map<Deg, 
 	}
 #ifdef DATABASE_SAVE_LOGGING
 	std::cout << "basis_ss is inserted into " + table_name + ", size=" << count << '\n';
+#endif
+}
+
+void Database::update_basis_ss(const std::string& table_name, const std::map<Deg, Staircase>& basis_ss) const
+{
+	std::map<Deg, int> indices = load_indices(table_name, -1);
+	Statement stmt(*this, "UPDATE " + table_name + " SET base=?1, diff=?2, level=?3 WHERE base_id=?4;");
+
+	int count = 0;
+	for (const auto& [deg, basis_ss_d] : basis_ss) {
+		for (size_t i = 0; i < basis_ss_d.basis_ind.size(); ++i) {
+			stmt.bind_str(1, array_to_str(basis_ss_d.basis_ind[i]));
+			if (basis_ss_d.diffs_ind[i] == array{ -1 })
+				stmt.bind_null(2);
+			else
+				stmt.bind_str(2, array_to_str(basis_ss_d.diffs_ind[i]));
+			stmt.bind_int(3, basis_ss_d.levels[i]);
+			stmt.bind_int(4, indices[deg] + (int)i);
+			stmt.step_and_reset();
+			++count;
+		}
+	}
+#ifdef DATABASE_SAVE_LOGGING
+	std::cout << "basis_ss " + table_name + " is updated, num_of_change=" << count << '\n';
 #endif
 }
 

@@ -5,6 +5,7 @@
 #include <iostream>
 #include <sstream>
 
+//#define SS_PHASE2
 #define DEDUCE_LOGGING
 
 /* If n = 2^k1 + ... + 2^kn,
@@ -23,11 +24,20 @@ array two_expansion(int n)
 }
 
 /* Deduce zero differentials for degree reason */
-int DeduceZeroDiffs(const grbn::GbWithCache& gb, const std::map<Deg, Mon1d>& basis, Staircases1d& basis_ss, bool bForEt = false)
+int DeduceZeroDiffs(const grbn::GbWithCache& gb, const std::map<Deg, Mon1d>& basis, Staircases1d& basis_ss, int t_max, bool bForEt = false, bool bPrint = false)
 {
+	if (t_max == -1)
+		t_max = basis.rbegin()->first.t;
+
 	int count_new_diffs = 0;
 	int prev_t = -1;
 	for (auto p = basis_ss.front().begin(); p != basis_ss.front().end(); ++p) {
+		if (bPrint && p->first.t != prev_t) {
+			std::cout << p->first.t << "     \r";
+			prev_t = p->first.t;
+		}
+		if (p->first.t > t_max)
+			break;
 		const Staircase& sc = GetRecentStaircase(basis_ss, p->first);
 		for (size_t i = 0; i < sc.levels.size(); ++i) {
 			if (sc.diffs_ind[i] == array{ -1 } && sc.levels[i] > kLevelMax / 2) {
@@ -51,11 +61,18 @@ int DeduceZeroDiffs(const grbn::GbWithCache& gb, const std::map<Deg, Mon1d>& bas
 }
 
 /* Use the fact everything in positive degree should be killed by differentials */
-int DeduceDiffsForEt(const grbn::GbWithCache& gb, const std::map<Deg, Mon1d>& basis, Staircases1d& basis_ss)
+int DeduceDiffsForEt(const grbn::GbWithCache& gb, const std::map<Deg, Mon1d>& basis, Staircases1d& basis_ss, int t_max, int bPrint = false)
 {
 	int count_new_diffs = 0;
+	int prev_t = -1;
 	/* Look for pairs of basis that can be only killed in one way */
 	for (auto p = basis_ss.front().begin(); p != basis_ss.front().end(); ++p) {
+		if (bPrint && p->first.t != prev_t) {
+			std::cout << p->first.t << "     \r";
+			prev_t = p->first.t;
+		}
+		if (p->first.t > t_max)
+			break;
 		const Deg deg = p->first;
 		const Staircase& sc = GetRecentStaircase(basis_ss, deg);
 
@@ -73,26 +90,17 @@ int DeduceDiffsForEt(const grbn::GbWithCache& gb, const std::map<Deg, Mon1d>& ba
 			if (count_tgt == 0 && count_src == 1) { /* It is a target */
 				int r = deg_src.v - deg.v;
 				if (index == 0 || sc.levels[index - 1] < r) {
-#ifdef DEDUCE_LOGGING
-					std::cout << deg << " <-- " << deg_src << '\n';
-#endif
 					++count_new_diffs;
 					SetDiff(gb, basis, basis_ss, deg_src, GetRecentStaircase(basis_ss, deg_src).basis_ind[index_src], sc.basis_ind[index], deg_src.v - deg.v);
 				}
 			}
 			else if (count_tgt == 1 && count_src == 0) { /* It is a source */
 				Staircase sc_tgt = GetRecentStaircase(basis_ss, deg_tgt);
-#ifdef DEDUCE_LOGGING
-				std::cout << deg << " --> " << deg_tgt << '\n';
-#endif
 				++count_new_diffs;
 				SetDiff(gb, basis, basis_ss, deg, sc.basis_ind[index], sc_tgt.basis_ind[index_tgt], deg.v - deg_tgt.v);
 			}
 			else if (count_tgt == 0 && count_src > 1) { /* It is a permanent cycle */
 				if (sc.levels[index] > kLevelMax / 2) {
-#ifdef DEDUCE_LOGGING
-					std::cout << deg << " --> 0\n";
-#endif
 					++count_new_diffs;
 					SetDiff(gb, basis, basis_ss, deg, sc.basis_ind[index], array{}, kLevelMax / 2 + 2);
 					AddImage(basis_ss, deg, sc.basis_ind[index], { -1 }, kLevelMax / 2 - 1);
@@ -109,34 +117,35 @@ int DeduceDiffsForEt(const grbn::GbWithCache& gb, const std::map<Deg, Mon1d>& ba
  * Return 0 if there is no global structure
  * Return 1 if there exists a global structure 
  * Return 2 if the search space is too big
- * Return 3 if the search depth is reached */
-int FindGlobalStructure(const grbn::GbWithCache& gb, const std::map<Deg, Mon1d>& basis, Staircases1d& basis_ss, int depth, bool bForEt = false)
+ * Return 3 if maximum number of iterations is reached */
+int FindGlobalStructure(const grbn::GbWithCache& gb, const std::map<Deg, Mon1d>& basis, Staircases1d& basis_ss, int t_max, int iter_max, bool bForEt = false)
 {
 	const size_t initial_history_length = basis_ss.size();
 	CacheDeduction cache_history;
 	cache_history.push_back();
-	cache_history.InitNullDiffs(basis_ss);
+	cache_history.InitNullDiffs(basis_ss, t_max);
 
+	int count_iterations = 0;
 	while (true) { /* Deep search for a global structure */
+		++count_iterations;
 		/* Find the place to start in cached history */
 		Deg deg = cache_history.degs_.back();
-		if (deg.s == -1) {
-			if (bForEt && !NoNullDiff(basis_ss)) { /* Invalid global structure. Roll back. */
-				if (cache_history.degs_.size() > 1) {
-					basis_ss.pop_back();
-					cache_history.pop_back();
-					continue;
-				}
-				else
-					return 0; /* No global structure */
+		if (bForEt && cache_history.degs_.size() > 1 && deg.t != cache_history.degs_[cache_history.degs_.size() - 2].t) {
+			if (!NoNullDiff(basis_ss, cache_history.degs_[cache_history.degs_.size() - 2].t)) { /* Invalid global structure at degree t. Roll back. */
+				basis_ss.pop_back();
+				cache_history.pop_back();
+				continue;
 			}
-			//basis_ss.resize(initial_history_length);
+		}
+		if (deg.s == -1) {
+			basis_ss.resize(initial_history_length);
 			return 1; /* Find one global structure */
 		}
-		if (depth != -1 && cache_history.degs_.size() > depth) {
+		if (iter_max != -1 && count_iterations >= iter_max) {
 			basis_ss.resize(initial_history_length);
-			return 3; /* search depth is reached */
+			return 3; /* maximum number of iterations is reached */
 		}
+
 		const NullDiff& nd = cache_history.GetRecentNullDiff(deg);
 		if (nd.num_tgts > 10) {
 			basis_ss.resize(initial_history_length);
@@ -162,18 +171,18 @@ int FindGlobalStructure(const grbn::GbWithCache& gb, const std::map<Deg, Mon1d>&
 		if (nd.num_tgts > 0) { /* tgt is zero when there is only one choice */
 			const Deg deg_tgt = deg + Deg{ 1, 0, -r };
 			const Staircase& sc_tgt = GetRecentStaircase(basis_ss, deg_tgt);
-			for (int j : two_expansion(i))
+			for (int j : two_expansion((1 << nd.num_tgts) - 1 - i))
 				tgt = lina::AddVectors(tgt, sc_tgt.basis_ind[(size_t)nd.first_r + j]);
 		}
 
 		basis_ss.push_back({}); /* Warning: this invalidates references above */
 		cache_history.push_back();
 		try {
-			SetDiff(gb, basis, basis_ss, deg, src, tgt, r);
-			DeduceZeroDiffs(gb, basis, basis_ss, bForEt);
+			SetDiff(gb, basis, basis_ss, deg, std::move(src), std::move(tgt), r, t_max);
+			DeduceZeroDiffs(gb, basis, basis_ss, t_max, bForEt);
 			if (bForEt)
-				DeduceDiffsForEt(gb, basis, basis_ss);
-			cache_history.InitNullDiffs(basis_ss);
+				DeduceDiffsForEt(gb, basis, basis_ss, t_max);
+			cache_history.InitNullDiffs(basis_ss, t_max);
 		}
 		catch (SSException&) { /* Try the next possibility */
 			basis_ss.pop_back();
@@ -182,10 +191,11 @@ int FindGlobalStructure(const grbn::GbWithCache& gb, const std::map<Deg, Mon1d>&
 	}
 }
 
-int DeduceDiffsByTrying(const grbn::GbWithCache& gb, const std::map<Deg, Mon1d>& basis, Staircases1d& basis_ss, int depth, bool bForEt = false)
+int DeduceDiffsByTrying(const grbn::GbWithCache& gb, const std::map<Deg, Mon1d>& basis, Staircases1d& basis_ss, int t_try, int t_test, int iter_max, bool bForEt = false)
 {
+	int count_new_diffs = 0;
 	NullDiffs nullDiffs;
-	nullDiffs.InitNullDiffs(basis_ss, true);
+	nullDiffs.InitNullDiffs(basis_ss, t_try, true);
 
 	/* List the degrees */
 	std::vector<Deg> degs;
@@ -197,11 +207,17 @@ int DeduceDiffsByTrying(const grbn::GbWithCache& gb, const std::map<Deg, Mon1d>&
 			nums_tgts.push_back(num_tgts);
 		}
 	}
-	std::sort(degs.begin(), degs.end(), [&degs, &nums_tgts](const Deg& d1, const Deg& d2) {return nums_tgts[&d1 - &degs[0]] < nums_tgts[&d2 - &degs[0]]; });
+	array indices_degs = grbn::range((int)degs.size());
+	std::sort(indices_degs.begin(), indices_degs.end(), [nums_tgts](int i1, int i2) {return nums_tgts[i1] < nums_tgts[i2]; });
 
-	for (auto& deg : degs) {
+	int index_count = 0;
+	for (int index_degs : indices_degs) {
+		std::cout << ++index_count << '/' << indices_degs.size() << " " << count_new_diffs << "      \r";
+		const Deg& deg = degs[index_degs];
 		const Staircase& sc = GetRecentStaircase(basis_ss, deg);
 		const NullDiff& nd = nullDiffs.null_diffs_.at(deg);
+		if (nd.index == -1)
+			continue;
 		const int r = kLevelMax - sc.levels[nd.index];
 		const Deg deg_tgt = deg + Deg{ 1, 0, -r };
 		array src = sc.basis_ind[nd.index];
@@ -209,23 +225,31 @@ int DeduceDiffsByTrying(const grbn::GbWithCache& gb, const std::map<Deg, Mon1d>&
 
 		int count_pass = 0;
 		for (int i = 0; i < (1 << nd.num_tgts); ++i) {
-			/* Calculate the diff */
+			/* Calculate tgt */
 			array tgt;
 			if (nd.num_tgts > 0) {
 				const Staircase& sc_tgt = GetRecentStaircase(basis_ss, deg_tgt);
-				for (int j : two_expansion(i))
+				for (int j : two_expansion((1 << nd.num_tgts) - 1 - i))
 					tgt = lina::AddVectors(tgt, sc_tgt.basis_ind[(size_t)nd.first_r + j]);
 			}
-#ifdef DEDUCE_LOGGING
-			std::cout << "Try " << i << '/' << (1 << nd.num_tgts) << ": " << deg << " d_{" << r << '}' << src << '=' << tgt;
-#endif
-			basis_ss.push_back({}); /* Warning: invalidate references above */
+
+			//std::cout << "Try " << i + 1 << '/' << (1 << nd.num_tgts) << ": " << deg << " d_{" << r << '}' << src << '=' << tgt;
+
+			if (i == (1 << nd.num_tgts) - 1 && count_pass == 0) {
+				//std::cout << " Accepted\n";
+				tgt_pass = tgt;
+				++count_pass;
+				break;
+			}
+
+			basis_ss.push_back({}); /* Warning: invalidate references sc above */
 			bool bException = false;
 			try {
 				SetDiff(gb, basis, basis_ss, deg, src, tgt, r);
+				DeduceZeroDiffs(gb, basis, basis_ss, -1, bForEt);
 				if (bForEt)
-					while (DeduceDiffsForEt(gb, basis, basis_ss));
-				if (!FindGlobalStructure(gb, basis, basis_ss, depth, bForEt))
+					DeduceDiffsForEt(gb, basis, basis_ss, -1);
+				if (!FindGlobalStructure(gb, basis, basis_ss, t_test, iter_max, bForEt))
 					bException = true;
 			}
 			catch (SSException&) {
@@ -233,32 +257,102 @@ int DeduceDiffsByTrying(const grbn::GbWithCache& gb, const std::map<Deg, Mon1d>&
 			}
 			basis_ss.pop_back();
 			if (!bException) {
-				tgt_pass = tgt;
+				//std::cout << " Success\n";
+				tgt_pass = std::move(tgt);
 				++count_pass;
-#ifdef DEDUCE_LOGGING
-				std::cout << " Success\n";
-#endif
 				if (count_pass > 1)
 					break;
 			}
-#ifdef DEDUCE_LOGGING
-			else
-				std::cout << " Fail\n";
-#endif
+			//else
+				//std::cout << " Fail\n";
 		}
 		if (count_pass == 0)
 			throw SSException(0x5b3d7e35U, "no compatible differentials");
 		else if (count_pass == 1) {
 			basis_ss.push_back({});
-			SetDiff(gb, basis, basis_ss, deg, src, tgt_pass, r);
-			DeduceZeroDiffs(gb, basis, basis_ss, bForEt);
+			std::cout << deg << " d_{" << r << '}' << src << '=' << tgt_pass << '\n';
+			SetDiff(gb, basis, basis_ss, deg, std::move(src), std::move(tgt_pass), r);
+			DeduceZeroDiffs(gb, basis, basis_ss, -1, bForEt);
 			if (bForEt)
-				DeduceDiffsForEt(gb, basis, basis_ss);
-			nullDiffs.InitNullDiffs(basis_ss, false);
+				DeduceDiffsForEt(gb, basis, basis_ss, -1);
+			nullDiffs.InitNullDiffs(basis_ss, t_try, false);
 			ApplyRecentChanges(basis_ss);
+			++count_new_diffs;
 		}
 	}
-	return 0;
+	return count_new_diffs;
+}
+
+void WrapDeduceZeroDiffs(const Database& db, const std::string& table_prefix, int t_max, bool bForEt /*= false*/)
+{
+	const grbn::GbWithCache gb = db.load_gb(table_prefix + "_relations", t_max);
+	const std::map<Deg, Mon1d> basis = db.load_basis(table_prefix + "_basis", t_max);
+	Staircases1d basis_ss = { db.load_basis_ss(table_prefix + "_ss", -1), {} };
+
+	int count = 0;
+	try {
+		count = DeduceZeroDiffs(gb, basis, basis_ss, t_max, bForEt, true);
+
+		db.begin_transaction();
+		db.update_basis_ss(table_prefix + "_ss", basis_ss[1]);
+		db.end_transaction();
+	}
+	catch (SSException& e) {
+		std::cerr << "Error code " << std::hex << e.id() << ": " << e.what() << '\n';
+	}
+	catch (MyException& e) {
+		std::cerr << "MyError " << std::hex << e.id() << ": " << e.what() << '\n';
+	}
+
+	std::cout << "Changed differentials: " << count << '\n';
+}
+
+void WrapDeduceDiffsForEt(const Database& db, const std::string& table_prefix, int t_max)
+{
+	const grbn::GbWithCache gb = db.load_gb(table_prefix + "_relations", t_max);
+	const std::map<Deg, Mon1d> basis = db.load_basis(table_prefix + "_basis", t_max);
+	Staircases1d basis_ss = { db.load_basis_ss(table_prefix + "_ss", -1), {} };
+
+	int count = 0;
+	try {
+		count = DeduceDiffsForEt(gb, basis, basis_ss, t_max, true);
+
+		db.begin_transaction();
+		db.update_basis_ss(table_prefix + "_ss", basis_ss[1]);
+		db.end_transaction();
+	}
+	catch (SSException& e) {
+		std::cerr << "Error " << std::hex << e.id() << ": " << e.what() << '\n';
+	}
+	catch (MyException& e) {
+		std::cerr << "MyError " << std::hex << e.id() << ": " << e.what() << '\n';
+	}
+
+	std::cout << "Changed differentials: " << count << '\n';
+}
+
+void WrapDeduceDiffsByTrying(const Database& db, const std::string& table_prefix, int t_try, int t_test, int iter_max, bool bForEt /*= false*/)
+{
+	const grbn::GbWithCache gb = db.load_gb(table_prefix + "_relations", -1);
+	const std::map<Deg, Mon1d> basis = db.load_basis(table_prefix + "_basis", -1);
+	Staircases1d basis_ss = { db.load_basis_ss(table_prefix + "_ss", -1), {} };
+
+	int count = 0;
+	try {
+		count = DeduceDiffsByTrying(gb, basis, basis_ss, t_try, t_test, iter_max, bForEt);
+
+		db.begin_transaction();
+		db.update_basis_ss(table_prefix + "_ss", basis_ss[1]);
+		db.end_transaction();
+	}
+	catch (SSException& e) {
+		std::cerr << "Error code " << std::hex << e.id() << ": " << e.what() << '\n';
+	}
+	catch (MyException& e) {
+		std::cerr << "MyError " << std::hex << e.id() << ": " << e.what() << '\n';
+	}
+
+	std::cout << "Changed differentials: " << count << '\n';
 }
 
 /* generate the table of the spectral sequence */
@@ -266,20 +360,50 @@ void DeduceDiffs(const Database& db, const std::string& table_prefix, int t_max,
 {
 	const grbn::GbWithCache gb = db.load_gb(table_prefix + "_relations", t_max);
 	const std::map<Deg, Mon1d> basis = db.load_basis(table_prefix + "_basis", t_max);
+#ifndef SS_PHASE2
 	Staircases1d basis_ss = { db.load_basis_ss(table_prefix + "_ss", t_max) };
-
+#else
+	Staircases1d basis_ss = { db.load_basis_ss(table_prefix + "_ss_tmp", t_max) };
+#endif
+#ifndef SS_PHASE2
 	try {
 		while (true) {
 			int count1 = DeduceZeroDiffs(gb, basis, basis_ss, true);
 			std::cout << "DeduceZeroDiffs: " << count1 << '\n';
 
-			int count2 = DeduceDiffsForEt(gb, basis, basis_ss);
+			int count2 = DeduceDiffsForEt(gb, basis, basis_ss, -1);
 			std::cout << "DeduceDiffsForEt: " << count2 << '\n';
 
-			//int count3 = DeduceDiffsByTrying(gb, basis, basis_ss, 0, true);
-			//std::cout << "DeduceDiffsByTrying: " << count3 << '\n';
+			int count3 = DeduceDiffsByTrying(gb, basis, basis_ss, -1, -1, 500, true);
+			std::cout << "DeduceDiffsByTrying: " << count3 << '\n';
 
-			if (count1 + count2 /*+ count3*/ == 0)
+			if (count1 + count2 + count3 == 0)
+				break;
+		}
+		while (true) {
+			int count1 = DeduceZeroDiffs(gb, basis, basis_ss, true);
+			std::cout << "DeduceZeroDiffs: " << count1 << '\n';
+
+			int count2 = DeduceDiffsForEt(gb, basis, basis_ss, -1);
+			std::cout << "DeduceDiffsForEt: " << count2 << '\n';
+
+			int count3 = DeduceDiffsByTrying(gb, basis, basis_ss, -1, -1, 1000, true);
+			std::cout << "DeduceDiffsByTrying: " << count3 << '\n';
+
+			if (count1 + count2 + count3 == 0)
+				break;
+		}
+		while (true) {
+			int count1 = DeduceZeroDiffs(gb, basis, basis_ss, true);
+			std::cout << "DeduceZeroDiffs: " << count1 << '\n';
+
+			int count2 = DeduceDiffsForEt(gb, basis, basis_ss, -1);
+			std::cout << "DeduceDiffsForEt: " << count2 << '\n';
+
+			int count3 = DeduceDiffsByTrying(gb, basis, basis_ss, -1, -1, 2000, true);
+			std::cout << "DeduceDiffsByTrying: " << count3 << '\n';
+
+			if (count1 + count2 + count3 == 0)
 				break;
 		}
 	}
@@ -287,12 +411,20 @@ void DeduceDiffs(const Database& db, const std::string& table_prefix, int t_max,
 	{
 		std::cerr << "Error-" << std::hex << e.id() << ": " << e.what() << '\n';
 	}
-	FindGlobalStructure(gb, basis, basis_ss, -1, true);
+#else
+	int code = FindGlobalStructure(gb, basis, basis_ss, -1, true);
+	std::cout << "\ncode: " << code << "            \n";
 	ApplyAllChanges(basis_ss);
+#endif
 	
 	/* insert into the database */
 	db.begin_transaction();
+#ifndef SS_PHASE2
 	db.execute_cmd("DELETE FROM " + table_prefix + "_ss_tmp;");
 	db.save_basis_ss(table_prefix + "_ss_tmp", basis_ss.front());
+#else
+	db.execute_cmd("DELETE FROM " + table_prefix + "_ss_tmp1;");
+	db.save_basis_ss(table_prefix + "_ss_tmp1", basis_ss.front());
+#endif
 	db.end_transaction();
 }

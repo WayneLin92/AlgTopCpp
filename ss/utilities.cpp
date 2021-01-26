@@ -24,14 +24,14 @@ const Staircase& GetRecentStaircase(const Staircases1d& basis_ss, const Deg& deg
 	throw MyException(0x553989e0U, "BUG: deg not found");
 }
 
-void ApplyAllChanges(Staircases1d& basis_ss)
+void ApplyAllChanges(Staircases1d& basis_ss, size_t nHistory /*= 0*/)
 {
-	for (auto p = basis_ss.front().begin(); p != basis_ss.front().end(); ++p) {
+	for (auto p = basis_ss[nHistory].begin(); p != basis_ss[nHistory].end(); ++p) {
 		auto& sc = GetRecentStaircase(basis_ss, p->first);
 		if (&(p->second) != &sc)
 			p->second = std::move(sc);
 	}
-	basis_ss.resize(1);
+	basis_ss.resize(nHistory + 1);
 }
 
 void ApplyRecentChanges(Staircases1d& basis_ss)
@@ -60,9 +60,12 @@ size_t GetFirstIndexOfKnownLevels(const Staircase& sc, int level)
 	return result;
 }
 
-bool NoNullDiff(const Staircases1d& basis_ss)
+/* Return if there is no null differential in degree t */
+bool NoNullDiff(const Staircases1d& basis_ss, int t)
 {
-	for (auto p = basis_ss.front().begin(); p != basis_ss.front().end(); ++p) {
+	auto p1 = basis_ss.front().lower_bound(Deg{ 0, t, 0 });
+	auto p2 = basis_ss.front().lower_bound(Deg{ 0, t + 1, 0 });
+	for (auto p = p1; p != p2; ++p) {
 		const Staircase& sc = GetRecentStaircase(basis_ss, p->first);
 		for (size_t i = 0; i < sc.diffs_ind.size(); ++i)
 			if (sc.diffs_ind[i] == array{ -1 })
@@ -155,11 +158,16 @@ NullDiff GetNullDiff(const Staircases1d& basis_ss, const Deg& deg)
 	return result;
 }
 
-void NullDiffs::InitNullDiffs(const Staircases1d& basis_ss, bool bNew)
+void NullDiffs::InitNullDiffs(const Staircases1d& basis_ss, int t_max, bool bNew)
 {
 	const std::map<Deg, Staircase>& basis_ss0 = bNew ? basis_ss.front() : basis_ss.back();
-	for (auto p = basis_ss0.begin(); p != basis_ss0.end(); ++p)
+	if (t_max == -1)
+		t_max = INT_MAX;
+	for (auto p = basis_ss0.begin(); p != basis_ss0.end(); ++p) {
+		if (p->first.t > t_max)
+			break;
 		null_diffs_[p->first] = GetNullDiff(basis_ss, p->first);
+	}
 }
 
 const NullDiff& CacheDeduction::GetRecentNullDiff(const Deg& deg) const
@@ -171,22 +179,29 @@ const NullDiff& CacheDeduction::GetRecentNullDiff(const Deg& deg) const
 }
 
 /* Cache the data about null diffs. Cache the deg of the least targets. */
-void CacheDeduction::InitNullDiffs(const Staircases1d& basis_ss)
+void CacheDeduction::InitNullDiffs(const Staircases1d& basis_ss, int t_max)
 {
 	bool bNew = null_diffs_.size() == 1;
 	const std::map<Deg, Staircase>& basis_ss0 = bNew ? basis_ss.front() : basis_ss.back();
+	if (t_max == -1)
+		t_max = INT_MAX;
 
 	/* Initialize null_diffs_.back() */
-	for (auto p = basis_ss0.begin(); p != basis_ss0.end(); ++p)
+	for (auto p = basis_ss0.begin(); p != basis_ss0.end(); ++p) {
+		if (p->first.t > t_max)
+			break;
 		null_diffs_.back()[p->first] = GetNullDiff(basis_ss, p->first);
+	}
 
 	/* Initialize degs_.back() */
 	int min_num_tgts = INT_MAX;
 	for (auto p = null_diffs_.front().begin(); p != null_diffs_.front().end(); ++p) {
+		if (p->first.t > t_max)
+			break;
 		int num_tgts = GetRecentNullDiff(p->first).num_tgts;
-		if (min_num_tgts > num_tgts && num_tgts >= 0) {
-			min_num_tgts = num_tgts;
+		if (num_tgts >= 0 && (degs_.back().t == -1 || degs_.back().t > p->first.t || (degs_.back().t == p->first.t && min_num_tgts > num_tgts))) {
 			degs_.back() = p->first;
+			min_num_tgts = num_tgts;
 		}
 	}
 }
@@ -231,7 +246,7 @@ Staircase triangularize(const Staircase& sc, size_t i_insert, array x, array dx,
 	}
 #ifdef _DEBUG
 	if (sc_new.basis_ind.size() != sc.basis_ind.size())
-		throw MyException(0xdd696043U, "BUG");
+		throw MyException(0xdd696043U, "BUG: triangularize()");
 #endif
 	return sc_new;
 }
@@ -244,7 +259,7 @@ void AddDiff(Staircases1d& basis_ss, const Deg& deg_x, array x, array dx, int r)
 	/* If x is zero then dx is in Im(d_{r-2}) */
 	if (x.empty()) {
 		if (dx != array{ -1 } && !dx.empty())
-			AddImage(basis_ss, deg_dx, dx, { -1 }, r - 2);
+			AddImage(basis_ss, deg_dx, std::move(dx), { -1 }, r - 2);
 		return;
 	}
 
@@ -254,7 +269,7 @@ void AddDiff(Staircases1d& basis_ss, const Deg& deg_x, array x, array dx, int r)
 	x = lina::Residue(sc.basis_ind.begin(), sc.basis_ind.begin() + first_Nmr, x);
 	if (x.empty()) {
 		if (dx != array{ -1 } && !dx.empty())
-			AddImage(basis_ss, deg_dx, dx, { -1 }, r - 2);
+			AddImage(basis_ss, deg_dx, std::move(dx), { -1 }, r - 2);
 		return;
 	}
 
@@ -271,7 +286,7 @@ void AddDiff(Staircases1d& basis_ss, const Deg& deg_x, array x, array dx, int r)
 		basis_ss.back()[deg_x] = triangularize(sc, first_Nmr, x, { -1 }, kLevelMax - r - 2, image_new, level_image_new);
 	}
 	else { /* Otherwise insert it to the beginning of level N-r */
-		basis_ss.back()[deg_x] = triangularize(sc, first_Nmr, x, dx, kLevelMax - r, image_new, level_image_new);
+		basis_ss.back()[deg_x] = triangularize(sc, first_Nmr, x, dx, kLevelMax - r, image_new, level_image_new); //
 	}
 
 	if (level_image_new != -1) {
@@ -334,11 +349,12 @@ void AddImage(Staircases1d& basis_ss, const Deg& deg_dx, array dx, array x, int 
 
 /* Add d_r(x)=dx and all its implications.
  * deg_x must be in basis_ss. */
-void SetDiff(const grbn::GbWithCache& gb, const std::map<Deg, Mon1d>& basis, Staircases1d& basis_ss, Deg deg_x, array x, array dx, int r)
+void SetDiff(const grbn::GbWithCache& gb, const std::map<Deg, Mon1d>& basis, Staircases1d& basis_ss, Deg deg_x, array x, array dx, int r, int t_max /*= -1*/)
 {
-	Deg deg_dx = deg_x + Deg{ 1, 0, -r };
-	int t_max = basis.rbegin()->first.t; //
+	if (t_max == -1)
+		t_max = basis.rbegin()->first.t;
 
+	Deg deg_dx = deg_x + Deg{ 1, 0, -r };
 	for (auto& [deg_y, basis_ss_d_original] : basis_ss.front()) {
 		const Staircase& basis_ss_d = GetRecentStaircase(basis_ss, deg_y);
 		Deg deg_dy = deg_y + Deg{ 1, 0, -r };
@@ -356,7 +372,7 @@ void SetDiff(const grbn::GbWithCache& gb, const std::map<Deg, Mon1d>& basis, Sta
 					Poly poly_dxy = grbn::Reduce(poly_x * poly_dy + poly_dx * poly_y, gb);
 					array dxy = poly_dxy.empty() ? array{} : Poly_to_indices(poly_dxy, basis.at(deg_x + deg_dy));
 
-					AddDiff(basis_ss, deg_x + deg_y, xy, dxy, r);
+					AddDiff(basis_ss, deg_x + deg_y, std::move(xy), std::move(dxy), r);
 				}
 			}
 			else if (r <= basis_ss_d.levels[i] && basis_ss_d.levels[i] < kLevelMax - r) { /* y is a d_r cycle */
@@ -368,7 +384,7 @@ void SetDiff(const grbn::GbWithCache& gb, const std::map<Deg, Mon1d>& basis, Sta
 				Poly poly_dxy = grbn::Reduce(poly_dx * poly_y, gb);
 				array dxy = poly_dxy.empty() ? array{} : Poly_to_indices(poly_dxy, basis.at(deg_x + deg_dy));
 
-				AddDiff(basis_ss, deg_x + deg_y, xy, dxy, r);
+				AddDiff(basis_ss, deg_x + deg_y, std::move(xy), std::move(dxy), r);
 			}
 		}
 	}

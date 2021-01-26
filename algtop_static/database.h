@@ -49,6 +49,7 @@ public:
 	Poly1d load_gen_reprs(const std::string& table_name) const;
 	Mon2d load_leading_terms(const std::string& table_name, int t_max) const;
 	Poly1d load_gb(const std::string& table_name, int t_max) const;
+	std::map<Deg, int> load_indices(const std::string& table_name, int t_max) const;
 	std::map<Deg, Mon1d> load_basis(const std::string& table_name, int t_max) const;
 	std::map<Deg, array2d> load_mon_diffs_ind(const std::string& table_name, int t_max, int withnull=false) const;
 	std::map<Deg, Poly1d> load_mon_diffs(const std::string& table_name, const std::map<Deg, Mon1d>& basis, int r, int t_max) const;
@@ -63,6 +64,7 @@ public:
 	void save_basis(const std::string& table_name, const std::map<Deg, Mon1d>& basis, const std::map<Deg, array2d>& mon_reprs) const;
 	void save_basis(const std::string& table_name, const std::map<Deg, Mon1d>& basis, const std::map<Deg, Poly1d>& mon_reprs) const;
 	void save_basis_ss(const std::string& table_name, const std::map<Deg, Staircase>& basis_ss) const;
+	void update_basis_ss(const std::string& table_name, const std::map<Deg, Staircase>& basis_ss) const;
 private:
 	sqlite3* conn_ = nullptr;
 };
