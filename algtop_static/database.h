@@ -1,7 +1,7 @@
 #ifndef DATABSE_H
 #define DATABSE_H
 
-//#define DATABASE_SAVE_LOGGING /* This is a switch to print what are saved to the database */
+#define DATABASE_SAVE_LOGGING /* This is a switch to print what are saved to the database */
 
 #include "algebras.h"
 #include <string>

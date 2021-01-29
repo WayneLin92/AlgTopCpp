@@ -1,4 +1,4 @@
-#include "database.h"
+ #include "database.h"
 #include "sqlite3/sqlite3.h"
 #include "myio.h"
 #include "myexception.h"

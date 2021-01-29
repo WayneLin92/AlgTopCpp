@@ -47,6 +47,27 @@ size_t GetFirstIndexOfLevel(const Staircase& sc, int level)
 	return std::lower_bound(sc.levels.begin(), sc.levels.end(), level) - sc.levels.begin();
 }
 
+/* Find the position of the first base with null diff in level */
+size_t GetFirstIndexOfLevelNull(const Staircase& sc, int level)
+{
+	array::const_iterator first = std::lower_bound(sc.levels.begin(), sc.levels.end(), level);
+	array::const_iterator last = std::lower_bound(first, sc.levels.end(), level + 2);
+
+	array::const_iterator it;
+	ptrdiff_t count, step;
+	count = std::distance(first, last);
+	while (count > 0)
+	{
+		it = first; step = count / 2; advance(it, step);
+		if (*(sc.diffs_ind.begin() + (it - sc.levels.begin())) != array{ -1 }) {
+			first = ++it;
+			count -= step + 1;
+		}
+		else count = step;
+	}
+	return first - sc.levels.begin();
+}
+
 /* Return the first index of a level such that all levels above (inclusive) have known differentials */
 size_t GetFirstIndexOfKnownLevels(const Staircase& sc, int level)
 {
@@ -208,47 +229,51 @@ void CacheDeduction::InitNullDiffs(const Staircases1d& basis_ss, int t_max)
 
 /* Add x, dx, level and triangularize.
  * Output the image of a differential that should be moved to the next level */
-Staircase triangularize(const Staircase& sc, size_t i_insert, array x, array dx, int level, array& image, int& level_image)
+void triangularize(Staircase& sc, size_t i_insert, array x, array dx, int level, array& image, int& level_image)
 {
 	level_image = -1;
-	Staircase sc_new;
 
-	/* Copy the first part */
-	sc_new.basis_ind.insert(sc_new.basis_ind.end(), sc.basis_ind.begin(), sc.basis_ind.begin() + i_insert);
-	sc_new.diffs_ind.insert(sc_new.diffs_ind.end(), sc.diffs_ind.begin(), sc.diffs_ind.begin() + i_insert);
-	sc_new.levels.insert(sc_new.levels.end(), sc.levels.begin(), sc.levels.begin() + i_insert);
+	size_t i = i_insert;
+	while (!x.empty()) {
+		std::swap(x, sc.basis_ind[i]);
+		std::swap(dx, sc.diffs_ind[i]);
+		std::swap(level, sc.levels[i]);
 
-	/* Add x, dx, level at the insertion point */
-	sc_new.basis_ind.push_back(std::move(x));
-	sc_new.diffs_ind.push_back(std::move(dx));
-	sc_new.levels.push_back(level);
-
-	/* Triangularize the rest */
-	for (size_t i = i_insert; i < sc.basis_ind.size(); ++i) {
-		array base_ind = sc.basis_ind[i];
-		array diff_ind = sc.diffs_ind[i];
-		for (size_t j = i_insert; j < sc_new.basis_ind.size(); ++j) {
-			if (std::binary_search(base_ind.begin(), base_ind.end(), sc_new.basis_ind[j][0])) {
-				base_ind = lina::AddVectors(base_ind, sc_new.basis_ind[j]);
-				if (sc.levels[i] == sc_new.levels[j] && diff_ind != array{ -1 })
-					diff_ind = lina::AddVectors(diff_ind, sc_new.diffs_ind[j]);
+		++i;
+		for (size_t j = i_insert; j < i; ++j) {
+			if (std::binary_search(x.begin(), x.end(), sc.basis_ind[j][0])) {
+				x = lina::AddVectors(x, sc.basis_ind[j]);
+				if (level == sc.levels[j] && dx != array{ -1 })
+					dx = lina::AddVectors(dx, sc.diffs_ind[j]);
 			}
 		}
-		if (!base_ind.empty()) {
-			sc_new.basis_ind.push_back(std::move(base_ind));
-			sc_new.diffs_ind.push_back(std::move(diff_ind));
-			sc_new.levels.push_back(sc.levels[i]);
-		}
-		else if (diff_ind != array{ -1 } && !diff_ind.empty()) {
-			image = std::move(diff_ind);
-			level_image = kLevelMax - sc.levels[i];
-		}
 	}
+	if (dx != array{ -1 } && !dx.empty()) {
+		image = std::move(dx);
+		level_image = kLevelMax - level;
+	}
+
+	/* Triangularize the rest */
+	for (; i < sc.basis_ind.size(); ++i) {
+		for (size_t j = i_insert; j < i; ++j) {
+			if (std::binary_search(sc.basis_ind[i].begin(), sc.basis_ind[i].end(), sc.basis_ind[j][0])) {
+				sc.basis_ind[i] = lina::AddVectors(sc.basis_ind[i], sc.basis_ind[j]);
+				if (sc.levels[i] == sc.levels[j] && sc.diffs_ind[i] != array{ -1 })
+					sc.diffs_ind[i] = lina::AddVectors(sc.diffs_ind[i], sc.diffs_ind[j]);
+			}
+		}
 #ifdef _DEBUG
-	if (sc_new.basis_ind.size() != sc.basis_ind.size())
-		throw MyException(0xdd696043U, "BUG: triangularize()");
+		if (sc.basis_ind[i].empty())
+			throw MyException(0xfe35902dU, "BUG: triangularize()");
 #endif
-	return sc_new;
+	}
+}
+
+void UpdateStaircase(Staircases1d& basis_ss, const Deg& deg, const Staircase& sc_i, size_t i_insert, array x, array dx, int level, array& image, int& level_image)
+{
+	if (basis_ss.back().find(deg) == basis_ss.back().end())
+		basis_ss.back()[deg] = sc_i;
+	triangularize(basis_ss.back()[deg], i_insert, std::move(x), std::move(dx), level, image, level_image);
 }
 
 /* Add d_r(x)=dx and d_r^{-1}(dx)=x. */
@@ -263,11 +288,10 @@ void AddDiff(Staircases1d& basis_ss, const Deg& deg_x, array x, array dx, int r)
 		return;
 	}
 
-	/* If x is in Ker(d_r) then dx is in Im(d_{r-2}) */
 	const Staircase& sc = GetRecentStaircase(basis_ss, deg_x);
 	size_t first_Nmr = GetFirstIndexOfLevel(sc, kLevelMax - r);
 	x = lina::Residue(sc.basis_ind.begin(), sc.basis_ind.begin() + first_Nmr, x);
-	if (x.empty()) {
+	if (x.empty()) { /* If x is in Ker(d_r) then dx is in Im(d_{r-2}) */
 		if (dx != array{ -1 } && !dx.empty())
 			AddImage(basis_ss, deg_dx, std::move(dx), { -1 }, r - 2);
 		return;
@@ -279,14 +303,15 @@ void AddDiff(Staircases1d& basis_ss, const Deg& deg_x, array x, array dx, int r)
 		size_t first_Nmrp2 = GetFirstIndexOfLevel(sc, kLevelMax - r + 2);
 		x = lina::Residue(sc.basis_ind.begin() + first_Nmr, sc.basis_ind.begin() + first_Nmrp2, x);
 		if (!x.empty()) {
-			basis_ss.back()[deg_x] = triangularize(sc, first_Nmrp2, x, { -1 }, kLevelMax - r, image_new, level_image_new);
+			UpdateStaircase(basis_ss, deg_x, sc, first_Nmrp2, x, { -1 }, kLevelMax - r, image_new, level_image_new);
 		}
 	}
 	else if (dx.empty()) { /* If the target is zero, insert it to the end of level N-r-2 */
-		basis_ss.back()[deg_x] = triangularize(sc, first_Nmr, x, { -1 }, kLevelMax - r - 2, image_new, level_image_new);
+		UpdateStaircase(basis_ss, deg_x, sc, first_Nmr, x, { -1 }, kLevelMax - r - 2, image_new, level_image_new);
 	}
 	else { /* Otherwise insert it to the beginning of level N-r */
-		basis_ss.back()[deg_x] = triangularize(sc, first_Nmr, x, dx, kLevelMax - r, image_new, level_image_new); //
+		//size_t first_Nmrp2_null = GetFirstIndexOfLevelNull(sc, kLevelMax - r + 2);
+		UpdateStaircase(basis_ss, deg_x, sc, first_Nmr, x, dx, kLevelMax - r, image_new, level_image_new); //
 	}
 
 	if (level_image_new != -1) {
@@ -328,10 +353,10 @@ void AddImage(Staircases1d& basis_ss, const Deg& deg_dx, array dx, array x, int 
 		size_t first_rp2 = GetFirstIndexOfLevel(sc, r + 2);
 		dx = lina::Residue(sc.basis_ind.begin() + first_r, sc.basis_ind.begin() + first_rp2, dx);
 		if (!dx.empty())
-			basis_ss.back()[deg_dx] = triangularize(sc, first_rp2, dx, x, r, image_new, level_image_new);
+			UpdateStaircase(basis_ss, deg_dx, sc, first_rp2, dx, x, r, image_new, level_image_new);
 	}
 	else { /* Otherwise insert it to the beginning of level r */
-		basis_ss.back()[deg_dx] = triangularize(sc, first_r, dx, x, r, image_new, level_image_new);
+		UpdateStaircase(basis_ss, deg_dx, sc, first_r, dx, x, r, image_new, level_image_new); //
 	}
 
 	if (level_image_new != -1) {
@@ -349,7 +374,7 @@ void AddImage(Staircases1d& basis_ss, const Deg& deg_dx, array dx, array x, int 
 
 /* Add d_r(x)=dx and all its implications.
  * deg_x must be in basis_ss. */
-void SetDiff(const grbn::GbWithCache& gb, const std::map<Deg, Mon1d>& basis, Staircases1d& basis_ss, Deg deg_x, array x, array dx, int r, int t_max /*= -1*/)
+void SetDiff(const grbn::GbWithCache& gb, const std::map<Deg, Mon1d>& basis, Staircases1d& basis_ss, Deg deg_x, array x, array dx, int r, int t_max /*= -1*/) //TODO: check if there is a change
 {
 	if (t_max == -1)
 		t_max = basis.rbegin()->first.t;
