@@ -11,6 +11,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="E4_to_E4t.cpp" />
     <ClCompile Include="generate_E4t.cpp" />
     <ClCompile Include="generate_E4t_1.cpp" />
     <ClCompile Include="main_E4t.cpp" />

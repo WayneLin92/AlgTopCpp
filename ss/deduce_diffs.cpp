@@ -40,7 +40,7 @@ int DeduceZeroDiffs(const grbn::GbWithCache& gb, const std::map<Deg, Mon1d>& bas
 		for (size_t i = 0; i < sc.levels.size(); ++i) {
 			if (sc.diffs_ind[i] == array{ -1 } && sc.levels[i] > kLevelMax / 2) {
 				int r = kLevelMax - sc.levels[i];
-				auto [count_tgt, deg_tgt, index_tgt] = CountTgt(basis_ss, p->first, r);
+				auto [count_tgt, deg_tgt, index_tgt] = CountTgt(basis_ss, p->first, r); /* Find the first possible d_r1 target */
 				if (count_tgt > 0) {
 					if (p->first.v - deg_tgt.v > r) {
 						SetDiff(gb, basis, basis_ss, p->first, sc.basis_ind[i], {}, p->first.v - deg_tgt.v - 2, t_test);
@@ -100,8 +100,8 @@ int DeduceDiffsForEt(const grbn::GbWithCache& gb, const std::map<Deg, Mon1d>& ba
 			else if (count_tgt == 0 && count_src > 1) { /* It is a permanent cycle */
 				if (sc.levels[index] > kLevelMax / 2) {
 					++count_new_diffs;
-					SetDiff(gb, basis, basis_ss, deg, sc.basis_ind[index], array{}, kLevelMax / 2 + 2, t_test);
-					AddImage(basis_ss, deg, sc.basis_ind[index], { -1 }, kLevelMax / 2 - 1);
+					SetDiff(gb, basis, basis_ss, deg, sc.basis_ind[index], {}, kLevelMax / 4, t_test); //
+					AddImage(basis_ss, deg, sc.basis_ind[index], { -1 }, kLevelMax / 2 - 1); //
 				}
 			}
 			else if ((level < kLevelMax / 2 || count_tgt == 0) && count_src == 0) /* It is a nontrivial permanent cycle */
@@ -116,7 +116,7 @@ int DeduceDiffsForEt(const grbn::GbWithCache& gb, const std::map<Deg, Mon1d>& ba
  * Return 1 if there exists a global structure 
  * Return 2 if the search space is too big
  * Return 3 if maximum number of iterations is reached */
-int FindGlobalStructure(const grbn::GbWithCache& gb, const std::map<Deg, Mon1d>& basis, Staircases1d& basis_ss, int t_max, int iter_max, bool bForEt = false, int t_test = -1)
+int FindGlobalStructure(const grbn::GbWithCache& gb, const std::map<Deg, Mon1d>& basis, Staircases1d& basis_ss, int t_max, int iter_max, bool bForEt, int t_test)
 {
 	if (iter_max == 0)
 		return 3; /* maximum number of iterations is reached */
@@ -218,7 +218,7 @@ int DeduceDiffsByTrying(const grbn::GbWithCache& gb, const std::map<Deg, Mon1d>&
 		const Deg& deg = degs[index_degs];
 		const Staircase& sc = GetRecentStaircase(basis_ss, deg);
 		const NullDiff& nd = nullDiffs.null_diffs_.at(deg);
-		if (nd.index == -1 || nd.num_tgts > 8) // skip if there are too many possible targets
+		if (nd.index == -1 || nd.num_tgts > 10) // skip if there are too many possible targets
 			continue;
 		const int r = kLevelMax - sc.levels[nd.index];
 		const Deg deg_tgt = deg + Deg{ 1, 0, -r };
@@ -235,7 +235,7 @@ int DeduceDiffsByTrying(const grbn::GbWithCache& gb, const std::map<Deg, Mon1d>&
 					tgt = lina::AddVectors(tgt, sc_tgt.basis_ind[(size_t)nd.first_r + j]);
 			}
 
-			//std::cout << "Try " << i + 1 << '/' << (1 << nd.num_tgts) << ": " << deg << " d_{" << r << '}' << src << '=' << tgt;
+			//std::cout << "Try " << i + 1 << '/' << (1 << nd.num_tgts) << ": " << deg << " d_{" << r << '}' << src << '=' << tgt << '\n';
 
 			if (i == (1 << nd.num_tgts) - 1 && count_pass == 0) {
 				//std::cout << " Accepted\n";
@@ -283,7 +283,128 @@ int DeduceDiffsByTrying(const grbn::GbWithCache& gb, const std::map<Deg, Mon1d>&
 			ApplyRecentChanges(basis_ss);
 			++count_new_diffs;
 
-			if (timer.Elapsed() > 32400) { //
+			if (timer.Elapsed() > 3600.0 * 5) { //
+				timer.SuppressPrint();
+				break;
+			}
+		}
+	}
+	return count_new_diffs;
+}
+
+int DeduceDiffsByNat(const grbn::GbWithCache& gb, const std::map<Deg, Mon1d>& basis, Staircases1d& basis_ss, const Poly1d& gen_to_E4t,
+	const std::vector<Deg>& gen_degs1, const grbn::GbWithCache& gb1, const std::map<Deg, Mon1d>& basis1, Staircases1d& basis_ss1, 
+	int t_try, int t_test, int iter_max, bool bForEt = false)
+{
+	Timer timer;
+	int count_new_diffs = 0;
+	NullDiffs nullDiffs;
+	nullDiffs.InitNullDiffs(basis_ss, t_try, true);
+
+	/* List the degrees */
+	std::vector<Deg> degs;
+	array nums_tgts;
+	for (auto p = nullDiffs.null_diffs_.begin(); p != nullDiffs.null_diffs_.end(); ++p) {
+		int num_tgts = nullDiffs.null_diffs_.at(p->first).num_tgts;
+		if (num_tgts <= 10 && num_tgts >= 0) {
+			degs.push_back(p->first);
+			nums_tgts.push_back(num_tgts);
+		}
+	}
+	array indices_degs = grbn::range((int)degs.size());
+	std::stable_sort(indices_degs.begin(), indices_degs.end(), [nums_tgts](int i1, int i2) {return nums_tgts[i1] < nums_tgts[i2]; });
+
+	int index_count = 0;
+	for (int index_degs : indices_degs) {
+		//std::cout << ++index_count << '/' << indices_degs.size() << " " << count_new_diffs << "      \r";
+		const Deg& deg = degs[index_degs];
+		const Staircase& sc = GetRecentStaircase(basis_ss, deg);
+		const NullDiff& nd = nullDiffs.null_diffs_.at(deg);
+		if (nd.index == -1 || nd.num_tgts > 10) // skip if there are too many possible targets
+			continue;
+		const int r = kLevelMax - sc.levels[nd.index];
+		const Deg deg_tgt = deg + Deg{ 1, 0, -r };
+		array src = sc.basis_ind[nd.index];
+		array tgt_pass;
+
+		Poly poly_src = src.empty() ? Poly{} : indices_to_Poly(src, basis.at(deg));
+		Poly poly_src_image = poly_src.empty() ? Poly{} : get_image(poly_src, gen_to_E4t, gb1);
+		Deg deg1 = get_deg(poly_src_image, gen_degs1);
+		array src_image = poly_src_image.empty() ? array{} : Poly_to_indices(poly_src_image, basis1.at(deg1));
+
+		int count_pass = 0;
+		for (int i = 0; i < (1 << nd.num_tgts); ++i) {
+			/* Calculate tgt */
+			array tgt;
+			if (nd.num_tgts > 0) {
+				const Staircase& sc_tgt = GetRecentStaircase(basis_ss, deg_tgt);
+				for (int j : two_expansion((1 << nd.num_tgts) - 1 - i))
+					tgt = lina::AddVectors(tgt, sc_tgt.basis_ind[(size_t)nd.first_r + j]);
+			}
+
+			Poly poly_tgt = tgt.empty() ? Poly{} : indices_to_Poly(tgt, basis.at(deg_tgt));
+			Poly poly_tgt_image = poly_tgt.empty() ? Poly{} : get_image(poly_tgt, gen_to_E4t, gb1);
+			Deg deg1_tgt = get_deg(poly_tgt_image, gen_degs1);
+			array tgt_image = poly_tgt_image.empty() ? array{} : Poly_to_indices(poly_tgt_image, basis1.at(deg1_tgt));
+
+			std::cout << "Try " << i + 1 << '/' << (1 << nd.num_tgts) << ": " << deg << " d_{" << r << '}' << src << '=' << tgt;
+			std::cout << "-> " << deg1 << " d_{" << r << '}' << src_image << '=' << tgt_image;
+
+			if (i == (1 << nd.num_tgts) - 1 && count_pass == 0) {
+				std::cout << " Accepted\n";
+				tgt_pass = tgt;
+				++count_pass;
+				break;
+			}
+
+			basis_ss1.push_back({}); /* Warning: invalidate references sc above */
+			bool bException = false;
+			try {
+				if (!src_image.empty() && !poly_tgt_image.empty() && deg1_tgt != deg1 + Deg{ 1, 0, -r })
+					throw SSException(0xf434b447U, "degrees not compatible in E4t");
+				SetDiffV2(gb1, basis1, basis_ss1, deg1, deg1_tgt, src_image, tgt_image, r, -1);
+				/*DeduceZeroDiffs(gb1, basis1, basis_ss1, t_test, true, false, t_test);
+				DeduceDiffsForEt(gb1, basis1, basis_ss1, t_test, false, t_test);
+				if (!FindGlobalStructure(gb1, basis1, basis_ss1, t_try, iter_max, true, t_test))
+					bException = true;*/
+
+				/*SetDiff(gb, basis, basis_ss, deg, src, tgt, r, t_test);
+				DeduceZeroDiffs(gb, basis, basis_ss, t_test, bForEt, false, t_test);
+				if (bForEt)
+					DeduceDiffsForEt(gb, basis, basis_ss, t_test, false, t_test);
+				if (!FindGlobalStructure(gb, basis, basis_ss, t_try, iter_max, bForEt, t_test))
+					bException = true;*/
+			}
+			catch (SSException&) {
+				bException = true;
+			}
+			basis_ss1.pop_back();
+			if (!bException) {
+				std::cout << " Success\n";
+				tgt_pass = std::move(tgt);
+				++count_pass;
+				if (count_pass > 1)
+					break;
+			}
+			else
+				std::cout << " Fail\n";
+		}
+		if (count_pass == 0)
+			throw SSException(0x5b3d7e35U, "no compatible differentials");
+		else if (count_pass == 1) {
+			basis_ss.push_back({});
+			SetDiff(gb, basis, basis_ss, deg, src, tgt_pass, r);
+			//std::cout << deg << " " << nd.num_tgts << " d_{" << r << '}' << src << '=' << tgt_pass << '\n';
+			if (count_new_diffs % 10 == 0) {
+				DeduceZeroDiffs(gb, basis, basis_ss, -1, bForEt);
+				if (bForEt)
+					DeduceDiffsForEt(gb, basis, basis_ss, -1);
+			}
+			nullDiffs.InitNullDiffs(basis_ss, t_try, false);
+			ApplyRecentChanges(basis_ss);
+			++count_new_diffs;
+
+			if (timer.Elapsed() > 3600.0) { //
 				timer.SuppressPrint();
 				break;
 			}
@@ -363,6 +484,45 @@ void WrapDeduceDiffsByTrying(const Database& db, const std::string& table_prefix
 	catch (MyException& e) {
 		std::cerr << "MyError " << std::hex << e.id() << ": " << e.what() << '\n';
 	}
+	/*catch (NoException&) {
+		;
+	}*/
+
+	std::cout << "Changed differentials: " << count << '\n';
+}
+
+void WrapDeduceDiffsByNat(const Database& db, const std::string& table_prefix, const std::string& table_prefix1, std::string& column, 
+	int t_try, int t_test, int iter_max, bool bForEt /*= false*/)
+{
+	Timer timer;
+	const grbn::GbWithCache gb = db.load_gb(table_prefix + "_relations", -1);
+	const std::map<Deg, Mon1d> basis = db.load_basis(table_prefix + "_basis", -1);
+	Staircases1d basis_ss = { db.load_basis_ss(table_prefix + "_ss", -1), {} };
+
+	Poly1d gen_to_E4t = db.load_gen_images(table_prefix + "_generators", column, column == "to_E4t" ? 189 : 230);
+
+	const std::vector<Deg> gen_degs1 = db.load_gen_degs(table_prefix1 + "_generators");
+	const grbn::GbWithCache gb1 = db.load_gb(table_prefix1 + "_relations", t_test);
+	const std::map<Deg, Mon1d> basis1 = db.load_basis(table_prefix1 + "_basis", t_test);
+	Staircases1d basis_ss1 = { db.load_basis_ss(table_prefix1 + "_ss", t_test), {} };
+
+	int count = 0;
+	try {
+		count = DeduceDiffsByNat(gb, basis, basis_ss, gen_to_E4t, gen_degs1, gb1, basis1, basis_ss1, t_try, t_test, iter_max, false);
+
+		db.begin_transaction();
+		db.update_basis_ss(table_prefix + "_ss", basis_ss[1]);
+		db.end_transaction();
+	}
+	/*catch (SSException& e) {
+		std::cerr << "Error code " << std::hex << e.id() << ": " << e.what() << '\n';
+	}*/
+	/*catch (MyException& e) {
+		std::cerr << "MyError " << std::hex << e.id() << ": " << e.what() << '\n';
+	}*/
+	catch (NoException&) {
+		;
+	}
 
 	std::cout << "Changed differentials: " << count << '\n';
 }
@@ -376,19 +536,13 @@ void DeduceDiffs(const Database& db, const std::string& table_prefix, int t_max,
 
 	try {
 		while (true) {
-			int count1 = DeduceZeroDiffs(gb, basis, basis_ss, true);
-			std::cout << "DeduceZeroDiffs: " << count1 << '\n';
+			int count = DeduceDiffsByTrying(gb, basis, basis_ss, -1, -1, 500, bForEt);
+			std::cout << "DeduceDiffsByTrying: " << count << '\n';
 
-			int count2 = DeduceDiffsForEt(gb, basis, basis_ss, -1);
-			std::cout << "DeduceDiffsForEt: " << count2 << '\n';
-
-			int count3 = DeduceDiffsByTrying(gb, basis, basis_ss, -1, -1, 500, true);
-			std::cout << "DeduceDiffsByTrying: " << count3 << '\n';
-
-			if (count1 + count2 + count3 == 0)
+			if (count == 0)
 				break;
 		}
-		while (true) {
+		/*while (true) {
 			int count1 = DeduceZeroDiffs(gb, basis, basis_ss, true);
 			std::cout << "DeduceZeroDiffs: " << count1 << '\n';
 
@@ -413,11 +567,17 @@ void DeduceDiffs(const Database& db, const std::string& table_prefix, int t_max,
 
 			if (count1 + count2 + count3 == 0)
 				break;
-		}
+		}*/
 	}
 	catch (SSException& e)
 	{
-		std::cerr << "Error-" << std::hex << e.id() << ": " << e.what() << '\n';
+		std::cerr << "Error code " << std::hex << e.id() << ": " << e.what() << '\n';
+	}
+	/*catch (SSException& e) {
+		std::cerr << "Error code " << std::hex << e.id() << ": " << e.what() << '\n';
+	}*/
+	catch (MyException& e) {
+		std::cerr << "MyError " << std::hex << e.id() << ": " << e.what() << '\n';
 	}
 	
 	/* insert into the database */

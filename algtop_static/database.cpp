@@ -87,6 +87,16 @@ Poly1d Database::load_gen_reprs(const std::string& table_name) const
 	return reprs;
 }
 
+Poly1d Database::load_gen_images(const std::string& table_name, const std::string& column_name, int t_max) const
+{
+	Poly1d reprs;
+	Statement stmt(*this, "SELECT " + column_name + " FROM " + table_name + (t_max == -1 ? "" : " WHERE t<=" + std::to_string(t_max)) + " ORDER BY gen_id;");
+	while (stmt.step() == SQLITE_ROW)
+		reprs.push_back(str_to_Poly(stmt.column_str(0)));
+	std::cout << column_name << " loaded from " << table_name << ", size=" << reprs.size() << '\n';
+	return reprs;
+}
+
 Mon2d Database::load_leading_terms(const std::string& table_name, int t_max) const
 {
 	Mon2d leadings;
@@ -241,6 +251,20 @@ void Database::save_generators(const std::string& table_name, const std::vector<
 	}
 #ifdef DATABASE_SAVE_LOGGING
 	std::cout << gen_degs.size() - i_start << " generators are inserted into " + table_name + "!\n";
+#endif
+}
+
+void Database::save_gen_images(const std::string& table_name, const std::string& column_name, const Poly1d& gen_images) const
+{
+	Statement stmt_update_generators(*this, "Update " + table_name + " SET " + column_name + "=?1 WHERE gen_id=?2;");
+
+	for (size_t i = 0; i < gen_images.size(); ++i) {
+		stmt_update_generators.bind_str(1, Poly_to_str(gen_images[i]));
+		stmt_update_generators.bind_int(2, (int)i);
+		stmt_update_generators.step_and_reset();
+	}
+#ifdef DATABASE_SAVE_LOGGING
+	std::cout << gen_images.size() << " images are inserted into " + table_name + '.' + column_name + "!\n";
 #endif
 }
 
@@ -511,14 +535,18 @@ Mon str_to_Mon(const char* str_mon)
 std::string Poly_to_str(Poly::const_iterator pbegin, Poly::const_iterator pend) /* Warning: assume the algebra is connected */
 {
 	std::stringstream ss;
+	if (pbegin + 1 == pend && pbegin->empty()) {
+		ss << ';';
+		return ss.str();
+	}
 	for (auto pMon = pbegin; pMon < pend; ++pMon) {
 		for (auto p = pMon->begin(); p != pMon->end(); ++p) {
 			ss << p->gen << ',' << p->exp;
 			if (p + 1 != pMon->end())
-				ss << ",";
+				ss << ',';
 		}
 		if (pMon + 1 != pend)
-			ss << ";";
+			ss << ';';
 	}
 	return ss.str();
 }
@@ -527,7 +555,11 @@ Poly str_to_Poly(const char* str_poly) /* Warning: assume the algebra is connect
 {
 	Poly result;
 	if (str_poly[0] == '\0')
-		return {};
+		return result; /* Return 0 as a polynomial */
+	else if (strcmp(str_poly, ";") == 0) {
+		result.push_back({});
+		return result; /* Return 1 as a polynomial */
+	}
 	std::stringstream ss(str_poly);
 	while (ss.good()) {
 		int gen, exp;

@@ -17,7 +17,7 @@ struct DgaBasis1
 
 /********** FUNCTIONS **********/
 template<typename GbType>
-Poly get_repr(const Poly& poly, const Poly1d& gen_reprs, const GbType& gb)
+Poly get_image(const Poly& poly, const Poly1d& gen_reprs, const GbType& gb)
 {
 	return grbn::evaluate(poly, [&gen_reprs](int i) {return gen_reprs[i]; }, gb);
 }

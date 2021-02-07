@@ -47,6 +47,7 @@ public:
 	std::vector<Deg> load_gen_degs(const std::string& table_name) const;
 	Poly1d load_gen_diffs(const std::string& table_name) const;
 	Poly1d load_gen_reprs(const std::string& table_name) const;
+	Poly1d load_gen_images(const std::string& table_name, const std::string& column_name, int t_max) const;
 	Mon2d load_leading_terms(const std::string& table_name, int t_max) const;
 	Poly1d load_gb(const std::string& table_name, int t_max) const;
 	std::map<Deg, int> load_indices(const std::string& table_name, int t_max) const;
@@ -58,6 +59,7 @@ public:
 public:
 	void save_generators(const std::string& table_name, const std::vector<Deg>& gen_degs, const Poly1d& gen_reprs, size_t i_start) const;
 	void save_generators(const std::string& table_name, const std::vector<Deg>& gen_degs, const Poly1d& gen_reprs) const { save_generators(table_name, gen_degs, gen_reprs, 0); }
+	void save_gen_images(const std::string& table_name, const std::string& column_name, const Poly1d& gen_images) const;
 	void save_gb(const std::string& table_name, const Poly1d& gb, const std::vector<Deg>& gen_degs, size_t i_start) const;
 	void save_gb(const std::string& table_name, const Poly1d& gb, const std::vector<Deg>& gen_degs) const { save_gb(table_name, gb, gen_degs, 0); }
 	void save_basis(const std::string& table_name, const std::map<Deg, Mon1d>& basis) const;

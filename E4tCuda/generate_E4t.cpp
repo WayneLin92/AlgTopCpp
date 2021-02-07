@@ -206,7 +206,7 @@ Poly1d FindRels(std::map<Deg, Mon1d>& basis_HB, const std::map<Deg, DgaBasis1>& 
 
 		array2d map_repr;
 		for (const Mon& mon : basis_HB[d]) {
-			array repr = lina::Residue(image_diff, Poly_to_indices(get_repr({ mon }, gen_reprs_B, gb_A), basis_B_s));
+			array repr = lina::Residue(image_diff, Poly_to_indices(get_image({ mon }, gen_reprs_B, gb_A), basis_B_s));
 			map_repr.push_back(std::move(repr));
 		}
 		array2d image_repr, kernel_repr, g_repr;
@@ -222,7 +222,7 @@ Poly1d FindRels(std::map<Deg, Mon1d>& basis_HB, const std::map<Deg, DgaBasis1>& 
 	return result;
 }
 
-void generate_HB(const Database& db, const int t_max, const int t_max_compute=-1, bool drop_existing=false)
+void generate_HB(const Database& db, int t_max, int t_max_compute=-1, bool drop_existing=false)
 {
 	/*# Load data */
 	size_t index_x = (size_t)db.get_int("SELECT COUNT(*) FROM A_generators;") - 1; /* the gen_id of Xn is index_x + n */
@@ -413,7 +413,7 @@ void generate_HB(const Database& db, const int t_max, const int t_max_compute=-1
 				Poly1d cy_inv;
 				for (const Poly1d& yk : y_new) {
 					Poly cyk = c[i] * yk[0];
-					Poly cyk_repr = get_repr(cyk, gen_reprs_HA[i], gb_A0);
+					Poly cyk_repr = get_image(cyk, gen_reprs_HA[i], gb_A0);
 					cy_inv.push_back(d_inv(cyk_repr, gen_degs_B, gen_diffs_B, gb_A0, basis_A0, basis_X[i]));
 				}
 				if (t == t_x * 2) { /* Add [x^2] */
@@ -424,7 +424,7 @@ void generate_HB(const Database& db, const int t_max, const int t_max_compute=-1
 				for (size_t j = 0; j < y_new.size(); ++j) { /* Add [xy+d^{-1}(cy)] */
 					gen_degs_HA[i + 1].push_back(deg_x + get_deg(y_new[j][0], gen_degs_HA[i]));
 					gen_degs_t_HA[i + 1].push_back(gen_degs_HA[i + 1].back().t);
-					gen_reprs_HA[i + 1].push_back(Mon{ {int(index_x + i + 1), 1} } * get_repr(y_new[j][0], gen_reprs_HA[i], gb_A0) + cy_inv[j]);
+					gen_reprs_HA[i + 1].push_back(Mon{ {int(index_x + i + 1), 1} } * get_image(y_new[j][0], gen_reprs_HA[i], gb_A0) + cy_inv[j]);
 				}
 
 				/* Add new relations to HA[i + 1]. Compute degrees of relations first. */
