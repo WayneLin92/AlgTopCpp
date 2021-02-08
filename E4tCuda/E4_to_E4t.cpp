@@ -30,7 +30,7 @@ void generate_map_E4_E4t_loc()
 	Database db_E4t(R"(C:\Users\lwnpk\Documents\MyProgramData\Math_AlgTop\database\E4t.db)");
 	Database db_tmp(R"(C:\Users\lwnpk\Documents\MyProgramData\Math_AlgTop\database\tmp.db)");
 	int t_max = 230;
-	int t_max_E2t = 189;
+	int t_max_E2t = 100;
 	std::vector<Deg> gen_degs_E2t = db_E4t.load_gen_degs("B_generators");
 	Poly1d gen_diffs_E2t = db_E4t.load_gen_diffs("B_generators");
 	grbn::GbWithCache gb_E2t = db_E4t.load_gb("A_relations", t_max_E2t);
@@ -58,7 +58,7 @@ void generate_map_E4_E4t_loc_sq0()
 	Database db_E4t(R"(C:\Users\lwnpk\Documents\MyProgramData\Math_AlgTop\database\E4t.db)");
 	Database db_tmp(R"(C:\Users\lwnpk\Documents\MyProgramData\Math_AlgTop\database\tmp.db)");
 	int t_max = 230;
-	int t_max_E2t = 189;
+	int t_max_E2t = 120;
 	std::vector<Deg> gen_degs_E2t = db_E4t.load_gen_degs("B_generators");
 	Poly1d gen_diffs_E2t = db_E4t.load_gen_diffs("B_generators");
 	grbn::GbWithCache gb_E2t = db_E4t.load_gb("A_relations", t_max_E2t);
@@ -83,6 +83,7 @@ void generate_map_E4_E4t_loc_sq0()
 
 int main_generate_E4_to_E4t(int argc, char** argv)
 {
+	generate_map_E4_E4t();
 	generate_map_E4_E4t_loc();
 	generate_map_E4_E4t_loc_sq0();
 	return 0;

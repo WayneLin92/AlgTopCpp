@@ -191,5 +191,6 @@ Poly proj(const Poly& poly, const std::vector<Deg>& gen_degs, const Poly1d& gen_
 	array2d image1, kernel1, g1;
 	lina::SetLinearMap(map_repr, image1, kernel1, g1);
 
-	return indices_to_Poly(lina::GetImage(image1, g1, Poly_to_indices(poly, basis_d)), basis_H[d]);
+	array poly_ind_mod_boundary = lina::Residue(image, Poly_to_indices(poly, basis_d));
+	return indices_to_Poly(lina::GetImage(image1, g1, std::move(poly_ind_mod_boundary)), basis_H[d]);
 }
