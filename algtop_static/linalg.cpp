@@ -169,7 +169,7 @@ array GetImage(array2dIt spaceV_first, array2dIt spaceV_last, array2dIt f_first,
 			v = AddVectors(v, *p_Vi);
 			result = AddVectors(result, *p_fi);
 		}
-#if _DEBUG
+#ifdef _DEBUG
 	if (!v.empty()) {
 		throw MyException(0x6a4fe8a1U, "v is not in spaceV");
 	}

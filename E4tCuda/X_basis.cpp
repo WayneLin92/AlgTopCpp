@@ -1,4 +1,5 @@
 #include "main_E4t.h"
+#include "myexception.h"
 
 /* return a basis for polynomails of xi for t<=t_max */
 std::map<Deg, DgaBasis1> get_basis_X(const std::vector<Deg>& gen_degs, const Poly1d& gen_diffs, int start_x, int num_x, int t_max)
@@ -46,7 +47,7 @@ void save_basis_X(Database& db, int start_x, int num_x)
 
 	std::string table_name = "X" + std::to_string(num_x) + "_basis";
 	try { db.execute_cmd("DROP TABLE " + table_name + ';'); }
-	catch (const char*) {}
+	catch (MyException&) {}
 	db.execute_cmd("CREATE TABLE " + table_name + " (mon_id INTEGER PRIMARY KEY, mon TEXT NOT NULL UNIQUE, diff TEXT, s SMALLINT, t SMALLINT, v SMALLINT);");
 	Statement stmt(db, "INSERT INTO " + table_name + " (s, t, v, mon, diff) VALUES (?1, ?2, ?3, ?4, ?5);");
 

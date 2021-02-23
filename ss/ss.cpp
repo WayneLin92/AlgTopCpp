@@ -58,8 +58,10 @@ void generate_basis(const Database& db, const std::string& table_prefix, int t_m
 /* generate the differetials on the monomials */
 void generate_mon_diffs(const Database& db, const std::string& table_prefix, int r)
 {
-	/* load gen_degs, gen_diffs, gb and basis */
+	DiffType d_type = GetDiffType(table_prefix);
+	auto [s_diff, t_diff] = GetST(d_type);
 
+	/* load gen_degs, gen_diffs, gb and basis */
 	std::vector<Deg> gen_degs = db.load_gen_degs(table_prefix + "_generators");
 	Poly1d gen_diffs = db.load_gen_diffs(table_prefix + "_generators");
 	Poly1d gb = db.load_gb(table_prefix + "_relations", -1);
@@ -67,7 +69,6 @@ void generate_mon_diffs(const Database& db, const std::string& table_prefix, int
 	std::map<Deg, Poly1d> mon_diffs = db.load_mon_diffs(table_prefix + "_basis", basis, r, -1);
 
 	/* compute diffs */
-
 	Statement stmt(db, "UPDATE " + table_prefix + "_basis SET diff=?1 WHERE mon=?2;");
 
 	db.begin_transaction();
@@ -91,7 +92,7 @@ void generate_mon_diffs(const Database& db, const std::string& table_prefix, int
 				Deg d1 = d - gen_degs[gen_id];
 				size_t index_mon1 = std::lower_bound(basis.at(d1).begin(), basis.at(d1).end(), mon1) - basis.at(d1).begin();
 				mon_diffs[d].push_back(grbn::Reduce(add(mul(gen_diffs[gen_id], mon1), mul({ {gen_id, 1} }, mon_diffs[d1][index_mon1])), gb));
-				Deg d_diff = d + Deg{ 1, 0, -r };
+				Deg d_diff = d + Deg{ s_diff, t_diff, -r };
 				diff_indices = Poly_to_indices(mon_diffs[d][i], basis[d_diff]);
 			}
 			std::string str_diff(array_to_str(diff_indices));
@@ -106,6 +107,8 @@ void generate_mon_diffs(const Database& db, const std::string& table_prefix, int
 /* generate the table of the spectral sequence */
 void generate_ss(const Database& db, const std::string& table_basis, const std::string& table_ss, int r)
 {
+	int s_diff = 1; //
+	int t_diff = 0; //
 	std::map<Deg, array2d> mon_diffs_ind = db.load_mon_diffs_ind(table_basis, -1, true);
 	std::map<Deg, Staircase> basis_ss;
 
@@ -144,7 +147,7 @@ void generate_ss(const Database& db, const std::string& table_basis, const std::
 		lina::SetLinearMapV2(indices_non_boundaries, map_diff, image, kernel, g);
 
 		/* fill Im(d_r) */
-		Deg deg_diff = deg + Deg{ 1, 0, -r };
+		Deg deg_diff = deg + Deg{ s_diff, t_diff, -r }; //E4h0
 		for (size_t i = 0; i < image.size(); ++i) {
 			basis_ss[deg_diff].basis_ind.push_back(std::move(image[i]));
 			basis_ss[deg_diff].diffs_ind.push_back(std::move(g[i]));

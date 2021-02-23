@@ -2,6 +2,7 @@
 #include "linalg.h"
 #include "benchmark.h"
 #include "mycuda_public.h"
+#include "myexception.h"
 
 #define MULTITHREAD
 #define BENCHMARK
@@ -235,7 +236,7 @@ void generate_HB(const Database& db, int t_max, int t_max_compute=-1, bool drop_
 		t_min = 0;
 	else {
 		try { t_min = db.get_int("SELECT MAX(t) FROM HA1_basis;") + 1; } ////
-		catch (const char*) { t_min = 0; }
+		catch (MyException&) { t_min = 0; }
 	}
 	std::vector<Deg> gen_degs_B = db.load_gen_degs("B_generators");
 	Poly1d gen_diffs_B = db.load_gen_diffs("B_generators");
@@ -269,7 +270,7 @@ void generate_HB(const Database& db, int t_max, int t_max_compute=-1, bool drop_
 
 		/* Load gen_degs_HA */
 		try { db.execute_cmd("CREATE TABLE " + table_prefix + "_generators (gen_id INTEGER PRIMARY KEY, gen_name TEXT UNIQUE, gen_diff TEXT, repr TEXT, s SMALLINT, t SMALLINT, v SMALLINT);"); }
-		catch (const char*) {}
+		catch (MyException&) {}
 		if (i > 0 && drop_existing) db.execute_cmd("DELETE FROM " + table_prefix + "_generators;");
 		gen_degs_HA.push_back(db.load_gen_degs(table_prefix + "_generators"));
 
@@ -283,7 +284,7 @@ void generate_HB(const Database& db, int t_max, int t_max_compute=-1, bool drop_
 
 		/* Load gb_HA */
 		try { db.execute_cmd("CREATE TABLE " + table_prefix + "_relations (leading_term TEXT, basis TEXT, s SMALLINT, t SMALLINT, v SMALLINT);"); }
-		catch (const char*) {}
+		catch (MyException&) {}
 		if (i > 0 && drop_existing) db.execute_cmd("DELETE FROM " + table_prefix + "_relations;");
 		gb_HA.push_back(db.load_gb(table_prefix + "_relations", t_max));
 
@@ -295,7 +296,7 @@ void generate_HB(const Database& db, int t_max, int t_max_compute=-1, bool drop_
 
 		/* Load basis_HA */
 		try { db.execute_cmd("CREATE TABLE " + table_prefix + "_basis  (mon_id INTEGER PRIMARY KEY, mon TEXT NOT NULL UNIQUE, diff TEXT, repr TEXT, s SMALLINT, t SMALLINT, v SMALLINT);"); }
-		catch (const char*) {}
+		catch (MyException&) {}
 		if (drop_existing && i > 0) db.execute_cmd("DELETE FROM " + table_prefix + "_basis;");
 		basis_HA.push_back(db.load_basis(table_prefix + "_basis", t_max));
 
@@ -305,38 +306,38 @@ void generate_HB(const Database& db, int t_max, int t_max_compute=-1, bool drop_
 		if (i < n){
 			/* Load y and t_y */
 			try { db.execute_cmd("CREATE TABLE " + table_prefix + "_y  (y TEXT, t SMALLINT);"); }
-			catch (const char*) {}
+			catch (MyException&) {}
 			y.push_back({}); t_y.push_back({});
 			if (drop_existing) db.execute_cmd("DELETE FROM " + table_prefix + "_y;");
 			load_y(db, table_prefix + "_y", y.back(), t_y.back());
 
 			/* Load map_gen_id */
 			try { db.execute_cmd("CREATE TABLE " + table_prefix + "_map_gen_id  (gen_id INT);"); }
-			catch (const char*) {}
+			catch (MyException&) {}
 			if (drop_existing) db.execute_cmd("DELETE FROM " + table_prefix + "_map_gen_id;");
 			map_gen_id.push_back(db.get_ints(table_prefix + "_map_gen_id", "gen_id"));
 
 			/* Load gb_HA_ann_c */
 			try { db.execute_cmd("CREATE TABLE " + table_prefix + "_ann_c_gb (leading_term TEXT, basis TEXT, s SMALLINT, t SMALLINT, v SMALLINT);"); }
-			catch (const char*) {}
+			catch (MyException&) {}
 			if (drop_existing) db.execute_cmd("DELETE FROM " + table_prefix + "_ann_c_gb;");
 			gb_HA_ann_c.push_back(db.load_gb(table_prefix + "_ann_c_gb", t_max));
 
 			/* Load gb_HA_ann_y */
 			try { db.execute_cmd("CREATE TABLE " + table_prefix + "_ann_y_gb (leading_term TEXT, basis TEXT, s SMALLINT, t SMALLINT, v SMALLINT);"); }
-			catch (const char*) {}
+			catch (MyException&) {}
 			if (drop_existing) db.execute_cmd("DELETE FROM " + table_prefix + "_ann_y_gb;");
 			gb_HA_ann_y.push_back(db.load_gb(table_prefix + "_ann_y_gb", t_max));
 
 			/* Load gb_HA_ind_y */
 			try { db.execute_cmd("CREATE TABLE " + table_prefix + "_ind_y_gb (leading_term TEXT, basis TEXT, s SMALLINT, t SMALLINT, v SMALLINT);"); }
-			catch (const char*) {}
+			catch (MyException&) {}
 			if (drop_existing) db.execute_cmd("DELETE FROM " + table_prefix + "_ind_y_gb;");
 			gb_HA_ind_y.push_back(db.load_gb(table_prefix + "_ind_y_gb", t_max));
 
 			/* Load gb_HA_ind_a */
 			try { db.execute_cmd("CREATE TABLE " + table_prefix + "_ind_a_gb (leading_term TEXT, basis TEXT, s SMALLINT, t SMALLINT, v SMALLINT);"); }
-			catch (const char*) {}
+			catch (MyException&) {}
 			if (drop_existing) db.execute_cmd("DELETE FROM " + table_prefix + "_ind_a_gb;");
 			gb_HA_ind_a.push_back(db.load_gb(table_prefix + "_ind_a_gb", t_max));
 
@@ -500,18 +501,17 @@ void generate_HB(const Database& db, int t_max, int t_max_compute=-1, bool drop_
 
 int main_test_51e8aa0a(int argc, char** argv)
 {
-	Database db(R"(C:\Users\lwnpk\Documents\MyProgramData\Math_AlgTop\database\HB.db)");
+	Database db(R"(C:\Users\lwnpk\Documents\MyProgramData\Math_AlgTop\database\E4t_benchmark.db)");
 	 
 	return 0;
 }
 
 int main_benchmark_E4t100(int argc, char** argv)
 {
-	Database db(R"(C:\Users\lwnpk\Documents\MyProgramData\Math_AlgTop\database\HB.db)");
+	Database db(R"(C:\Users\lwnpk\Documents\MyProgramData\Math_AlgTop\database\E4t_benchmark.db)");
 	Timer timer;
 	int t_max = 100;
 	generate_HB(db, t_max, -1, true);
-	
 	return 0;
 }
 
