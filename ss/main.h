@@ -32,7 +32,7 @@ public:
 	NoException(unsigned int error_id, const std::string& message) : MyException(error_id, message) {}
 };
 
-struct NullDiff { int index, num_tgts, first_r; };
+struct NullDiff { int index, num_tgts, first; };
 
 class NullDiffs
 {
@@ -77,6 +77,7 @@ inline std::pair<int, int> GetST(DiffType diff_type)
 
 DiffType GetDiffType(const std::string& table_prefix);
 bool IsEt(const std::string& table_prefix);
+bool IsEt(DiffType d_type);
 
 /* Staircase utilities */
 const Staircase& GetRecentStaircase(const Staircases1d& basis_ss, const Deg& deg);
@@ -84,6 +85,7 @@ void ApplyAllChanges(Staircases1d& basis_ss, size_t nHistory = 0);
 void ApplyRecentChanges(Staircases1d& basis_ss);
 std::ostream& operator<<(std::ostream& sout, const Staircase& sc);
 bool NoNullDiff(const Staircases1d& basis_ss, int t);
+NullDiff GetNextNullDiff(const Staircases1d& basis_ss, const Deg& deg, DiffType d_type, int index);
 std::tuple<int, Deg, int> CountTgt(const Staircases1d& basis_ss, const Deg& deg, DiffType d_type, int r);
 std::tuple<int, Deg, int> CountSrc(const Staircases1d& basis_ss, const Deg& deg, DiffType d_type, int level);
 
@@ -92,6 +94,7 @@ void AddImage(Staircases1d& basis_ss, const Deg& deg_dx, DiffType d_type, array 
 void AddDiff(Staircases1d& basis_ss, const Deg& deg_x, DiffType d_type, array x, array dx, int r);
 void SetDiff(const grbn::GbWithCache& gb, const std::map<Deg, Mon1d>& basis, Staircases1d& basis_ss, Deg deg_x, DiffType d_type, array x, array dx, int r, int t_max = -1);
 int SetDiffV2(const grbn::GbWithCache& gb, const std::map<Deg, Mon1d>& basis, Staircases1d& basis_ss, const Deg& deg_x, const Deg& deg_dx, DiffType d_type, array x, array dx, int r, int t_max = -1);
+void SetImage(const grbn::GbWithCache& gb, const std::map<Deg, Mon1d>& basis, Staircases1d& basis_ss, Deg deg_x, DiffType d_type, array x, int r, int t_max = -1);
 
 void DeduceDiffs(const Database& db, const std::string& table_prefix, int t_max);
 
@@ -102,10 +105,10 @@ void generate_next_page(const Database& db, const std::string& table_prefix, con
 
 void WrapDeduceZeroDiffs(const Database& db, const std::string& table_prefix, int t_max);
 void WrapDeduceDiffsForEt(const Database& db, const std::string& table_prefix, int t_max);
-void WrapDeduceDiffsByTrying(const Database& db, const std::string& table_prefix, int t_try, int t_test);
+void WrapDeduceDiffs(const Database& db, const std::string& table_prefix, int t_try, int t_test, int max_poss, int nCheck, double seconds);
 void WrapDeduceDiffsByNat(const Database& db, const std::string& table_prefix, const std::string& table_prefix1, std::string& column,
 	int t_try, int t_test);
-void WrapCheckDiffsByNat(const Database& db, const std::string& table_prefix, const std::string& table_prefix1, std::string& column,
-	int t_try, int t_test);
+void WrapDeduceDiffsByNatV2(const Database& db, const std::string& table_prefix, const std::string& table_prefix1, std::string& column, int t_max);
+void WrapDeduceDiffsForE4(const Database& db, int t_try, int t_test);
 
 #endif

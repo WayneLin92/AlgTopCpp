@@ -68,6 +68,7 @@ void ApplyAllChanges(Staircases1d& basis_ss, size_t nHistory /*= 0*/)
 	basis_ss.resize(nHistory + 1);
 }
 
+/* Combine the last two records in basis_ss */
 void ApplyRecentChanges(Staircases1d& basis_ss)
 {
 	size_t index_before_last = basis_ss.size() - 2;
@@ -114,6 +115,14 @@ size_t GetFirstIndexOfNullOnLevel(const Staircase& sc, int level)
 	return first - sc.levels.begin();
 }
 
+/* Return if x is in the vector space <level */
+bool IsZeroOnLevel(const Staircases1d& basis_ss, const Deg& deg, const array& x, int level)
+{
+	const Staircase& sc = GetRecentStaircase(basis_ss, deg);
+	size_t first_l = GetFirstIndexOnLevel(sc, level);
+	return lina::Residue(sc.basis_ind.begin(), sc.basis_ind.begin() + first_l, x).empty();
+}
+
 /* Return if a possible source of an image can be found */
 bool ExistsSrc(const Staircases1d& basis_ss, const Deg& deg, DiffType d_type, int r)
 {
@@ -143,7 +152,7 @@ bool ExistsTgt(const Staircases1d& basis_ss, const Deg& deg, DiffType d_type, in
 	return false;
 }
 
-/* Return the first index of a source level such that all levels above are already fixed */
+/* Return the first index (>=`level`) such that all levels above are already fixed */
 size_t GetFirstIndexOfFixedLevels(const Staircases1d& basis_ss, const Deg& deg, DiffType d_type, int level)
 {
 	auto [s_diff, t_diff] = GetST(d_type);
@@ -179,13 +188,28 @@ bool NoNullDiff(const Staircases1d& basis_ss, int t) //E4h0
 
 /* Count the number of all possible d_r targets.
  * Return (count, index). */
-std::pair<int, int> CountDrTgt(const Staircases1d& basis_ss, const Deg& deg_tgt, DiffType d_type, int r) //
+std::pair<int, int> CountDrTgt(const Staircases1d& basis_ss, const Deg& deg_tgt, DiffType d_type, int r)
 {
 	std::pair<int, int> result;
 	if (basis_ss.front().find(deg_tgt) != basis_ss.front().end()) {
 		const Staircase& sc_tgt = GetRecentStaircase(basis_ss, deg_tgt);
 		result.second = (int)GetFirstIndexOnLevel(sc_tgt, r);
 		result.first = (int)GetFirstIndexOfFixedLevels(basis_ss, deg_tgt, d_type, kLevelMax - r + 2) - result.second;
+	}
+	else
+		result = { 0, -1 };
+	return result;
+}
+
+/* Count the number of all possible d_r sources.
+ * Return (count, index). */
+std::pair<int, int> CountDrSrc(const Staircases1d& basis_ss, const Deg& deg_src, DiffType d_type, int r)
+{
+	std::pair<int, int> result;
+	if (basis_ss.front().find(deg_src) != basis_ss.front().end()) {
+		const Staircase& sc_src = GetRecentStaircase(basis_ss, deg_src);
+		result.second = (int)GetFirstIndexOnLevel(sc_src, kLevelMax - r);
+		result.first = (int)GetFirstIndexOfFixedLevels(basis_ss, deg_src, d_type, kLevelMax - r + 2) - result.second;
 	}
 	else
 		result = { 0, -1 };
@@ -247,6 +271,43 @@ std::tuple<int, Deg, int> CountSrc(const Staircases1d& basis_ss, const Deg& deg,
 	return std::make_tuple(count, deg_src, index);
 }
 
+/* Return the smallest r1>=r such that d_{r1} has a possible target 
+** Return -1 if not found */
+int NextRTgt(const Staircases1d& basis_ss, const Deg& deg, DiffType d_type, int r)
+{
+	auto [s_diff, t_diff] = GetST(d_type);
+	Deg deg_tgt; int count = 0, index = -1;
+	const Staircase& sc = GetRecentStaircase(basis_ss, deg);
+	for (int r1 = r; r1 <= deg.v; r1 += 2) {
+		Deg d_tgt = deg + Deg{ s_diff, t_diff, -r1 };
+		auto [c, first_r1] = CountDrTgt(basis_ss, d_tgt, d_type, r1);
+		if (c > 0)
+			return r1;
+	}
+	return -1;
+}
+
+/* Return the largest r1<=r such that d_{r1} has a possible target
+** Return -1 if not found */
+int NextRSrc(const Staircases1d& basis_ss, const Deg& deg, DiffType d_type, int r)
+{
+	auto [s_diff, t_diff] = GetST(d_type);
+	Deg deg_src; int count = 0, index = -1;
+	int r_max = std::min(r, 2 * (deg.t - deg.s + 1) - deg.v); //Warning: Vanishing line depends on the spectral sequence
+	const Staircase& sc = GetRecentStaircase(basis_ss, deg);
+	for (int r1 = r_max; r1 >= kLevelMin; r1 -= 2) {
+		Deg d_src = deg - Deg{ s_diff, t_diff, -r1 };
+		if (basis_ss.front().find(d_src) != basis_ss.front().end()) {
+			const Staircase& sc_src = GetRecentStaircase(basis_ss, d_src);
+			int first_Nmr1 = (int)GetFirstIndexOnLevel(sc_src, kLevelMax - r1);
+			int c = (int)GetFirstIndexOfFixedLevels(basis_ss, d_src, d_type, kLevelMax - r1 + 2) - first_Nmr1;
+			if (c > 0)
+				return r1;
+		}
+	}
+	return -1;
+}
+
 NullDiff GetNullDiff(const Staircases1d& basis_ss, const Deg& deg, DiffType d_type)
 {
 	auto [s_diff, t_diff] = GetST(d_type);
@@ -259,6 +320,33 @@ NullDiff GetNullDiff(const Staircases1d& basis_ss, const Deg& deg, DiffType d_ty
 			auto [num_tgts, first_r] = CountDrTgt(basis_ss, deg_tgt, d_type, r);
 			result = { (int)i, num_tgts, first_r };
 			break;
+		}
+	}
+	return result;
+}
+
+/* Get the nulldiff with the smallest index(>=`index`) */
+NullDiff GetNextNullDiff(const Staircases1d& basis_ss, const Deg& deg, DiffType d_type, int index)
+{
+	auto [s_diff, t_diff] = GetST(d_type);
+	NullDiff result{ -1, -1, -1 };
+	const Staircase& sc = GetRecentStaircase(basis_ss, deg);
+	for (size_t i = index; i < sc.diffs_ind.size(); ++i) {
+		if (sc.diffs_ind[i] == array{ -1 }){
+			if (sc.levels[i] < kLevelMax / 2) {
+				int r = sc.levels[i];
+				Deg deg_src = deg - Deg{ s_diff, t_diff, -r };
+				auto [num_srcs, first_src] = CountDrSrc(basis_ss, deg_src, d_type, r);
+				result = { (int)i, num_srcs, first_src };
+				break;
+			}
+			else if (sc.levels[i] > kLevelPC) {
+				int r = kLevelMax - sc.levels[i];
+				Deg deg_tgt = deg + Deg{ s_diff, t_diff, -r };
+				auto [num_tgts, first_tgt] = CountDrTgt(basis_ss, deg_tgt, d_type, r);
+				result = { (int)i, num_tgts, first_tgt };
+				break;
+			}
 		}
 	}
 	return result;
@@ -431,7 +519,7 @@ void AddDiff(Staircases1d& basis_ss, const Deg& deg_x, DiffType d_type, array x,
 		}
 	}
 	else if (dx.empty()) { /* If the target is zero, insert it to the end of level N-r-2 */
-		if (IsEt(d_type) && (deg_x.t - t_diff) <= t_max && !ExistsSrc(basis_ss, deg_x, d_type, kLevelMax) && !ExistsTgt(basis_ss, deg_x, d_type, r + 2))
+		if (IsEt(d_type) && (deg_x.t - t_diff) <= t_max && !ExistsSrc(basis_ss, deg_x, d_type, kLevelMax) && !ExistsTgt(basis_ss, deg_x, d_type, r + 2)) //TODO: Do the same for the image
 			throw SSException(0x32235858U, "No target to resolve the null differential");
 		UpdateStaircase(basis_ss, deg_x, sc, first_Nmr, x, { -1 }, kLevelMax - r - 2, image_new, level_image_new);
 	}
@@ -503,12 +591,24 @@ void AddImage(Staircases1d& basis_ss, const Deg& deg_dx, DiffType d_type, array 
 }
 
 /* Add d_r(x)=dx and all its implications.
- * deg_x must be in basis_ss. */
-void SetDiff(const grbn::GbWithCache& gb, const std::map<Deg, Mon1d>& basis, Staircases1d& basis_ss, Deg deg_x, DiffType d_type, array x, array dx, int r, int t_max)
+ * deg_x must be in basis_ss.
+ * `level` is the original level of x */
+void SetDiff(const grbn::GbWithCache& gb, const std::map<Deg, Mon1d>& basis, Staircases1d& basis_ss, const Deg& deg_x, DiffType d_type, array x, array dx, int r, int level, int t_max /* =-1 */)
 {
 	auto [s_diff, t_diff] = GetST(d_type);
 	if (t_max == -1)
 		t_max = basis.rbegin()->first.t;
+	if (dx.empty()) {
+		r = NextRTgt(basis_ss, deg_x, d_type, r + 2) - 2; /* d_r=0 and d_{r+2} has a possible target */
+		if (r == -1) {
+			if (IsEt(d_type)) {
+				SetImage(gb, basis, basis_ss, deg_x, d_type, x, kLevelMax / 2 - 1, t_max);
+				return;
+			}
+			else
+				r = kLevelMax / 4;
+		}
+	}
 
 	Deg deg_dx = deg_x + Deg{ s_diff, t_diff, -r };
 	for (auto& [deg_y, basis_ss_d_original] : basis_ss.front()) {
@@ -517,47 +617,28 @@ void SetDiff(const grbn::GbWithCache& gb, const std::map<Deg, Mon1d>& basis, Sta
 		if (deg_x.t + deg_y.t > t_max || deg_x.t + deg_y.t + t_diff > t_max)
 			break;
 		for (size_t i = 0; i < basis_ss_d.levels.size(); ++i) {
-			if (basis_ss_d.levels[i] == kLevelMax - r) { /* y is not a d_r cycle */
-				if (basis_ss_d.diffs_ind[i] != array{ -1 }) {
-					Poly poly_x = indices_to_Poly(x, basis.at(deg_x));
-					Poly poly_y = indices_to_Poly(basis_ss_d.basis_ind[i], basis.at(deg_y));
-					Poly poly_xy = grbn::Reduce(poly_x * poly_y, gb);
-					array xy = poly_xy.empty() ? array{} : Poly_to_indices(poly_xy, basis.at(deg_x + deg_y));
-					Poly poly_dx = dx.empty() ? Poly{} : indices_to_Poly(dx, basis.at(deg_dx));
-					Poly poly_dy = basis_ss_d.diffs_ind[i].empty() ? Poly{} : indices_to_Poly(basis_ss_d.diffs_ind[i], basis.at(deg_dy));
-					Poly poly_dxy = grbn::Reduce(poly_x * poly_dy + poly_dx * poly_y, gb);
-					array dxy = poly_dxy.empty() ? array{} : Poly_to_indices(poly_dxy, basis.at(deg_x + deg_dy));
+			if (basis_ss_d.levels[i] > kLevelMax - r || (basis_ss_d.levels[i] == kLevelMax - r && basis_ss_d.diffs_ind[i] == array{ -1 }))
+				break;
+			Poly poly_x = indices_to_Poly(x, basis.at(deg_x));
+			Poly poly_y = indices_to_Poly(basis_ss_d.basis_ind[i], basis.at(deg_y));
+			Poly poly_xy = grbn::Reduce(poly_x * poly_y, gb);
+			array xy = poly_xy.empty() ? array{} : Poly_to_indices(poly_xy, basis.at(deg_x + deg_y));
+			Poly poly_dx = dx.empty() ? Poly{} : indices_to_Poly(dx, basis.at(deg_dx));
+			Poly poly_dy = basis_ss_d.levels[i] < kLevelMax - r ? Poly{} : indices_to_Poly(basis_ss_d.diffs_ind[i], basis.at(deg_dy));
+			Poly poly_dxy = grbn::Reduce(poly_x * poly_dy + poly_dx * poly_y, gb);
+			array dxy = poly_dxy.empty() ? array{} : Poly_to_indices(poly_dxy, basis.at(deg_x + deg_dy));
 
-					AddDiff(basis_ss, deg_x + deg_y, d_type, std::move(xy), std::move(dxy), r);
-				}
-			}
-			else if (r <= basis_ss_d.levels[i] && basis_ss_d.levels[i] < kLevelMax - r) { /* y is a d_r cycle */
-				Poly poly_x = indices_to_Poly(x, basis.at(deg_x));
-				Poly poly_y = indices_to_Poly(basis_ss_d.basis_ind[i], basis.at(deg_y));
-				Poly poly_xy = grbn::Reduce(poly_x * poly_y, gb);
-				array xy = poly_xy.empty() ? array{} : Poly_to_indices(poly_xy, basis.at(deg_x + deg_y));
-				Poly poly_dx = dx.empty() ? Poly{} : indices_to_Poly(dx, basis.at(deg_dx));
-				Poly poly_dxy = grbn::Reduce(poly_dx * poly_y, gb);
-				array dxy = poly_dxy.empty() ? array{} : Poly_to_indices(poly_dxy, basis.at(deg_x + deg_dy));
-
-				AddDiff(basis_ss, deg_x + deg_y, d_type, std::move(xy), std::move(dxy), r);
-			}
+			AddDiff(basis_ss, deg_x + deg_y, d_type, std::move(xy), std::move(dxy), r);
 		}
 	}
 }
 
 /* Check first if it is a new differential before adding differentials */
-int SetDiffV2(const grbn::GbWithCache& gb, const std::map<Deg, Mon1d>& basis, Staircases1d& basis_ss, const Deg& deg_x, const Deg& deg_dx, DiffType d_type, array x, array dx, int r, int t_max)
+int SetDiffV2(const grbn::GbWithCache& gb, const std::map<Deg, Mon1d>& basis, Staircases1d& basis_ss, const Deg& deg_x, const Deg& deg_dx, DiffType d_type, array x, array dx, int r, int t_max /* =-1 */)
 {
-	if (t_max == -1)
-		t_max = basis.rbegin()->first.t;
-	if (deg_x.t > t_max) //TODO: Consider t_diff
-		return 0;
-
 	if (x.empty()) {
-		if (!dx.empty()) {
-			SetDiff(gb, basis, basis_ss, deg_dx, d_type, dx, {}, kLevelMax / 4, t_max); //
-			AddImage(basis_ss, deg_dx, d_type, std::move(dx), array{ -1 }, r - 2); //
+		if (!dx.empty() && !IsZeroOnLevel(basis_ss, deg_dx, dx, r)) {
+			SetImage(gb, basis, basis_ss, deg_dx, d_type, std::move(dx), r - 2, t_max);
 			return 1;
 		}
 	}
@@ -566,4 +647,32 @@ int SetDiffV2(const grbn::GbWithCache& gb, const std::map<Deg, Mon1d>& basis, St
 		return 1;
 	}
 	return 0;
+}
+
+/* Add d_r(?)=x and all its implications.
+ * deg_dx must be in basis_ss. */
+void SetImage(const grbn::GbWithCache& gb, const std::map<Deg, Mon1d>& basis, Staircases1d& basis_ss, Deg deg_x, DiffType d_type, array x, int r, int t_max /* =-1 */)
+{
+	auto [s_diff, t_diff] = GetST(d_type);
+	if (t_max == -1)
+		t_max = basis.rbegin()->first.t;
+	r = NextRSrc(basis_ss, deg_x, d_type, r);
+	if (r == -1)
+		throw SSException(0xbef9931bU, "no source for the image.");
+
+	for (auto& [deg_y, basis_ss_d_original] : basis_ss.front()) {
+		const Staircase& basis_ss_d = GetRecentStaircase(basis_ss, deg_y);
+		if (deg_x.t + deg_y.t > t_max || deg_x.t + deg_y.t + t_diff > t_max)
+			break;
+		for (size_t i = 0; i < basis_ss_d.levels.size(); ++i) {
+			if (basis_ss_d.levels[i] >= kLevelMax - r)
+				break;
+			Poly poly_x = indices_to_Poly(x, basis.at(deg_x));
+			Poly poly_y = indices_to_Poly(basis_ss_d.basis_ind[i], basis.at(deg_y));
+			Poly poly_xy = grbn::Reduce(poly_x * poly_y, gb);
+			array xy = poly_xy.empty() ? array{} : Poly_to_indices(poly_xy, basis.at(deg_x + deg_y));
+
+			AddImage(basis_ss, deg_x + deg_y, d_type, std::move(xy), { -1 }, r);
+		}
+	}
 }
